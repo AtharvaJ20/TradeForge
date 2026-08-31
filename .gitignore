@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment files — NEVER commit; use .env.example as the template
+.env
+.env.local
+.env.*.local
+
+# Test and coverage artefacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Type-checker caches
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linter caches
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude Code project session data
+.claude/
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Alembic
+alembic/versions/__pycache__/

@@ -1,0 +1,121 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tradeforge"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    # Web framework
+    "fastapi[standard]>=0.115.0",
+    # Validation — API layer only; domain layer must not import pydantic
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    # Database
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    # Cache / session store
+    "redis>=5.2.0",
+    # AWS KMS (envelope encryption for broker credentials — ADR-002)
+    "boto3>=1.35.0",
+    # Dev environment only: load .env file; production uses secrets manager
+    "python-dotenv>=1.0.0",
+    # Password hashing — Argon2id (SR-AUTH-001)
+    "argon2-cffi>=23.1.0",
+    # Async SMTP for transactional email (local Mailpit + production Resend via relay)
+    "aiosmtplib>=3.0.0",
+    # Async HTTP client — HIBP k-anonymity check (SR-AUTH-002)
+    "httpx>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    # Async HTTP client for FastAPI TestClient
+    "httpx>=0.28.0",
+    # Type checking
+    "mypy>=1.13.0",
+    "pydantic>=2.9.0",
+    "boto3-stubs[kms]>=1.35.0",
+    "types-redis>=4.6.0",
+    # Linting and formatting
+    "ruff>=0.8.0",
+    # Time travel in tests
+    "freezegun>=1.5.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tradeforge"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# Both fixtures and tests share the session event loop so asyncpg connection pools
+# created in fixtures are reusable within the same test session.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+# Coverage is opt-in: run with --cov=tradeforge --cov-report=term-missing
+addopts = "-v --tb=short"
+
+# ---------------------------------------------------------------------------
+# mypy — strict mode; domain layer must have zero Any without justification
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+# sqlalchemy-stubs are not required; SQLAlchemy 2.x ships its own py.typed
+ignore_missing_imports = false
+exclude = ["alembic/"]
+
+# ---------------------------------------------------------------------------
+# ruff — linter + formatter replacing flake8, isort, pyupgrade
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "ANN", # type annotations
+    "S",   # bandit security
+    "B",   # bugbear
+    "A",   # builtins shadowing
+    "N",   # pep8-naming
+]
+ignore = [
+    "ANN101", # missing type for `self`
+    "ANN102", # missing type for `cls`
+    "S101",   # allow assert in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN", "S"]  # relax annotations and security checks in tests
+"alembic/**" = ["ANN", "N"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src/tradeforge"]
+omit = ["*/migrations/*", "alembic/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

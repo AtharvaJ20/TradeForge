@@ -1,0 +1,103 @@
+/* Design tokens — semantic CSS custom properties.
+   Light values on :root; dark overrides follow.
+   All Tailwind colour utilities reference these vars via tailwind.config.ts. */
+
+:root {
+  /* Text */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+
+  /* Surfaces */
+  --color-surface-base: #ffffff;
+  --color-surface-subtle: #f9fafb;
+  --color-surface-warning: #fffbeb;
+  --color-surface-info: #eff6ff;
+  --color-surface-success: #f0fdf4;
+  --color-surface-danger: #fef2f2;
+  --color-surface-neutral: #f9fafb;
+  --color-surface-danger-subtle: #fee2e2;
+
+  /* Semantic emphasis */
+  --color-warning: #d97706;
+  --color-warning-emphasis: #b45309;
+  --color-info: #2563eb;
+  --color-success: #16a34a;
+  --color-success-emphasis: #15803d;
+  --color-danger: #dc2626;
+  --color-danger-emphasis: #b91c1c;
+  --color-success-subtle: #bbf7d0;
+  --color-danger-subtle: #fecaca;
+
+  /* Borders */
+  --color-border: #e5e7eb;
+  --color-border-focus: #2563eb;
+
+  /* Brand */
+  --color-primary: #2563eb;
+  --color-primary-emphasis: #1d4ed8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-text-primary: #f9fafb;
+    --color-text-secondary: #9ca3af;
+    --color-text-muted: #6b7280;
+
+    --color-surface-base: #111827;
+    --color-surface-subtle: #1f2937;
+    --color-surface-warning: #1c1408;
+    --color-surface-info: #0c1929;
+    --color-surface-success: #052e16;
+    --color-surface-danger: #1c0606;
+    --color-surface-neutral: #1f2937;
+    --color-surface-danger-subtle: #450a0a;
+
+    --color-warning: #fbbf24;
+    --color-warning-emphasis: #f59e0b;
+    --color-info: #60a5fa;
+    --color-success: #4ade80;
+    --color-success-emphasis: #22c55e;
+    --color-danger: #f87171;
+    --color-danger-emphasis: #ef4444;
+    --color-success-subtle: #14532d;
+    --color-danger-subtle: #7f1d1d;
+
+    --color-border: #374151;
+    --color-border-focus: #60a5fa;
+
+    --color-primary: #60a5fa;
+    --color-primary-emphasis: #3b82f6;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
+
+  --color-surface-base: #111827;
+  --color-surface-subtle: #1f2937;
+  --color-surface-warning: #1c1408;
+  --color-surface-info: #0c1929;
+  --color-surface-success: #052e16;
+  --color-surface-danger: #1c0606;
+  --color-surface-neutral: #1f2937;
+  --color-surface-danger-subtle: #450a0a;
+
+  --color-warning: #fbbf24;
+  --color-warning-emphasis: #f59e0b;
+  --color-info: #60a5fa;
+  --color-success: #4ade80;
+  --color-success-emphasis: #22c55e;
+  --color-danger: #f87171;
+  --color-danger-emphasis: #ef4444;
+  --color-success-subtle: #14532d;
+  --color-danger-subtle: #7f1d1d;
+
+  --color-border: #374151;
+  --color-border-focus: #60a5fa;
+
+  --color-primary: #60a5fa;
+  --color-primary-emphasis: #3b82f6;
+}

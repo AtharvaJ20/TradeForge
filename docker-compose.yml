@@ -1,0 +1,151 @@
+# TradeForge — local development backing services
+#
+# Implements LOCAL-DEV-INFRASTRUCTURE.md exactly.
+# The FastAPI application runs OUTSIDE Docker (uvicorn --reload).
+# This file provides only the backing services it depends on.
+#
+# FIRST-TIME SETUP (run these in order):
+#
+#   docker compose up -d
+#   docker compose --profile init run --rm localstack-init
+#   # Copy the KeyMetadata.KeyId from the output above, then set in .env:
+#   # KMS_KEY_ARN=arn:aws:kms:ap-south-1:000000000000:key/<KeyId>
+#
+# NORMAL WORKFLOW:
+#
+#   docker compose up -d      # start all backing services
+#   docker compose down       # stop and remove containers (data volume persists)
+#   docker compose down -v    # stop AND delete the Postgres data volume (clean slate)
+#
+# PORTS (all bound to 127.0.0.1 — not exposed on the network interface):
+#   Postgres  → localhost:5432
+#   Redis     → localhost:6379
+#   LocalStack → localhost:4566
+#   Mailpit SMTP → localhost:1025
+#   Mailpit UI   → http://localhost:8025
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 — matches RDS PostgreSQL 16 production target (ADR-001)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: tradeforge-postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tradeforge_dev
+    volumes:
+      # Named volume: data survives container restarts (LOCAL-DEV-INFRASTRUCTURE.md)
+      - tradeforge_postgres_data:/var/lib/postgresql/data
+      # Creates tradeforge_app and tradeforge_audit users on first init.
+      # Table-level grants (security_audit_log) are applied by Bhima after
+      # running Alembic migrations for the first time.
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-users.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tradeforge_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 — matches ElastiCache Redis 7.x production target (ADR-001)
+  # Ephemeral: --save "" disables persistence (sessions need not survive restart)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: tradeforge-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    # Explicitly disable RDB persistence; sessions are ephemeral by design
+    command: redis-server --save "" --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # LocalStack — KMS-only; replaces AWS KMS for local envelope encryption (ADR-002)
+  # Ephemeral: no volume. Keys are lost on container restart.
+  # Re-run `docker compose --profile init run --rm localstack-init` after restart.
+  # ---------------------------------------------------------------------------
+  localstack:
+    # Pin to 3.x — the last free community release. localstack/localstack:latest
+    # as of mid-2026 is the Pro edition and requires LOCALSTACK_AUTH_TOKEN.
+    image: localstack/localstack:3
+    container_name: tradeforge-localstack
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      # Only start the KMS service — nothing else is needed
+      SERVICES: kms
+      DEBUG: "0"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Mailpit — captures all outgoing SMTP email; replaces Resend locally (ADR-002)
+  # Browse captured emails at http://localhost:8025
+  # ---------------------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: tradeforge-mailpit
+    ports:
+      - "127.0.0.1:1025:1025"   # SMTP — application sends here
+      - "127.0.0.1:8025:8025"   # Web UI
+    healthcheck:
+      # curl is not in the mailpit container; use mailpit's built-in readyz subcommand
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # LocalStack init — creates the local CMK (profile: init)
+  #
+  # Run ONCE after first `docker compose up -d`:
+  #   docker compose --profile init run --rm localstack-init
+  #
+  # Copy KeyMetadata.KeyId from the JSON output and set in .env:
+  #   KMS_KEY_ARN=arn:aws:kms:ap-south-1:000000000000:key/<KeyId>
+  #
+  # Must be re-run whenever the localstack container is recreated (state is ephemeral).
+  # ---------------------------------------------------------------------------
+  localstack-init:
+    image: amazon/aws-cli:latest
+    container_name: tradeforge-localstack-init
+    profiles: [init]
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      # Dummy credentials — LocalStack accepts any non-empty value
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ap-south-1
+    command:
+      - kms
+      - create-key
+      - --endpoint-url
+      - http://localstack:4566
+      - --region
+      - ap-south-1
+      - --description
+      - "TradeForge broker credentials key (local dev)"
+      - --key-usage
+      - ENCRYPT_DECRYPT
+      - --key-spec
+      - SYMMETRIC_DEFAULT
+
+volumes:
+  tradeforge_postgres_data:
+    name: tradeforge_postgres_data
