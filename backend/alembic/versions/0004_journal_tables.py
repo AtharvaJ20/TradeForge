@@ -239,7 +239,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # trade_pnl  (Step 10 P&L engine — fully expanded schema)
+    # trade_pnl  (Step 10 P&L engine stub — charge breakdown added by 0007)
     # ------------------------------------------------------------------
     op.create_table(
         "trade_pnl",
@@ -261,24 +261,6 @@ def upgrade() -> None:
         sa.Column("net_pnl", sa.Numeric(18, 4), nullable=False),
         sa.Column("total_charges", sa.Numeric(18, 4), nullable=False),
         sa.Column("r_multiple", sa.Numeric(18, 6), nullable=True),
-        # Charge breakdown
-        sa.Column("brokerage", sa.Numeric(18, 4), nullable=False),
-        sa.Column("stt", sa.Numeric(18, 4), nullable=False),
-        sa.Column("exchange_charges", sa.Numeric(18, 4), nullable=False),
-        sa.Column("sebi_charges", sa.Numeric(18, 4), nullable=False),
-        sa.Column("stamp_duty", sa.Numeric(18, 4), nullable=False),
-        sa.Column("gst", sa.Numeric(18, 4), nullable=False),
-        sa.Column("ipft", sa.Numeric(18, 4), nullable=False),
-        # Engine metadata
-        sa.Column("broker", sa.String(20), nullable=False),
-        sa.Column("charge_schedule_version", sa.String(50), nullable=False),
-        sa.Column("engine_version", sa.String(20), nullable=False),
-        sa.Column(
-            "calculated_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.text("now()"),
-        ),
         # Timestamps
         sa.Column(
             "created_at",
@@ -294,15 +276,6 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("trade_id", name="uq_trade_pnl_trade_id"),
-        sa.CheckConstraint(
-            "total_charges = brokerage + stt + exchange_charges + sebi_charges + stamp_duty + gst + ipft",
-            name="ck_trade_pnl_total_charges_identity",
-        ),
-        sa.CheckConstraint(
-            "brokerage >= 0 AND stt >= 0 AND exchange_charges >= 0 AND sebi_charges >= 0"
-            " AND stamp_duty >= 0 AND gst >= 0 AND ipft >= 0",
-            name="ck_trade_pnl_charges_non_negative",
-        ),
     )
     op.create_index("idx_trade_pnl_user_id", "trade_pnl", ["user_id"])
 
