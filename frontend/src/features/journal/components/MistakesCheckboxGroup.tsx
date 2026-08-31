@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 import type { MistakeType } from '../types'
 
 /** All 13 canonical mistake labels from the domain spec. */
-export const ALL_MISTAKES: MistakeType[] = [
+const ALL_MISTAKES: MistakeType[] = [
   'FOMO_ENTRY',
   'FOMO_EXIT',
   'OVERSIZED_POSITION',

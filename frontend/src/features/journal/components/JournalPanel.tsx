@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatDate, formatIst } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { useJournalEntry } from '../hooks/useJournalEntry'
 import { useUpsertJournalEntry } from '../hooks/useUpsertJournalEntry'
 import type { TradeForJournal, JournalEntryWrite } from '../types'
