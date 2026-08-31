@@ -71,19 +71,23 @@ jobs:
         working-directory: backend
         run: ruff format --check .
 
-      - name: Install btree_gist and run migrations
+      - name: Create btree_gist extension
         working-directory: backend
         run: |
-          python -c "
+          python - <<'PYEOF'
           import asyncio, os, asyncpg
           async def main():
-              url = os.environ['DATABASE_URL'].replace('postgresql+asyncpg://', 'postgresql://')
+              url = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
               conn = await asyncpg.connect(url)
-              await conn.execute('CREATE EXTENSION IF NOT EXISTS btree_gist')
+              await conn.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
               await conn.close()
+              print("btree_gist: ok")
           asyncio.run(main())
-          "
-          alembic upgrade head
+          PYEOF
+
+      - name: Run migrations
+        working-directory: backend
+        run: alembic upgrade head
 
       - name: Run tests with coverage gate (≥80%)
         working-directory: backend
