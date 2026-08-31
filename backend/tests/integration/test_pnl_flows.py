@@ -29,7 +29,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -117,7 +117,7 @@ async def _insert_closed_trade(
 ) -> uuid.UUID:
     tid = uuid.uuid4()
     td = trade_date or date(2026, 1, 15)
-    now = datetime(2026, 1, 15, 9, 31, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 15, 9, 31, tzinfo=UTC)
     await session.execute(
         text(
             "INSERT INTO trades "
@@ -150,7 +150,7 @@ async def _insert_open_trade(
     instrument_id: uuid.UUID,
 ) -> uuid.UUID:
     tid = uuid.uuid4()
-    now = datetime(2026, 1, 15, 9, 31, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 15, 9, 31, tzinfo=UTC)
     await session.execute(
         text(
             "INSERT INTO trades "
@@ -160,8 +160,13 @@ async def _insert_open_trade(
             "VALUES (:id, :uid, :iid, 'MIS', 'LONG', 'OPEN', "
             " :td, :ts, 100, 0, 100, 250.0000)"
         ),
-        {"id": str(tid), "uid": str(user_id), "iid": str(instrument_id),
-         "td": date(2026, 1, 15), "ts": now},
+        {
+            "id": str(tid),
+            "uid": str(user_id),
+            "iid": str(instrument_id),
+            "td": date(2026, 1, 15),
+            "ts": now,
+        },
     )
     return tid
 
@@ -174,7 +179,7 @@ async def _insert_entry_fill(
     trade_id: uuid.UUID,
     broker: str = "ZERODHA",
 ) -> None:
-    now = datetime(2026, 1, 15, 9, 31, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 15, 9, 31, tzinfo=UTC)
     await session.execute(
         text(
             "INSERT INTO execution_fills "
@@ -203,7 +208,7 @@ async def _insert_journal_entry(
     planned_risk_amount: str = "1000.0000",
 ) -> None:
     eid = uuid.uuid4()
-    now = datetime(2026, 1, 15, 10, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 15, 10, 0, tzinfo=UTC)
     await session.execute(
         text(
             "INSERT INTO journal_entries "
@@ -228,8 +233,6 @@ def _build_pnl_result(
     net_pnl: str = "950.0000",
     r_multiple: str | None = "2.500000",
 ) -> PnlResult:
-    charge = Decimal("50.0000")
-    charge_component = Decimal("7.1429")  # roughly charge / 7
     # Ensure total_charges identity: brokerage + stt + exchange + sebi + stamp + gst + ipft
     # Use round numbers that sum exactly to 50
     return PnlResult(
@@ -267,7 +270,9 @@ async def test_get_trade_snapshot_returns_none_for_open_trade(session: AsyncSess
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
     trade_id = await _insert_open_trade(session, user_id=user_id, instrument_id=instrument_id)
-    await _insert_entry_fill(session, user_id=user_id, instrument_id=instrument_id, trade_id=trade_id)
+    await _insert_entry_fill(
+        session, user_id=user_id, instrument_id=instrument_id, trade_id=trade_id
+    )
 
     repo = PnlRepository(session)
     result = await repo.get_trade_snapshot(trade_id)
@@ -310,9 +315,7 @@ async def test_get_trade_snapshot_includes_planned_risk_from_journal(
 ) -> None:
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(
-        session, user_id=user_id, instrument_id=instrument_id
-    )
+    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
     await _insert_entry_fill(
         session, user_id=user_id, instrument_id=instrument_id, trade_id=trade_id
     )
@@ -333,9 +336,7 @@ async def test_get_trade_snapshot_returns_none_when_no_entry_fill(
     """get_trade_snapshot requires at least one ENTRY fill to determine broker."""
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(
-        session, user_id=user_id, instrument_id=instrument_id
-    )
+    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
     # No fills inserted — _get_broker_for_trade returns None
 
     repo = PnlRepository(session)
@@ -351,9 +352,7 @@ async def test_get_trade_snapshot_returns_none_when_no_entry_fill(
 async def test_upsert_creates_trade_pnl_row(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(
-        session, user_id=user_id, instrument_id=instrument_id
-    )
+    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
 
     repo = PnlRepository(session)
     pnl = _build_pnl_result(trade_id, user_id)
@@ -375,16 +374,18 @@ async def test_upsert_is_idempotent(session: AsyncSession) -> None:
     """Calling upsert twice must update in place — no duplicate rows."""
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(
-        session, user_id=user_id, instrument_id=instrument_id
-    )
+    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
 
     repo = PnlRepository(session)
-    await repo.upsert(_build_pnl_result(trade_id, user_id, gross_pnl="1000.0000", net_pnl="950.0000"))
+    await repo.upsert(
+        _build_pnl_result(trade_id, user_id, gross_pnl="1000.0000", net_pnl="950.0000")
+    )
     await session.flush()
 
     # Second upsert with different values
-    await repo.upsert(_build_pnl_result(trade_id, user_id, gross_pnl="1200.0000", net_pnl="1150.0000"))
+    await repo.upsert(
+        _build_pnl_result(trade_id, user_id, gross_pnl="1200.0000", net_pnl="1150.0000")
+    )
     await session.flush()
 
     row_count = await session.execute(
@@ -407,9 +408,7 @@ async def test_get_for_trade_returns_none_when_not_found(session: AsyncSession) 
 async def test_update_r_multiple(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(
-        session, user_id=user_id, instrument_id=instrument_id
-    )
+    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
 
     repo = PnlRepository(session)
     await repo.upsert(_build_pnl_result(trade_id, user_id, r_multiple=None))
@@ -426,9 +425,7 @@ async def test_update_r_multiple(session: AsyncSession) -> None:
 async def test_update_r_multiple_to_none_clears_it(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(
-        session, user_id=user_id, instrument_id=instrument_id
-    )
+    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
 
     repo = PnlRepository(session)
     await repo.upsert(_build_pnl_result(trade_id, user_id, r_multiple="2.000000"))

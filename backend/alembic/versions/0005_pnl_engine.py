@@ -74,7 +74,10 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "broker", "trade_type", "exchange_segment", "effective_from",
+            "broker",
+            "trade_type",
+            "exchange_segment",
+            "effective_from",
             name="uq_charge_schedules_lookup",
         ),
         sa.CheckConstraint(

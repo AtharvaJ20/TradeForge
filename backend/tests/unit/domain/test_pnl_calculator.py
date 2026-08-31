@@ -255,8 +255,13 @@ class TestTotalChargesIdentity:
         cs = _cs_percent_cap()
         charges = compute_charges(snap, cs)
         expected = (
-            charges.brokerage + charges.stt + charges.exchange_charges
-            + charges.sebi_charges + charges.stamp_duty + charges.gst + charges.ipft
+            charges.brokerage
+            + charges.stt
+            + charges.exchange_charges
+            + charges.sebi_charges
+            + charges.stamp_duty
+            + charges.gst
+            + charges.ipft
         )
         assert charges.total_charges == expected
 
@@ -396,6 +401,11 @@ class TestWorkedExample:
         cs = _cs_percent_cap()
         result = compute_pnl(snap, cs)
         assert result.total_charges == (
-            result.brokerage + result.stt + result.exchange_charges
-            + result.sebi_charges + result.stamp_duty + result.gst + result.ipft
+            result.brokerage
+            + result.stt
+            + result.exchange_charges
+            + result.sebi_charges
+            + result.stamp_duty
+            + result.gst
+            + result.ipft
         )

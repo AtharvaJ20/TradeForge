@@ -136,17 +136,11 @@ def upgrade() -> None:
     # 0002 (which grants all DML) because fill_exclusions has no legitimate
     # UPDATE or DELETE path, not even a soft-delete.
     # ------------------------------------------------------------------
-    op.execute(
-        "GRANT SELECT, INSERT ON fill_exclusions TO tradeforge_app"
-    )
+    op.execute("GRANT SELECT, INSERT ON fill_exclusions TO tradeforge_app")
 
 
 def downgrade() -> None:
     # Drop trigger and function before dropping the table.
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_fill_exclusions_append_only ON fill_exclusions"
-    )
-    op.execute(
-        "DROP FUNCTION IF EXISTS trg_fill_exclusions_append_only()"
-    )
+    op.execute("DROP TRIGGER IF EXISTS trg_fill_exclusions_append_only ON fill_exclusions")
+    op.execute("DROP FUNCTION IF EXISTS trg_fill_exclusions_append_only()")
     op.drop_table("fill_exclusions")

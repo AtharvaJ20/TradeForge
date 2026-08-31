@@ -1,7 +1,5 @@
 """Unit tests for password domain layer (pure, no I/O)."""
 
-import pytest
-
 from tradeforge.domain.auth.password import (
     MAX_PASSWORD_LENGTH,
     MIN_PASSWORD_LENGTH,

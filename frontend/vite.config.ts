@@ -17,6 +17,15 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/__tests__/**', 'src/app.tsx', 'src/main.tsx'],
+      reporter: ['text', 'lcov'],
+      // Current baseline: lines 71%, functions 48%, branches 80%, statements 71%.
+      // Hooks and API client are untested — raise these as coverage grows.
+      thresholds: {
+        lines: 70,
+        functions: 45,
+        branches: 79,
+        statements: 70,
+      },
     },
   },
 })

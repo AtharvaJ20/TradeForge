@@ -19,7 +19,6 @@ from tradeforge.domain.decimal_config import (
     PRICE,
     QUANTITY,
     R_MULTIPLE,
-    RATE,
     SIX_PLACES,
     TWO_PLACES,
     ZERO,

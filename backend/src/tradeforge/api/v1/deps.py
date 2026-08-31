@@ -18,6 +18,7 @@ from tradeforge.application.auth.email import get_email_sender
 from tradeforge.application.auth.service import AuthService
 from tradeforge.domain.auth.errors import RedisUnavailableError
 from tradeforge.infrastructure.db import get_db
+from tradeforge.infrastructure.models.user import User
 from tradeforge.infrastructure.redis_client import get_redis
 from tradeforge.infrastructure.repositories.auth_repo import (
     AuditLogRepository,
@@ -26,7 +27,6 @@ from tradeforge.infrastructure.repositories.auth_repo import (
 )
 from tradeforge.infrastructure.repositories.session_repo import SessionRepository
 from tradeforge.infrastructure.repositories.user_repo import UserRepository
-from tradeforge.infrastructure.models.user import User
 from tradeforge.settings import get_settings
 
 SESSION_COOKIE = "tf_session"

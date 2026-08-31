@@ -1,7 +1,7 @@
 """Repositories for auth tokens and the security audit log."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -19,7 +19,9 @@ class PendingVerificationRepository:
         self._db = db
 
     async def create(self, email: str, token_hash: str, expires_at: datetime) -> None:
-        row = PendingEmailVerification(email=email.lower(), token_hash=token_hash, expires_at=expires_at)
+        row = PendingEmailVerification(
+            email=email.lower(), token_hash=token_hash, expires_at=expires_at
+        )
         self._db.add(row)
         await self._db.flush()
 
@@ -37,7 +39,7 @@ class PendingVerificationRepository:
         )
 
     async def delete_expired(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await self._db.execute(
             delete(PendingEmailVerification).where(PendingEmailVerification.expires_at < now)
         )
@@ -48,15 +50,15 @@ class PendingResetRepository:
         self._db = db
 
     async def create(self, email: str, token_hash: str, expires_at: datetime) -> None:
-        row = PendingPasswordReset(email=email.lower(), token_hash=token_hash, expires_at=expires_at)
+        row = PendingPasswordReset(
+            email=email.lower(), token_hash=token_hash, expires_at=expires_at
+        )
         self._db.add(row)
         await self._db.flush()
 
     async def find_by_token_hash(self, token_hash: str) -> PendingPasswordReset | None:
         result = await self._db.execute(
-            select(PendingPasswordReset).where(
-                PendingPasswordReset.token_hash == token_hash
-            )
+            select(PendingPasswordReset).where(PendingPasswordReset.token_hash == token_hash)
         )
         return result.scalar_one_or_none()
 
@@ -68,9 +70,7 @@ class PendingResetRepository:
     async def delete_by_email(self, email: str) -> None:
         """Invalidate any outstanding resets for this email before issuing a new one."""
         await self._db.execute(
-            delete(PendingPasswordReset).where(
-                PendingPasswordReset.email == email.lower()
-            )
+            delete(PendingPasswordReset).where(PendingPasswordReset.email == email.lower())
         )
 
 

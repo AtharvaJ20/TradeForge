@@ -31,7 +31,6 @@ from redis.asyncio import Redis
 
 from tradeforge.domain.auth.tokens import generate_session_token, sha256_hex
 from tradeforge.infrastructure.repositories.session_repo import (
-    SESSION_TTL,
     SessionRepository,
 )
 

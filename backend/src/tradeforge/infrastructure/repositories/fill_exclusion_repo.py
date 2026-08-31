@@ -24,11 +24,7 @@ class FillExclusionRepository:
         fill_id: uuid.UUID,
     ) -> bool:
         """Check whether a fill has already been permanently excluded."""
-        stmt = (
-            select(FillExclusion.id)
-            .where(FillExclusion.fill_id == fill_id)
-            .limit(1)
-        )
+        stmt = select(FillExclusion.id).where(FillExclusion.fill_id == fill_id).limit(1)
         result = await session.execute(stmt)
         return result.scalar_one_or_none() is not None
 

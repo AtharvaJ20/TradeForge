@@ -9,7 +9,7 @@ Run with:
 """
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -35,7 +35,7 @@ from tradeforge.domain.trade.types import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-_TS = datetime(2026, 1, 15, 9, 31, 0, tzinfo=timezone.utc)
+_TS = datetime(2026, 1, 15, 9, 31, 0, tzinfo=UTC)
 _DATE = date(2026, 1, 15)
 
 
@@ -50,8 +50,8 @@ def _fill(
     created_at_offset_seconds: int = 0,
     trade_id: uuid.UUID | None = None,
 ) -> FillRecord:
-    ts = datetime(2026, 1, 15, 9, 31, ts_offset_seconds, tzinfo=timezone.utc)
-    created = datetime(2026, 1, 15, 9, 30, created_at_offset_seconds, tzinfo=timezone.utc)
+    ts = datetime(2026, 1, 15, 9, 31, ts_offset_seconds, tzinfo=UTC)
+    created = datetime(2026, 1, 15, 9, 30, created_at_offset_seconds, tzinfo=UTC)
     return FillRecord(
         id=uuid.uuid4(),
         user_id=uuid.uuid4(),
@@ -225,8 +225,8 @@ def test_ambiguity_raises_e5() -> None:
     f1 = _fill(ts_offset_seconds=0, fill_id_str=None, created_at_offset_seconds=0)
     f2 = _fill(ts_offset_seconds=0, fill_id_str=None, created_at_offset_seconds=0)
     # Force both fills to have identical timestamps and created_at:
-    shared_ts = datetime(2026, 1, 15, 9, 31, 0, tzinfo=timezone.utc)
-    shared_created = datetime(2026, 1, 15, 9, 30, 0, tzinfo=timezone.utc)
+    shared_ts = datetime(2026, 1, 15, 9, 31, 0, tzinfo=UTC)
+    shared_created = datetime(2026, 1, 15, 9, 30, 0, tzinfo=UTC)
     f1 = FillRecord(
         id=uuid.uuid4(),
         user_id=uuid.uuid4(),

@@ -71,14 +71,31 @@ jobs:
         working-directory: backend
         run: ruff format --check .
 
-      - name: Install btree_gist and run migrations
+      - name: Prepare database (extension + roles)
         working-directory: backend
-        env:
-          PGPASSWORD: postgres
         run: |
-          psql -h localhost -U postgres -d tradeforge_test \
-            -c "CREATE EXTENSION IF NOT EXISTS btree_gist;"
-          alembic upgrade head
+          python - <<'PYEOF'
+          import asyncio, os, asyncpg
+          async def main():
+              url = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
+              conn = await asyncpg.connect(url)
+              await conn.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
+              # Migrations GRANT to tradeforge_app; create it if absent (CI-only)
+              await conn.execute("""
+                  DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tradeforge_app') THEN
+                      CREATE ROLE tradeforge_app;
+                    END IF;
+                  END $$;
+              """)
+              await conn.close()
+              print("db prep: ok")
+          asyncio.run(main())
+          PYEOF
+
+      - name: Run migrations
+        working-directory: backend
+        run: alembic upgrade head
 
       - name: Run tests with coverage gate (≥80%)
         working-directory: backend
@@ -93,5 +110,41 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coverage-report
+          name: backend-coverage-report
           path: backend/coverage.xml
+
+  frontend:
+    name: Frontend — lint · type-check · test (coverage ≥80%)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint (eslint)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type-check (tsc)
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Run tests with coverage gate (≥80%)
+        working-directory: frontend
+        run: npm run coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage-report
+          path: frontend/coverage/

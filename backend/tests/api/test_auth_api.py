@@ -23,7 +23,6 @@ from tradeforge.domain.auth.errors import (
     RateLimitedError,
 )
 
-
 # ------------------------------------------------------------------
 # Fixtures
 # ------------------------------------------------------------------
@@ -50,7 +49,9 @@ def override_auth_service(mock_auth: AsyncMock) -> None:
 # ------------------------------------------------------------------
 
 
-async def test_register_returns_200_on_success(http_client: AsyncClient, mock_auth: AsyncMock) -> None:
+async def test_register_returns_200_on_success(
+    http_client: AsyncClient, mock_auth: AsyncMock
+) -> None:
     mock_auth.register.return_value = None
     response = await http_client.post(
         "/v1/auth/register",
@@ -83,7 +84,9 @@ async def test_register_returns_422_on_policy_violation(
     assert response.status_code == 422
 
 
-async def test_register_rejects_invalid_email(http_client: AsyncClient, mock_auth: AsyncMock) -> None:
+async def test_register_rejects_invalid_email(
+    http_client: AsyncClient, mock_auth: AsyncMock
+) -> None:
     response = await http_client.post(
         "/v1/auth/register",
         json={"email": "not-an-email", "password": "StrongPass123!"},
@@ -145,8 +148,9 @@ async def test_login_sets_session_cookie(http_client: AsyncClient, mock_auth: As
     mock_auth.login.return_value = (user_id, "fake_session_token_64chars")
 
     # We also need to override the DB lookup in login handler
-    from tradeforge.infrastructure.db import get_db
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from tradeforge.infrastructure.db import get_db
 
     mock_db = AsyncMock(spec=AsyncSession)
 
@@ -202,9 +206,10 @@ async def test_login_returns_429_when_rate_limited(
 ) -> None:
     mock_auth.login.side_effect = RateLimitedError()
 
+    from unittest.mock import AsyncMock
+
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
-    from unittest.mock import AsyncMock
 
     async def fake_get_db():  # type: ignore[return]
         yield AsyncMock()
@@ -224,9 +229,10 @@ async def test_login_returns_423_when_account_locked(
 ) -> None:
     mock_auth.login.side_effect = AccountLockedError()
 
+    from unittest.mock import AsyncMock
+
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
-    from unittest.mock import AsyncMock
 
     async def fake_get_db():  # type: ignore[return]
         yield AsyncMock()
@@ -246,9 +252,10 @@ async def test_login_returns_403_when_email_not_verified(
 ) -> None:
     mock_auth.login.side_effect = EmailNotVerifiedError()
 
+    from unittest.mock import AsyncMock
+
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
-    from unittest.mock import AsyncMock
 
     async def fake_get_db():  # type: ignore[return]
         yield AsyncMock()

@@ -30,7 +30,10 @@ class StoragePort(Protocol):
         byte_size: int,
         ttl_seconds: int,
     ) -> str:
-        """Return a pre-signed PUT URL. Must include Content-Type + content-length-range conditions."""
+        """Return a pre-signed PUT URL.
+
+        Must include Content-Type + content-length-range conditions.
+        """
         ...
 
     async def presign_get(

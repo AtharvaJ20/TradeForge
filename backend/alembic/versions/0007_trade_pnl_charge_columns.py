@@ -23,18 +23,44 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Charge component columns
-    op.add_column("trade_pnl", sa.Column("brokerage", sa.Numeric(18, 4), nullable=False, server_default="0"))
-    op.add_column("trade_pnl", sa.Column("stt", sa.Numeric(18, 4), nullable=False, server_default="0"))
-    op.add_column("trade_pnl", sa.Column("exchange_charges", sa.Numeric(18, 4), nullable=False, server_default="0"))
-    op.add_column("trade_pnl", sa.Column("sebi_charges", sa.Numeric(18, 4), nullable=False, server_default="0"))
-    op.add_column("trade_pnl", sa.Column("stamp_duty", sa.Numeric(18, 4), nullable=False, server_default="0"))
-    op.add_column("trade_pnl", sa.Column("gst", sa.Numeric(18, 4), nullable=False, server_default="0"))
-    op.add_column("trade_pnl", sa.Column("ipft", sa.Numeric(18, 4), nullable=False, server_default="0"))
+    op.add_column(
+        "trade_pnl", sa.Column("brokerage", sa.Numeric(18, 4), nullable=False, server_default="0")
+    )
+    op.add_column(
+        "trade_pnl", sa.Column("stt", sa.Numeric(18, 4), nullable=False, server_default="0")
+    )
+    op.add_column(
+        "trade_pnl",
+        sa.Column("exchange_charges", sa.Numeric(18, 4), nullable=False, server_default="0"),
+    )
+    op.add_column(
+        "trade_pnl",
+        sa.Column("sebi_charges", sa.Numeric(18, 4), nullable=False, server_default="0"),
+    )
+    op.add_column(
+        "trade_pnl", sa.Column("stamp_duty", sa.Numeric(18, 4), nullable=False, server_default="0")
+    )
+    op.add_column(
+        "trade_pnl", sa.Column("gst", sa.Numeric(18, 4), nullable=False, server_default="0")
+    )
+    op.add_column(
+        "trade_pnl", sa.Column("ipft", sa.Numeric(18, 4), nullable=False, server_default="0")
+    )
 
     # Engine metadata columns
-    op.add_column("trade_pnl", sa.Column("broker", sa.String(20), nullable=False, server_default="UNKNOWN"))
-    op.add_column("trade_pnl", sa.Column("charge_schedule_version", sa.String(50), nullable=False, server_default="legacy"))
-    op.add_column("trade_pnl", sa.Column("engine_version", sa.String(20), nullable=False, server_default="0.0.0"))
+    op.add_column(
+        "trade_pnl", sa.Column("broker", sa.String(20), nullable=False, server_default="UNKNOWN")
+    )
+    op.add_column(
+        "trade_pnl",
+        sa.Column(
+            "charge_schedule_version", sa.String(50), nullable=False, server_default="legacy"
+        ),
+    )
+    op.add_column(
+        "trade_pnl",
+        sa.Column("engine_version", sa.String(20), nullable=False, server_default="0.0.0"),
+    )
     op.add_column(
         "trade_pnl",
         sa.Column(

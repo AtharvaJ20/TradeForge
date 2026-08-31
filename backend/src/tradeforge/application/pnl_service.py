@@ -64,8 +64,12 @@ class PnlService:
         await self._pnl_repo.upsert(result)
         logger.info(
             "P&L stored for trade %s: gross=%.4f net=%.4f charges=%.4f broker=%s schedule=%s",
-            trade_id, result.gross_pnl, result.net_pnl, result.total_charges,
-            result.broker, result.charge_schedule_version,
+            trade_id,
+            result.gross_pnl,
+            result.net_pnl,
+            result.total_charges,
+            result.broker,
+            result.charge_schedule_version,
         )
 
     async def recalculate_r_multiple(self, trade_id: uuid.UUID, user_id: uuid.UUID) -> None:
@@ -80,6 +84,7 @@ class PnlService:
 
         planned_risk = await self._pnl_repo._get_planned_risk(trade_id)
         from decimal import Decimal
+
         net_pnl = Decimal(str(existing.net_pnl))
         r_multiple = compute_r_multiple(net_pnl, planned_risk)
 

@@ -104,9 +104,7 @@ class JournalEntryRequest(BaseModel):
             invalid = [m for m in v if m not in MistakeType.__members__]
             if invalid:
                 allowed = ", ".join(MistakeType.__members__)
-                raise ValueError(
-                    f"Invalid mistake value(s): {invalid}. Allowed: {allowed}"
-                )
+                raise ValueError(f"Invalid mistake value(s): {invalid}. Allowed: {allowed}")
         return v
 
 
@@ -246,13 +244,16 @@ def _entry_out(view: Any) -> JournalEntryOut:
 def _handle_journal_error(exc: Exception) -> JSONResponse:
     if isinstance(exc, (JournalEntryNotFoundError, TradeNotFoundError, AttachmentNotFoundError)):
         return JSONResponse(status_code=404, content={"detail": str(exc)})
-    if isinstance(exc, (
-        AttachmentContentTypeNotAllowedError,
-        AttachmentSizeLimitExceededError,
-        AttachmentStorageQuotaExceededError,
-        AttachmentFilenameExtensionMismatchError,
-        AttachmentExpiredError,
-    )):
+    if isinstance(
+        exc,
+        (
+            AttachmentContentTypeNotAllowedError,
+            AttachmentSizeLimitExceededError,
+            AttachmentStorageQuotaExceededError,
+            AttachmentFilenameExtensionMismatchError,
+            AttachmentExpiredError,
+        ),
+    ):
         return JSONResponse(status_code=422, content={"detail": str(exc)})
     raise exc  # re-raise unexpected errors
 
@@ -300,9 +301,7 @@ async def upsert_journal_entry(
         change_reason=body.change_reason,
     )
     try:
-        view = await svc.upsert_entry(
-            user_id, trade_id, data, ip_address=get_client_ip(request)
-        )
+        view = await svc.upsert_entry(user_id, trade_id, data, ip_address=get_client_ip(request))
     except TradeNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     await db.commit()
