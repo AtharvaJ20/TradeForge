@@ -1,6 +1,6 @@
 """SQLAlchemy declarative base shared across all ORM models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import DeclarativeBase
 
@@ -10,4 +10,4 @@ class Base(DeclarativeBase):
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

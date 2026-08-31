@@ -29,7 +29,7 @@ Scenarios covered:
 import os
 import re
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -40,7 +40,6 @@ from tradeforge.application.trade.reconstruction import ReconstructionEngine
 from tradeforge.domain.trade.errors import (
     PositionCrossingZeroError,
     ReconstructionAmbiguityError,
-    ReconstructionConsistencyError,
 )
 from tradeforge.infrastructure.repositories.fill_exclusion_repo import FillExclusionRepository
 from tradeforge.infrastructure.repositories.fill_repo import FillRepository
@@ -192,7 +191,7 @@ async def _insert_fill(
 
 
 def _ts(hour: int = 9, minute: int = 31, second: int = 0, day: int = 15) -> datetime:
-    return datetime(2026, 1, day, hour, minute, second, tzinfo=timezone.utc)
+    return datetime(2026, 1, day, hour, minute, second, tzinfo=UTC)
 
 
 def _date(day: int = 15) -> date:
@@ -210,20 +209,28 @@ async def test_simple_long_trade(
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
 
-    entry_fill = await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="250.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+    await _insert_fill(
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="250.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
-    exit_fill = await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="260.00",
-        fill_timestamp=_ts(10, 0), fill_id_str="F002",
+    await _insert_fill(
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="260.00",
+        fill_timestamp=_ts(10, 0),
+        fill_id_str="F002",
     )
 
-    result = await engine_under_test.run(
-        session, user_id, instrument_id, "MIS", "EQ"
-    )
+    result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
 
     assert result.fills_processed == 2
     assert result.trades_opened == 1
@@ -244,7 +251,9 @@ async def test_simple_long_trade(
 
     # Verify fill assignments.
     fills = await session.execute(
-        text("SELECT id, trade_id, fill_role FROM execution_fills WHERE user_id=:uid ORDER BY fill_timestamp"),
+        text(
+            "SELECT id, trade_id, fill_role FROM execution_fills WHERE user_id=:uid ORDER BY fill_timestamp"
+        ),
         {"uid": str(user_id)},
     )
     rows = list(fills.mappings().all())
@@ -265,19 +274,34 @@ async def test_scaled_entry_average_price(
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="250.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="250.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="252.00",
-        fill_timestamp=_ts(9, 35), fill_id_str="F002",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="252.00",
+        fill_timestamp=_ts(9, 35),
+        fill_id_str="F002",
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="200", price="260.00",
-        fill_timestamp=_ts(10, 0), fill_id_str="F003",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="200",
+        price="260.00",
+        fill_timestamp=_ts(10, 0),
+        fill_id_str="F003",
     )
 
     result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
@@ -308,19 +332,34 @@ async def test_partial_exit_then_full_close(
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="200", price="250.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="200",
+        price="250.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="258.00",
-        fill_timestamp=_ts(10, 0), fill_id_str="F002",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="258.00",
+        fill_timestamp=_ts(10, 0),
+        fill_id_str="F002",
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="262.00",
-        fill_timestamp=_ts(10, 30), fill_id_str="F003",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="262.00",
+        fill_timestamp=_ts(10, 30),
+        fill_id_str="F003",
     )
 
     result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
@@ -353,20 +392,35 @@ async def test_reentry_after_close_creates_new_trade(
 
     # Trade A
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="250.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="250.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="260.00",
-        fill_timestamp=_ts(10, 0), fill_id_str="F002",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="260.00",
+        fill_timestamp=_ts(10, 0),
+        fill_id_str="F002",
     )
     # Trade B — re-entry
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="50", price="255.00",
-        fill_timestamp=_ts(11, 0), fill_id_str="F003",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="50",
+        price="255.00",
+        fill_timestamp=_ts(11, 0),
+        fill_id_str="F003",
     )
 
     result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
@@ -391,21 +445,29 @@ async def test_reentry_after_close_creates_new_trade(
 # ---------------------------------------------------------------------------
 
 
-async def test_short_trade(
-    session: AsyncSession, engine_under_test: ReconstructionEngine
-) -> None:
+async def test_short_trade(session: AsyncSession, engine_under_test: ReconstructionEngine) -> None:
     user_id = await _insert_user(session)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="260.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="260.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="250.00",
-        fill_timestamp=_ts(10, 0), fill_id_str="F002",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="250.00",
+        fill_timestamp=_ts(10, 0),
+        fill_id_str="F002",
     )
 
     result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
@@ -413,7 +475,9 @@ async def test_short_trade(
     assert result.fills_processed == 2
 
     trade = await session.execute(
-        text("SELECT direction, status, average_entry, average_exit FROM trades WHERE user_id=:uid"),
+        text(
+            "SELECT direction, status, average_entry, average_exit FROM trades WHERE user_id=:uid"
+        ),
         {"uid": str(user_id)},
     )
     t = trade.mappings().one()
@@ -436,16 +500,28 @@ async def test_cnc_tax_lot_created_and_closed(
 
     # Open on day 15, close on day 16 → CNC (overnight)
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="2400.00",
-        fill_timestamp=_ts(9, 31, day=15), fill_id_str="F001",
-        product_type="CNC", trade_date=_date(15),
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="2400.00",
+        fill_timestamp=_ts(9, 31, day=15),
+        fill_id_str="F001",
+        product_type="CNC",
+        trade_date=_date(15),
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="2500.00",
-        fill_timestamp=_ts(14, 0, day=16), fill_id_str="F002",
-        product_type="CNC", trade_date=_date(16),
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="2500.00",
+        fill_timestamp=_ts(14, 0, day=16),
+        fill_id_str="F002",
+        product_type="CNC",
+        trade_date=_date(16),
     )
 
     result = await engine_under_test.run(session, user_id, instrument_id, "CNC", "EQ")
@@ -456,10 +532,10 @@ async def test_cnc_tax_lot_created_and_closed(
     lot = await session.execute(
         text("SELECT * FROM tax_lots WHERE user_id=:uid"), {"uid": str(user_id)}
     )
-    l = lot.mappings().one()
-    assert l["status"] == "CLOSED"
-    assert Decimal(str(l["quantity_remaining"])) == Decimal("0.0000")
-    assert Decimal(str(l["cost_per_share"])) == Decimal("2400.0000")
+    lot_row = lot.mappings().one()
+    assert lot_row["status"] == "CLOSED"
+    assert Decimal(str(lot_row["quantity_remaining"])) == Decimal("0.0000")
+    assert Decimal(str(lot_row["cost_per_share"])) == Decimal("2400.0000")
 
     # trade_type stays CNC (open and close on different dates)
     trade = await session.execute(
@@ -480,16 +556,28 @@ async def test_cnc_same_day_trade_type(
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="2400.00",
-        fill_timestamp=_ts(9, 31, day=15), fill_id_str="F001",
-        product_type="CNC", trade_date=_date(15),
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="2400.00",
+        fill_timestamp=_ts(9, 31, day=15),
+        fill_id_str="F001",
+        product_type="CNC",
+        trade_date=_date(15),
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="2450.00",
-        fill_timestamp=_ts(14, 0, day=15), fill_id_str="F002",
-        product_type="CNC", trade_date=_date(15),
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="2450.00",
+        fill_timestamp=_ts(14, 0, day=15),
+        fill_id_str="F002",
+        product_type="CNC",
+        trade_date=_date(15),
     )
 
     await engine_under_test.run(session, user_id, instrument_id, "CNC", "EQ")
@@ -512,17 +600,29 @@ async def test_cnc_scale_in_updates_lot(
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="2400.00",
-        fill_timestamp=_ts(9, 31, day=15), fill_id_str="F001",
-        product_type="CNC", trade_date=_date(15),
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="2400.00",
+        fill_timestamp=_ts(9, 31, day=15),
+        fill_id_str="F001",
+        product_type="CNC",
+        trade_date=_date(15),
     )
     # Scale-in
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="2200.00",
-        fill_timestamp=_ts(11, 0, day=15), fill_id_str="F002",
-        product_type="CNC", trade_date=_date(15),
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="2200.00",
+        fill_timestamp=_ts(11, 0, day=15),
+        fill_id_str="F002",
+        product_type="CNC",
+        trade_date=_date(15),
     )
 
     await engine_under_test.run(session, user_id, instrument_id, "CNC", "EQ")
@@ -530,11 +630,11 @@ async def test_cnc_scale_in_updates_lot(
     lot = await session.execute(
         text("SELECT * FROM tax_lots WHERE user_id=:uid"), {"uid": str(user_id)}
     )
-    l = lot.mappings().one()
-    assert Decimal(str(l["quantity_original"])) == Decimal("200.0000")
-    assert Decimal(str(l["quantity_remaining"])) == Decimal("200.0000")
+    lot_row = lot.mappings().one()
+    assert Decimal(str(lot_row["quantity_original"])) == Decimal("200.0000")
+    assert Decimal(str(lot_row["quantity_remaining"])) == Decimal("200.0000")
     # average_entry = (100×2400 + 100×2200) / 200 = 2300.00
-    assert Decimal(str(l["cost_per_share"])) == Decimal("2300.0000")
+    assert Decimal(str(lot_row["cost_per_share"])) == Decimal("2300.0000")
 
 
 # ---------------------------------------------------------------------------
@@ -549,14 +649,24 @@ async def test_idempotency_second_run_is_noop(
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="250.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="250.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="260.00",
-        fill_timestamp=_ts(10, 0), fill_id_str="F002",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="260.00",
+        fill_timestamp=_ts(10, 0),
+        fill_id_str="F002",
     )
 
     result1 = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
@@ -584,9 +694,14 @@ async def test_open_trade_resumption(
 
     # Run 1: entry fill only
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="250.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="250.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
     result1 = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
     assert result1.trades_opened == 1
@@ -594,9 +709,14 @@ async def test_open_trade_resumption(
 
     # Insert the exit fill AFTER the first run (simulates a later import).
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="100", price="260.00",
-        fill_timestamp=_ts(10, 0), fill_id_str="F002",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="100",
+        price="260.00",
+        fill_timestamp=_ts(10, 0),
+        fill_id_str="F002",
     )
 
     # Run 2: picks up the exit fill and closes the existing trade.
@@ -624,15 +744,25 @@ async def test_e1_position_crossing_zero(
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="250.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="250.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
     # SELL 150 against LONG 100 → would go to -50 (crosses zero)
     crossing_fill_id = await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="SELL", quantity="150", price="260.00",
-        fill_timestamp=_ts(10, 0), fill_id_str="F002",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="SELL",
+        quantity="150",
+        price="260.00",
+        fill_timestamp=_ts(10, 0),
+        fill_id_str="F002",
     )
 
     with pytest.raises(PositionCrossingZeroError) as exc_info:
@@ -724,9 +854,14 @@ async def test_excluded_fill_is_skipped(
 
     # The crossing-zero fill that needs exclusion.
     fill_pk = await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="100", price="250.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="100",
+        price="250.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
     )
 
     # Record it in fill_exclusions — the engine should skip it.
@@ -766,9 +901,14 @@ async def test_nrml_fut_trade_type(
     instrument_id = await _insert_instrument(session, instrument_type="FUT", symbol="NIFTY_JAN_FUT")
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="50", price="22000.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="50",
+        price="22000.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
         product_type="NRML",
     )
 
@@ -793,9 +933,14 @@ async def test_nrml_opt_trade_type(
     instrument_id = await _insert_instrument(session, instrument_type="CE", symbol="NIFTY_24000_CE")
 
     await _insert_fill(
-        session, user_id=user_id, instrument_id=instrument_id,
-        side="BUY", quantity="50", price="120.00",
-        fill_timestamp=_ts(9, 31), fill_id_str="F001",
+        session,
+        user_id=user_id,
+        instrument_id=instrument_id,
+        side="BUY",
+        quantity="50",
+        price="120.00",
+        fill_timestamp=_ts(9, 31),
+        fill_id_str="F001",
         product_type="NRML",
     )
 

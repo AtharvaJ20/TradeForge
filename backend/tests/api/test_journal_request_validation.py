@@ -6,12 +6,12 @@ capture_moment). No database, no HTTP — pure model-level unit tests.
 
 from __future__ import annotations
 
-import pytest
 from decimal import Decimal
+
+import pytest
 from pydantic import ValidationError
 
 from tradeforge.api.v1.journal import JournalEntryRequest, PresignRequest
-
 
 # ---------------------------------------------------------------------------
 # D-002 — planned_entry / planned_stop / planned_target must be > 0
@@ -112,9 +112,7 @@ class TestMistakesValidation:
             JournalEntryRequest(mistakes=["NOT_A_MISTAKE"])
 
     def test_valid_mistakes_accepted(self) -> None:
-        req = JournalEntryRequest(
-            mistakes=["FOMO_ENTRY", "HELD_THROUGH_STOP", "REVENGE_TRADE"]
-        )
+        req = JournalEntryRequest(mistakes=["FOMO_ENTRY", "HELD_THROUGH_STOP", "REVENGE_TRADE"])
         assert req.mistakes == ["FOMO_ENTRY", "HELD_THROUGH_STOP", "REVENGE_TRADE"]
 
     def test_empty_mistakes_list_accepted(self) -> None:
@@ -127,10 +125,19 @@ class TestMistakesValidation:
 
     def test_all_13_mistake_types_accepted(self) -> None:
         all_mistakes = [
-            "FOMO_ENTRY", "FOMO_EXIT", "OVERSIZED_POSITION", "NO_STOP_DEFINED",
-            "MOVED_STOP_WIDER", "CUT_WINNER_EARLY", "HELD_THROUGH_STOP",
-            "REVENGE_TRADE", "AVERAGING_DOWN", "ENTRY_TOO_EARLY",
-            "ENTRY_TOO_LATE", "IGNORED_SIGNAL", "DISTRACTED",
+            "FOMO_ENTRY",
+            "FOMO_EXIT",
+            "OVERSIZED_POSITION",
+            "NO_STOP_DEFINED",
+            "MOVED_STOP_WIDER",
+            "CUT_WINNER_EARLY",
+            "HELD_THROUGH_STOP",
+            "REVENGE_TRADE",
+            "AVERAGING_DOWN",
+            "ENTRY_TOO_EARLY",
+            "ENTRY_TOO_LATE",
+            "IGNORED_SIGNAL",
+            "DISTRACTED",
         ]
         req = JournalEntryRequest(mistakes=all_mistakes)
         assert len(req.mistakes) == 13  # type: ignore[arg-type]
@@ -155,9 +162,7 @@ class TestCaptureMomentValidation:
         errors = exc_info.value.errors()
         assert any(e["loc"][-1] == "capture_moment" for e in errors)
 
-    @pytest.mark.parametrize(
-        "moment", ["AT_ENTRY", "DURING_TRADE", "AT_EXIT", "POST_REVIEW"]
-    )
+    @pytest.mark.parametrize("moment", ["AT_ENTRY", "DURING_TRADE", "AT_EXIT", "POST_REVIEW"])
     def test_valid_capture_moments_accepted(self, moment: str) -> None:
         req = PresignRequest(
             filename="chart.png",

@@ -18,8 +18,6 @@ from tradeforge.api.v1.deps import (
     get_current_user,
     get_current_user_id,
 )
-from tradeforge.infrastructure.db import get_db
-from tradeforge.infrastructure.repositories.user_repo import UserRepository
 from tradeforge.application.auth.service import AuthService
 from tradeforge.domain.auth.errors import (
     AccountLockedError,
@@ -30,13 +28,14 @@ from tradeforge.domain.auth.errors import (
     RateLimitedError,
     RedisUnavailableError,
 )
+from tradeforge.infrastructure.db import get_db
 from tradeforge.infrastructure.models.user import User
+from tradeforge.infrastructure.repositories.user_repo import UserRepository
 from tradeforge.settings import get_settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 SESSION_MAX_AGE = 30 * 24 * 60 * 60  # 30 days in seconds
-
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -267,4 +266,6 @@ async def password_reset_confirm(
     except RedisUnavailableError:
         raise HTTPException(status_code=503, detail="SERVICE_UNAVAILABLE")
     await db.commit()
-    return MessageResponse(message="Password reset successfully. Please log in with your new password.")
+    return MessageResponse(
+        message="Password reset successfully. Please log in with your new password."
+    )

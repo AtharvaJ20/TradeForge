@@ -64,5 +64,6 @@ class AttachmentFilenameExtensionMismatchError(JournalDomainError):
         self.filename = filename
         self.content_type = content_type
         super().__init__(
-            f"Filename {filename!r} extension does not match declared content type {content_type!r}."
+            f"Filename {filename!r} extension does not match "
+            f"declared content type {content_type!r}."
         )

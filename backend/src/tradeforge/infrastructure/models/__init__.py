@@ -4,7 +4,15 @@ from .auth import PendingEmailVerification, PendingPasswordReset, SecurityAuditL
 from .base import Base
 from .charge_schedule import ChargeSchedule
 from .journal import JournalAttachment, JournalAuditLog, JournalEntry
-from .trade_domain import ExecutionFill, FillExclusion, Instrument, LotSizeHistory, ManagementEvent, TaxLot, Trade
+from .trade_domain import (
+    ExecutionFill,
+    FillExclusion,
+    Instrument,
+    LotSizeHistory,
+    ManagementEvent,
+    TaxLot,
+    Trade,
+)
 from .trade_pnl import TradePnl
 from .user import User
 

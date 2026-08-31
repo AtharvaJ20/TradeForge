@@ -1,8 +1,7 @@
 """Unit tests for get_client_ip — trusted-proxy-aware IP extraction (BLOCKER-2)."""
 
-from unittest.mock import MagicMock
-
-import pytest
+from contextlib import contextmanager
+from unittest.mock import MagicMock, patch
 
 from tradeforge.api.v1.deps import get_client_ip
 
@@ -27,8 +26,9 @@ def _make_request(
     request.headers.get = lambda key, default="": headers.get(key, default)
 
     # Patch settings so trusted_proxies comes from our argument, not the real .env
-    import tradeforge.api.v1.deps as deps_module
     from unittest.mock import patch
+
+    import tradeforge.api.v1.deps as deps_module
 
     request._trusted_proxies_patch = patch.object(
         deps_module,
@@ -42,9 +42,6 @@ def _make_request(
 # ------------------------------------------------------------------
 # Helper that patches settings inside get_client_ip
 # ------------------------------------------------------------------
-
-from contextlib import contextmanager
-from unittest.mock import patch
 
 
 @contextmanager
@@ -136,18 +133,14 @@ def test_untrusted_peer_with_xff_is_not_trusted() -> None:
     """A peer NOT in the trusted list cannot override the IP via XFF."""
     with _trusted("10.0.0.1"):
         # Peer is 5.6.7.8 which is not trusted → XFF must be ignored.
-        ip = get_client_ip(
-            _request(client_host="5.6.7.8", x_forwarded_for="1.1.1.1")
-        )
+        ip = get_client_ip(_request(client_host="5.6.7.8", x_forwarded_for="1.1.1.1"))
         assert ip == "5.6.7.8"
 
 
 def test_all_xff_trusted_falls_back_to_direct_peer() -> None:
     """If every XFF IP is itself a trusted proxy, fall back to the direct peer."""
     with _trusted("10.0.0.1, 10.0.0.2"):
-        ip = get_client_ip(
-            _request(client_host="10.0.0.2", x_forwarded_for="10.0.0.1")
-        )
+        ip = get_client_ip(_request(client_host="10.0.0.2", x_forwarded_for="10.0.0.1"))
         assert ip == "10.0.0.2"
 
 

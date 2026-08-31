@@ -213,16 +213,10 @@ def upgrade() -> None:
             name="ck_trades_trade_type",
         ),
         sa.CheckConstraint("direction IN ('LONG', 'SHORT')", name="ck_trades_direction"),
-        sa.CheckConstraint(
-            "status IN ('OPEN', 'PARTIAL', 'CLOSED')", name="ck_trades_status"
-        ),
+        sa.CheckConstraint("status IN ('OPEN', 'PARTIAL', 'CLOSED')", name="ck_trades_status"),
         sa.CheckConstraint("net_position >= 0", name="ck_trades_net_position_gte0"),
-        sa.CheckConstraint(
-            "total_entry_quantity >= 0", name="ck_trades_total_entry_gte0"
-        ),
-        sa.CheckConstraint(
-            "total_exit_quantity >= 0", name="ck_trades_total_exit_gte0"
-        ),
+        sa.CheckConstraint("total_entry_quantity >= 0", name="ck_trades_total_entry_gte0"),
+        sa.CheckConstraint("total_exit_quantity >= 0", name="ck_trades_total_exit_gte0"),
         sa.CheckConstraint(
             "total_exit_quantity <= total_entry_quantity",
             name="ck_trades_exit_lte_entry",
@@ -290,9 +284,7 @@ def upgrade() -> None:
             "fill_role IN ('ENTRY', 'EXIT') OR fill_role IS NULL",
             name="ck_fills_fill_role",
         ),
-        sa.CheckConstraint(
-            "product_type IN ('MIS', 'CNC', 'NRML')", name="ck_fills_product_type"
-        ),
+        sa.CheckConstraint("product_type IN ('MIS', 'CNC', 'NRML')", name="ck_fills_product_type"),
         sa.CheckConstraint("quantity > 0", name="ck_fills_quantity_positive"),
         sa.CheckConstraint("price > 0", name="ck_fills_price_positive"),
         sa.CheckConstraint(
@@ -449,9 +441,7 @@ def upgrade() -> None:
         ),
     )
     op.create_index("idx_mgmt_trade_id", "management_events", ["trade_id"])
-    op.create_index(
-        "idx_mgmt_user_occurred", "management_events", ["user_id", "occurred_at"]
-    )
+    op.create_index("idx_mgmt_user_occurred", "management_events", ["user_id", "occurred_at"])
     # Partial index on corrects_event_id (WHERE NOT NULL): FK index +
     # used by the active-timeline EXISTS subquery in canonical queries.
     op.create_index(
@@ -587,9 +577,7 @@ def upgrade() -> None:
         "management_events",
         "tax_lots",
     ):
-        op.execute(
-            f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO tradeforge_app"
-        )
+        op.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO tradeforge_app")
 
 
 def downgrade() -> None:

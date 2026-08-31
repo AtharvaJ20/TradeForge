@@ -9,19 +9,18 @@ Tests truncate auth tables before each run so the dev DB stays clean.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from tradeforge.domain.auth.tokens import generate_session_token, generate_verification_token, sha256_hex
-from tradeforge.infrastructure.models import Base
-from tradeforge.infrastructure.models.auth import PendingEmailVerification
-from tradeforge.infrastructure.models.user import User
+from tradeforge.domain.auth.tokens import (
+    generate_verification_token,
+    sha256_hex,
+)
 from tradeforge.infrastructure.repositories.auth_repo import (
     AuditLogRepository,
-    PendingResetRepository,
     PendingVerificationRepository,
 )
 from tradeforge.infrastructure.repositories.user_repo import UserRepository
@@ -132,7 +131,7 @@ async def test_verification_token_lifecycle(db: AsyncSession) -> None:
 
     raw_token = generate_verification_token()
     token_hash = sha256_hex(raw_token)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    expires_at = datetime.now(UTC) + timedelta(hours=24)
 
     await ver_repo.create(email="ver@example.com", token_hash=token_hash, expires_at=expires_at)
     await db.commit()
@@ -153,7 +152,7 @@ async def test_expired_verification_token_is_excluded_by_service_layer(db: Async
     raw_token = generate_verification_token()
     token_hash = sha256_hex(raw_token)
     # Store as already expired
-    expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    expires_at = datetime.now(UTC) - timedelta(minutes=1)
 
     await ver_repo.create(email="x@x.com", token_hash=token_hash, expires_at=expires_at)
     await db.commit()
@@ -161,7 +160,7 @@ async def test_expired_verification_token_is_excluded_by_service_layer(db: Async
     row = await ver_repo.find_by_token_hash(token_hash)
     assert row is not None
     # Expiry check is performed by the service layer
-    assert row.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc)
+    assert row.expires_at.replace(tzinfo=UTC) < datetime.now(UTC)
 
 
 # ------------------------------------------------------------------
@@ -192,7 +191,7 @@ async def test_csrf_attempt_is_persisted_to_audit_log(db: AsyncSession) -> None:
     independently.  We verify the committed row is visible to a separate session
     (postgres superuser) using a timestamp boundary to isolate this test's rows.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from httpx import ASGITransport, AsyncClient
     from sqlalchemy import select
@@ -200,11 +199,9 @@ async def test_csrf_attempt_is_persisted_to_audit_log(db: AsyncSession) -> None:
     from tradeforge.infrastructure.models.auth import SecurityAuditLog
     from tradeforge.main import app
 
-    before = datetime.now(timezone.utc)
+    before = datetime.now(UTC)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
             "/v1/auth/register",
             json={"email": "csrf_test@example.com", "password": "StrongPass123!"},

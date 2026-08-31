@@ -12,7 +12,7 @@ Security invariant (SR-ATT-005, SR-ATT-006):
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select, update
@@ -53,9 +53,7 @@ class JournalRepository:
     # Journal entry CRUD
     # ------------------------------------------------------------------
 
-    async def get_entry(
-        self, trade_id: uuid.UUID, user_id: uuid.UUID
-    ) -> JournalEntry | None:
+    async def get_entry(self, trade_id: uuid.UUID, user_id: uuid.UUID) -> JournalEntry | None:
         result = await self._db.execute(
             select(JournalEntry).where(
                 JournalEntry.trade_id == trade_id,
@@ -76,13 +74,9 @@ class JournalRepository:
         await self._db.flush()
         return entry
 
-    async def update_entry(
-        self, entry_id: uuid.UUID, updates: dict[str, Any]
-    ) -> None:
+    async def update_entry(self, entry_id: uuid.UUID, updates: dict[str, Any]) -> None:
         await self._db.execute(
-            update(JournalEntry)
-            .where(JournalEntry.id == entry_id)
-            .values(**updates)
+            update(JournalEntry).where(JournalEntry.id == entry_id).values(**updates)
         )
         await self._db.flush()
 
@@ -137,9 +131,7 @@ class JournalRepository:
     # Attachments — quota checks (SR-ATT-002)
     # ------------------------------------------------------------------
 
-    async def sum_confirmed_bytes_for_trade(
-        self, trade_id: uuid.UUID, user_id: uuid.UUID
-    ) -> int:
+    async def sum_confirmed_bytes_for_trade(self, trade_id: uuid.UUID, user_id: uuid.UUID) -> int:
         result = await self._db.execute(
             select(func.coalesce(func.sum(JournalAttachment.byte_size), 0)).where(
                 JournalAttachment.trade_id == trade_id,
@@ -232,9 +224,7 @@ class JournalRepository:
         if confirmed_at is not None:
             values["confirmed_at"] = confirmed_at
         await self._db.execute(
-            update(JournalAttachment)
-            .where(JournalAttachment.id == attachment_id)
-            .values(**values)
+            update(JournalAttachment).where(JournalAttachment.id == attachment_id).values(**values)
         )
         await self._db.flush()
 
@@ -242,7 +232,7 @@ class JournalRepository:
         await self._db.execute(
             update(JournalAttachment)
             .where(JournalAttachment.id == attachment_id)
-            .values(deleted_at=datetime.now(timezone.utc))
+            .values(deleted_at=datetime.now(UTC))
         )
         await self._db.flush()
 

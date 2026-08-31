@@ -16,7 +16,7 @@ NEVER include passwords, tokens, or session data in log output or API responses.
 
 import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -30,7 +30,6 @@ from tradeforge.domain.auth.errors import (
     InvalidTokenError,
     PasswordPolicyViolationError,
     RateLimitedError,
-    RedisUnavailableError,
 )
 from tradeforge.domain.auth.events import AuditEventType
 from tradeforge.domain.auth.password import validate_password_policy
@@ -156,10 +155,8 @@ class AuthService:
 
         raw_token = generate_verification_token()
         token_hash = sha256_hex(raw_token)
-        expires_at = datetime.now(timezone.utc) + EMAIL_VERIFICATION_TTL
-        await self._verifications.create(
-            email=email, token_hash=token_hash, expires_at=expires_at
-        )
+        expires_at = datetime.now(UTC) + EMAIL_VERIFICATION_TTL
+        await self._verifications.create(email=email, token_hash=token_hash, expires_at=expires_at)
 
         await self._email.send(
             to=email,
@@ -185,8 +182,8 @@ class AuthService:
 
         token_hash = sha256_hex(raw_token)
         row = await self._verifications.find_by_token_hash(token_hash)
-        now = datetime.now(timezone.utc)
-        if row is None or row.expires_at.replace(tzinfo=timezone.utc) < now:
+        now = datetime.now(UTC)
+        if row is None or row.expires_at.replace(tzinfo=UTC) < now:
             raise InvalidTokenError("Verification token is invalid or expired.")
 
         user = await self._users.find_by_email(row.email)
@@ -341,7 +338,7 @@ class AuthService:
 
         raw_token = generate_reset_token()
         token_hash = sha256_hex(raw_token)
-        expires_at = datetime.now(timezone.utc) + PASSWORD_RESET_TTL
+        expires_at = datetime.now(UTC) + PASSWORD_RESET_TTL
 
         await self._resets.create(email=email, token_hash=token_hash, expires_at=expires_at)
 
@@ -351,15 +348,16 @@ class AuthService:
             html_body=(
                 f"<p>We received a password reset request for your account.</p>"
                 f"<p>Reset token: <strong>{raw_token}</strong></p>"
-                f"<p>This token expires in 1 hour. If you did not request this, ignore this email.</p>"
+                "<p>This token expires in 1 hour. "
+                "If you did not request this, ignore this email.</p>"
             ),
         )
 
     async def confirm_password_reset(self, raw_token: str, new_password: str, ip: str) -> None:
         token_hash = sha256_hex(raw_token)
         row = await self._resets.find_by_token_hash(token_hash)
-        now = datetime.now(timezone.utc)
-        if row is None or row.expires_at.replace(tzinfo=timezone.utc) < now:
+        now = datetime.now(UTC)
+        if row is None or row.expires_at.replace(tzinfo=UTC) < now:
             raise InvalidTokenError("Reset token is invalid or expired.")
 
         policy_error = validate_password_policy(new_password)

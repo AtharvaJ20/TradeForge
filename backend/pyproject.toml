@@ -96,14 +96,18 @@ select = [
     "N",   # pep8-naming
 ]
 ignore = [
-    "ANN101", # missing type for `self`
-    "ANN102", # missing type for `cls`
     "S101",   # allow assert in tests
+    "B008",   # FastAPI Depends() in default arguments is the intended DI pattern
+    "B904",   # raise-without-from-inside-except: tracked for a follow-up PR
+    "ANN401", # Any is legitimately used for untyped SQLAlchemy ORM row objects
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ANN", "S"]  # relax annotations and security checks in tests
-"alembic/**" = ["ANN", "N"]
+"tests/**" = ["ANN", "S", "E501"]  # relax annotations, security, line-length in tests
+# Migration files use old-style Union/Optional types, have intentional import
+# ordering (load_dotenv() must run before SQLAlchemy imports in env.py), and
+# contain long SQL string literals that cannot be wrapped without breaking syntax.
+"alembic/**" = ["ANN", "N", "UP", "I", "E402", "E501"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -24,7 +24,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -123,7 +123,7 @@ async def _insert_trade(
     total_entry_quantity: str = "100.0000",
 ) -> uuid.UUID:
     tid = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.execute(
         text(
             "INSERT INTO trades "
@@ -239,7 +239,9 @@ async def test_upsert_twice_writes_audit_log_for_changed_fields_only(
     await svc.upsert_entry(
         user_id,
         trade_id,
-        JournalEntryWrite(setup_name="Breakout", notes="Initial note", change_reason="Corrected setup"),
+        JournalEntryWrite(
+            setup_name="Breakout", notes="Initial note", change_reason="Corrected setup"
+        ),
     )
 
     result = await session.execute(
@@ -434,9 +436,7 @@ async def test_planned_risk_amount_computation(session: AsyncSession) -> None:
     )
     svc = _svc(session)
 
-    view = await svc.upsert_entry(
-        user_id, trade_id, JournalEntryWrite(planned_stop=Decimal("490"))
-    )
+    view = await svc.upsert_entry(user_id, trade_id, JournalEntryWrite(planned_stop=Decimal("490")))
 
     assert view.planned_risk_amount == Decimal("1000.0000")
 

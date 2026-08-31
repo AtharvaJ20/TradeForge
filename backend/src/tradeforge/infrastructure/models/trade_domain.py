@@ -146,16 +146,10 @@ class Trade(Base):
             name="ck_trades_trade_type",
         ),
         CheckConstraint("direction IN ('LONG', 'SHORT')", name="ck_trades_direction"),
-        CheckConstraint(
-            "status IN ('OPEN', 'PARTIAL', 'CLOSED')", name="ck_trades_status"
-        ),
+        CheckConstraint("status IN ('OPEN', 'PARTIAL', 'CLOSED')", name="ck_trades_status"),
         CheckConstraint("net_position >= 0", name="ck_trades_net_position_gte0"),
-        CheckConstraint(
-            "total_entry_quantity >= 0", name="ck_trades_total_entry_gte0"
-        ),
-        CheckConstraint(
-            "total_exit_quantity >= 0", name="ck_trades_total_exit_gte0"
-        ),
+        CheckConstraint("total_entry_quantity >= 0", name="ck_trades_total_entry_gte0"),
+        CheckConstraint("total_exit_quantity >= 0", name="ck_trades_total_exit_gte0"),
         CheckConstraint(
             "total_exit_quantity <= total_entry_quantity",
             name="ck_trades_exit_lte_entry",
@@ -207,9 +201,7 @@ class ExecutionFill(Base):
             "fill_role IN ('ENTRY', 'EXIT') OR fill_role IS NULL",
             name="ck_fills_fill_role",
         ),
-        CheckConstraint(
-            "product_type IN ('MIS', 'CNC', 'NRML')", name="ck_fills_product_type"
-        ),
+        CheckConstraint("product_type IN ('MIS', 'CNC', 'NRML')", name="ck_fills_product_type"),
         CheckConstraint("quantity > 0", name="ck_fills_quantity_positive"),
         CheckConstraint("price > 0", name="ck_fills_price_positive"),
         CheckConstraint(

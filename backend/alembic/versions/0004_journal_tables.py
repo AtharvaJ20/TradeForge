@@ -165,9 +165,7 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("byte_size > 0", name="ck_attachment_byte_size_positive"),
     )
-    op.create_index(
-        "idx_attachments_journal_entry_id", "journal_attachments", ["journal_entry_id"]
-    )
+    op.create_index("idx_attachments_journal_entry_id", "journal_attachments", ["journal_entry_id"])
     op.create_index("idx_attachments_user_id", "journal_attachments", ["user_id"])
     op.create_index("idx_attachments_trade_id", "journal_attachments", ["trade_id"])
     # Partial index for PENDING cleanup job (SR-ATT-010)
@@ -208,9 +206,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "idx_audit_log_journal_entry_id", "journal_audit_log", ["journal_entry_id"]
-    )
+    op.create_index("idx_audit_log_journal_entry_id", "journal_audit_log", ["journal_entry_id"])
     op.create_index("idx_audit_log_user_id", "journal_audit_log", ["user_id"])
 
     # Append-only enforcement: block UPDATE and DELETE on journal_audit_log
@@ -314,9 +310,7 @@ def upgrade() -> None:
     # Grants — extend tradeforge_app access to all four new tables
     # ------------------------------------------------------------------
     for table in ("journal_entries", "journal_attachments", "journal_audit_log", "trade_pnl"):
-        op.execute(
-            f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO tradeforge_app"
-        )
+        op.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO tradeforge_app")
     # journal_audit_log: tradeforge_app may only INSERT (trigger blocks UPDATE/DELETE)
     # The broad grant above is intentional — the trigger is the enforcement layer.
 

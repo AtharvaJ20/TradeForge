@@ -26,6 +26,7 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tradeforge.application.pnl_service import PnlService
 from tradeforge.domain.decimal_config import PRICE, QUANTITY, ZERO
 from tradeforge.domain.trade.errors import (
     PositionCrossingZeroError,
@@ -44,7 +45,6 @@ from tradeforge.domain.trade.types import (
     product_type_family_for,
     provisional_trade_type,
 )
-from tradeforge.application.pnl_service import PnlService
 from tradeforge.infrastructure.repositories.fill_exclusion_repo import FillExclusionRepository
 from tradeforge.infrastructure.repositories.fill_repo import FillRepository
 from tradeforge.infrastructure.repositories.tax_lot_repo import TaxLotRepository
@@ -246,13 +246,11 @@ class ReconstructionEngine:
                     entry_value = entry_value + fill.quantity * fill.price
                     entry_qty = entry_qty + fill.quantity
                     new_avg_entry = (entry_value / entry_qty).quantize(*PRICE)
-                    new_total_entry = (
-                        current_trade.total_entry_quantity + fill.quantity
-                    ).quantize(*QUANTITY)
-                    new_net = (current_trade.net_position + fill.quantity).quantize(*QUANTITY)
-                    new_status = (
-                        "PARTIAL" if current_trade.total_exit_quantity > ZERO else "OPEN"
+                    new_total_entry = (current_trade.total_entry_quantity + fill.quantity).quantize(
+                        *QUANTITY
                     )
+                    new_net = (current_trade.net_position + fill.quantity).quantize(*QUANTITY)
+                    new_status = "PARTIAL" if current_trade.total_exit_quantity > ZERO else "OPEN"
 
                     await self._trades.update_trade(
                         session,
@@ -287,9 +285,9 @@ class ReconstructionEngine:
                 else:
                     # EXIT fill (partial or full).
                     exit_fills.append(fill)
-                    new_total_exit = (
-                        current_trade.total_exit_quantity + fill.quantity
-                    ).quantize(*QUANTITY)
+                    new_total_exit = (current_trade.total_exit_quantity + fill.quantity).quantize(
+                        *QUANTITY
+                    )
                     new_net = (current_trade.net_position - fill.quantity).quantize(*QUANTITY)
 
                     # Decrement tax lot for CNC exit fills (§10).
@@ -334,6 +332,7 @@ class ReconstructionEngine:
                         # Trigger P&L calculation for the just-closed trade.
                         if self._pnl_service is not None:
                             from tradeforge.domain.pnl.errors import ChargeScheduleNotFoundError
+
                             try:
                                 await self._pnl_service.calculate_and_store(trade_id, user_id)
                             except ChargeScheduleNotFoundError as exc:
@@ -392,12 +391,10 @@ class ReconstructionEngine:
                 f"E4: No tax lot found for CNC trade {trade_id} during scale-in. "
                 "Manual lot reconciliation required."
             )
-        qty_already_exited = (
-            Decimal(str(lot.quantity_original)) - Decimal(str(lot.quantity_remaining))
+        qty_already_exited = Decimal(str(lot.quantity_original)) - Decimal(
+            str(lot.quantity_remaining)
         )
-        new_qty_original = (Decimal(str(lot.quantity_original)) + scale_in_qty).quantize(
-            *QUANTITY
-        )
+        new_qty_original = (Decimal(str(lot.quantity_original)) + scale_in_qty).quantize(*QUANTITY)
         new_qty_remaining = (new_qty_original - qty_already_exited).quantize(*QUANTITY)
         await self._lots.update_lot(
             session,
@@ -427,9 +424,7 @@ class ReconstructionEngine:
                 "Manual lot reconciliation required."
             )
 
-        new_remaining = (
-            Decimal(str(lot.quantity_remaining)) - fill.quantity
-        ).quantize(*QUANTITY)
+        new_remaining = (Decimal(str(lot.quantity_remaining)) - fill.quantity).quantize(*QUANTITY)
 
         if new_remaining < ZERO:
             raise ReconstructionConsistencyError(

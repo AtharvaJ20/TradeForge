@@ -32,9 +32,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Set any NULL rows to '0.0.0.0' before re-adding NOT NULL constraint.
-    op.execute(
-        "UPDATE security_audit_log SET ip_address = '0.0.0.0' WHERE ip_address IS NULL"
-    )
+    op.execute("UPDATE security_audit_log SET ip_address = '0.0.0.0' WHERE ip_address IS NULL")
     op.alter_column(
         "security_audit_log",
         "ip_address",

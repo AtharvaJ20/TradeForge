@@ -7,11 +7,10 @@ from __future__ import annotations
 
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -89,10 +88,10 @@ CONTENT_TYPE_TO_EXTENSIONS: dict[str, frozenset[str]] = {
     "image/gif": frozenset({".gif"}),
 }
 
-ATTACHMENT_MAX_BYTES: int = 15 * 1024 * 1024        # 15 MB per file (SR-ATT-002)
+ATTACHMENT_MAX_BYTES: int = 15 * 1024 * 1024  # 15 MB per file (SR-ATT-002)
 ATTACHMENT_PER_TRADE_MAX_BYTES: int = 75 * 1024 * 1024  # 75 MB per trade
 ATTACHMENT_PER_USER_MAX_BYTES: int = 2 * 1024 * 1024 * 1024  # 2 GB per user
-PRESIGN_UPLOAD_TTL_SECONDS: int = 900   # 15 min upload window (SR-ATT-007)
+PRESIGN_UPLOAD_TTL_SECONDS: int = 900  # 15 min upload window (SR-ATT-007)
 PRESIGN_DOWNLOAD_TTL_SECONDS: int = 3600  # 1 hr download URL TTL (SR-ATT-007)
 PENDING_EXPIRY_MINUTES: int = 30  # PENDING rows expire after 30 min (SR-ATT-010)
 

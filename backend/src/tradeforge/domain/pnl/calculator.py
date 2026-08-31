@@ -88,8 +88,7 @@ def compute_charges(trade: TradeSnapshot, cs: ChargeScheduleRow) -> ChargeBreakd
 
     # §6.10 Re-sum from quantized values — never from pre-quantization intermediates
     total_charges = (
-        q_brokerage + q_stt + q_exchange_charges + q_sebi_charges
-        + q_stamp_duty + q_gst + q_ipft
+        q_brokerage + q_stt + q_exchange_charges + q_sebi_charges + q_stamp_duty + q_gst + q_ipft
     )
 
     return ChargeBreakdown(
@@ -104,9 +103,7 @@ def compute_charges(trade: TradeSnapshot, cs: ChargeScheduleRow) -> ChargeBreakd
     )
 
 
-def compute_r_multiple(
-    net_pnl: Decimal, planned_risk_amount: Decimal | None
-) -> Decimal | None:
+def compute_r_multiple(net_pnl: Decimal, planned_risk_amount: Decimal | None) -> Decimal | None:
     """R-multiple = net_pnl / planned_risk_amount, or None if risk is unknown/zero."""
     if planned_risk_amount is None or planned_risk_amount == ZERO:
         return None

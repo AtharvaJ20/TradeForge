@@ -29,8 +29,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, utcnow
 
 _EMOTION_CHECK = (
-    "CALM", "CONFIDENT", "ANXIOUS", "FEARFUL", "GREEDY",
-    "FRUSTRATED", "EUPHORIC", "BORED", "DISTRACTED", "NEUTRAL",
+    "CALM",
+    "CONFIDENT",
+    "ANXIOUS",
+    "FEARFUL",
+    "GREEDY",
+    "FRUSTRATED",
+    "EUPHORIC",
+    "BORED",
+    "DISTRACTED",
+    "NEUTRAL",
 )
 _EMOTION_SQL = "', '".join(_EMOTION_CHECK)
 

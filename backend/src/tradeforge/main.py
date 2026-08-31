@@ -1,8 +1,10 @@
 """FastAPI application factory."""
 
+from collections.abc import Awaitable, Callable
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from tradeforge.domain.auth.errors import RedisUnavailableError
 from tradeforge.settings import get_settings
@@ -32,7 +34,9 @@ def create_app() -> FastAPI:
     # SameSite=Strict handles the cross-site cookie case; this layer catches
     # non-browser clients that might try to forge cross-origin state mutations.
     @app.middleware("http")
-    async def csrf_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+    async def csrf_middleware(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             origin = request.headers.get("Origin")
             if origin is not None and origin not in settings.allowed_origins_list():
@@ -57,7 +61,7 @@ def create_app() -> FastAPI:
                             },
                         )
                         await session.commit()
-                except Exception:
+                except Exception:  # noqa: S110
                     pass  # Never let audit failure suppress the 403
                 return JSONResponse(
                     status_code=403,
@@ -71,7 +75,9 @@ def create_app() -> FastAPI:
 
     # Global error handler: Redis unavailable → 503 (SR-AUTH-021 Rule D)
     @app.exception_handler(RedisUnavailableError)
-    async def redis_unavailable_handler(request: Request, exc: RedisUnavailableError) -> JSONResponse:
+    async def redis_unavailable_handler(
+        request: Request, exc: RedisUnavailableError
+    ) -> JSONResponse:
         return JSONResponse(status_code=503, content={"detail": "SERVICE_UNAVAILABLE"})
 
     # Auth router

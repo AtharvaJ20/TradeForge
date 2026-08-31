@@ -18,7 +18,7 @@ Architecture (ADR-002):
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -118,9 +118,7 @@ class JournalService:
     # Journal entry — read
     # ------------------------------------------------------------------
 
-    async def get_entry(
-        self, user_id: uuid.UUID, trade_id: uuid.UUID
-    ) -> JournalEntryView:
+    async def get_entry(self, user_id: uuid.UUID, trade_id: uuid.UUID) -> JournalEntryView:
         entry = await self._repo.get_entry(trade_id, user_id)
         if entry is None:
             raise JournalEntryNotFoundError(trade_id)
@@ -129,9 +127,7 @@ class JournalService:
         pnl_status = _compute_pnl_status(entry.planned_stop, has_pnl)
 
         raw_attachments = await self._repo.list_confirmed_attachments(entry.id)
-        attachment_views = [
-            await self._build_attachment_view(att) for att in raw_attachments
-        ]
+        attachment_views = [await self._build_attachment_view(att) for att in raw_attachments]
 
         return self._build_entry_view(entry, pnl_status, attachment_views)
 
@@ -193,15 +189,15 @@ class JournalService:
                 await self._pnl_service.recalculate_r_multiple(trade_id, user_id)
             except Exception:
                 import logging as _logging
+
                 _logging.getLogger(__name__).warning(
-                    "r_multiple recalculation failed for trade %s — continuing", trade_id,
+                    "r_multiple recalculation failed for trade %s — continuing",
+                    trade_id,
                     exc_info=True,
                 )
 
         raw_attachments = await self._repo.list_confirmed_attachments(entry.id)
-        attachment_views = [
-            await self._build_attachment_view(att) for att in raw_attachments
-        ]
+        attachment_views = [await self._build_attachment_view(att) for att in raw_attachments]
 
         return self._build_entry_view(entry, pnl_status, attachment_views)
 
@@ -209,9 +205,7 @@ class JournalService:
     # Audit history
     # ------------------------------------------------------------------
 
-    async def get_audit_history(
-        self, user_id: uuid.UUID, trade_id: uuid.UUID
-    ) -> list[AuditEntry]:
+    async def get_audit_history(self, user_id: uuid.UUID, trade_id: uuid.UUID) -> list[AuditEntry]:
         entry = await self._repo.get_entry(trade_id, user_id)
         if entry is None:
             raise JournalEntryNotFoundError(trade_id)
@@ -308,7 +302,9 @@ class JournalService:
         entry = await self._repo.get_entry(trade_id, user_id)
         if entry is None:
             entry = await self._repo.create_entry(
-                trade_id, user_id, {}  # blank entry — fields filled by future upsert_entry
+                trade_id,
+                user_id,
+                {},  # blank entry — fields filled by future upsert_entry
             )
 
         # Server-generated attachment ID and S3 key (SR-ATT-005)
@@ -367,10 +363,10 @@ class JournalService:
             raise AttachmentNotFoundError(attachment_id)
 
         # SR-ATT-010: PENDING rows older than PENDING_EXPIRY_MINUTES are expired
-        expiry_cutoff = datetime.now(timezone.utc) - timedelta(minutes=PENDING_EXPIRY_MINUTES)
+        expiry_cutoff = datetime.now(UTC) - timedelta(minutes=PENDING_EXPIRY_MINUTES)
         created_at = att.created_at
         if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
+            created_at = created_at.replace(tzinfo=UTC)
 
         if created_at < expiry_cutoff:
             await self._repo.update_attachment_status(attachment_id, "EXPIRED")
@@ -391,10 +387,8 @@ class JournalService:
             )
             raise AttachmentNotFoundError(attachment_id)
 
-        now = datetime.now(timezone.utc)
-        await self._repo.update_attachment_status(
-            attachment_id, "CONFIRMED", confirmed_at=now
-        )
+        now = datetime.now(UTC)
+        await self._repo.update_attachment_status(attachment_id, "CONFIRMED", confirmed_at=now)
 
         await self._log_attachment_event(
             "ATTACHMENT_CONFIRMED",

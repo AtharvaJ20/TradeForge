@@ -1,7 +1,7 @@
 """UserRepository — all queries include a user_id ownership filter (SR-AUTH-021 Rule E)."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,7 +42,7 @@ class UserRepository:
         await self._db.execute(
             update(User)
             .where(User.id == user_id)
-            .values(is_email_verified=True, updated_at=datetime.now(timezone.utc))
+            .values(is_email_verified=True, updated_at=datetime.now(UTC))
         )
 
     async def set_locked(self, user_id: uuid.UUID, *, locked: bool) -> None:

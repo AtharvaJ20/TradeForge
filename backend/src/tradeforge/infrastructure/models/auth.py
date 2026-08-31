@@ -14,9 +14,7 @@ from .base import Base, utcnow
 class PendingEmailVerification(Base):
     __tablename__ = "pending_email_verifications"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     # SHA-256 of the raw token; raw token is sent to user and never stored
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -29,9 +27,7 @@ class PendingEmailVerification(Base):
 class PendingPasswordReset(Base):
     __tablename__ = "pending_password_resets"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -54,9 +50,7 @@ class SecurityAuditLog(Base):
 
     __tablename__ = "security_audit_log"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     event_type: Mapped[str] = mapped_column(String(64), nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     # PostgreSQL INET type; asyncpg maps it to/from str. NULL when no request context.
