@@ -71,7 +71,7 @@ jobs:
         working-directory: backend
         run: ruff format --check .
 
-      - name: Create btree_gist extension
+      - name: Prepare database (extension + roles)
         working-directory: backend
         run: |
           python - <<'PYEOF'
@@ -80,8 +80,16 @@ jobs:
               url = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
               conn = await asyncpg.connect(url)
               await conn.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
+              # Migrations GRANT to tradeforge_app; create it if absent (CI-only)
+              await conn.execute("""
+                  DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tradeforge_app') THEN
+                      CREATE ROLE tradeforge_app;
+                    END IF;
+                  END $$;
+              """)
               await conn.close()
-              print("btree_gist: ok")
+              print("db prep: ok")
           asyncio.run(main())
           PYEOF
 
