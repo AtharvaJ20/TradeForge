@@ -25,7 +25,7 @@ def _pool() -> ConnectionPool[Any]:
     )
 
 
-async def get_redis() -> AsyncGenerator[Redis[str], None]:
+async def get_redis() -> AsyncGenerator[Redis, None]:  # type: ignore[type-arg]
     """FastAPI dependency: yields a per-request Redis client backed by the shared pool."""
     client = cast("Redis[str]", Redis(connection_pool=_pool()))
     try:
