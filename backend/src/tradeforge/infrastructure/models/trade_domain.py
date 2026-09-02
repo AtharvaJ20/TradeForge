@@ -97,6 +97,9 @@ class Trade(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("trading_accounts.id"), nullable=True
+    )
     instrument_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("instruments.id"), nullable=False
     )
@@ -167,6 +170,9 @@ class ExecutionFill(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("trading_accounts.id"), nullable=True
     )
     instrument_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("instruments.id"), nullable=False

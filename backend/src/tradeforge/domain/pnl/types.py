@@ -62,6 +62,7 @@ class TradeSnapshot:
     exchange_segment: str
     broker: str
     planned_risk_amount: Decimal | None
+    account_id: uuid.UUID | None = None  # populated from trades.account_id (Step 11+)
 
 
 @dataclass(frozen=True)
@@ -102,3 +103,4 @@ class PnlResult:
     broker: str
     charge_schedule_version: str
     engine_version: str
+    account_id: uuid.UUID | None = None  # propagated from TradeSnapshot (Step 11+)

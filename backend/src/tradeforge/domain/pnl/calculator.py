@@ -131,6 +131,7 @@ def compute_pnl(
     return PnlResult(
         trade_id=trade.trade_id,
         user_id=trade.user_id,
+        account_id=trade.account_id,
         gross_pnl=gross_pnl,
         net_pnl=net_pnl,
         r_multiple=r_multiple,

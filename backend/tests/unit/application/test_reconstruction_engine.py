@@ -24,8 +24,9 @@ from tradeforge.infrastructure.repositories.tax_lot_repo import TaxLotRepository
 from tradeforge.infrastructure.repositories.trade_repo import TradeRepository
 
 _USER = uuid.UUID("00000000-0000-0000-0000-000000000001")
-_INST = uuid.UUID("00000000-0000-0000-0000-000000000002")
-_TRADE_ID = uuid.UUID("00000000-0000-0000-0000-000000000003")
+_ACCOUNT = uuid.UUID("00000000-0000-0000-0000-000000000002")
+_INST = uuid.UUID("00000000-0000-0000-0000-000000000003")
+_TRADE_ID = uuid.UUID("00000000-0000-0000-0000-000000000004")
 _TS = datetime(2026, 1, 15, 9, 30, 0, tzinfo=UTC)
 _DATE = date(2026, 1, 15)
 _DATE2 = date(2026, 1, 16)
@@ -39,10 +40,12 @@ def _fill(
     fill_id_str="F001",
     fill_timestamp=None,
     trade_date=None,
+    account_id=None,
 ):
     return FillRecord(
         id=uuid.uuid4(),
         user_id=_USER,
+        account_id=account_id or _ACCOUNT,
         instrument_id=_INST,
         trade_id=None,
         fill_timestamp=fill_timestamp or _TS,
@@ -117,7 +120,7 @@ class TestNoFills:
         trade_repo.get_open_trade_with_lock.return_value = None
         fill_repo.get_unprocessed_fills.return_value = []
 
-        result = await engine.run(session, _USER, _INST, "MIS", "EQ")
+        result = await engine.run(session, _USER, _ACCOUNT, _INST, "MIS", "EQ")
 
         assert result.fills_processed == 0
         trade_repo.create_trade.assert_not_called()
@@ -132,7 +135,7 @@ class TestLongMISTrade:
             _fill("SELL", "100", "510"),
         ]
 
-        result = await engine.run(session, _USER, _INST, "MIS", "EQ")
+        result = await engine.run(session, _USER, _ACCOUNT, _INST, "MIS", "EQ")
 
         assert result.fills_processed == 2
         assert result.trades_opened == 1
@@ -149,7 +152,7 @@ class TestLongMISTrade:
             _fill("SELL", "50", "510"),
         ]
 
-        result = await engine.run(session, _USER, _INST, "MIS", "EQ")
+        result = await engine.run(session, _USER, _ACCOUNT, _INST, "MIS", "EQ")
 
         assert result.fills_processed == 2
         assert result.trades_opened == 1
@@ -165,7 +168,7 @@ class TestShortMISTrade:
             _fill("BUY", "100", "490"),
         ]
 
-        result = await engine.run(session, _USER, _INST, "MIS", "EQ")
+        result = await engine.run(session, _USER, _ACCOUNT, _INST, "MIS", "EQ")
 
         assert result.trades_opened == 1
         assert result.trades_closed == 1
@@ -184,7 +187,7 @@ class TestCNCTrade:
         lot_repo.get_open_lot.return_value = _make_open_lot("100")
         lot_repo.get_lot_for_trade.return_value = _make_closed_lot()
 
-        result = await engine.run(session, _USER, _INST, "CNC", "EQ")
+        result = await engine.run(session, _USER, _ACCOUNT, _INST, "CNC", "EQ")
 
         assert result.tax_lots_created == 1
         lot_repo.create_lot.assert_called_once()
@@ -203,7 +206,7 @@ class TestCNCTrade:
         lot_repo.get_lot_for_trade.side_effect = [scale_in_lot, closed_lot]
         lot_repo.get_open_lot.return_value = _make_open_lot("150", qty_original="150")
 
-        result = await engine.run(session, _USER, _INST, "CNC", "EQ")
+        result = await engine.run(session, _USER, _ACCOUNT, _INST, "CNC", "EQ")
 
         assert result.tax_lots_updated >= 1
 
@@ -217,7 +220,7 @@ class TestCNCTrade:
         lot_repo.get_open_lot.return_value = _make_open_lot("100")
         lot_repo.get_lot_for_trade.return_value = _make_closed_lot()
 
-        await engine.run(session, _USER, _INST, "CNC", "EQ")
+        await engine.run(session, _USER, _ACCOUNT, _INST, "CNC", "EQ")
 
         last_update = trade_repo.update_trade.call_args_list[-1]
         assert last_update.args[2]["trade_type"] == "CNC_SAME_DAY"
@@ -232,7 +235,7 @@ class TestCNCTrade:
         lot_repo.get_open_lot.return_value = _make_open_lot("100")
         lot_repo.get_lot_for_trade.return_value = _make_closed_lot()
 
-        await engine.run(session, _USER, _INST, "CNC", "EQ")
+        await engine.run(session, _USER, _ACCOUNT, _INST, "CNC", "EQ")
 
         last_update = trade_repo.update_trade.call_args_list[-1]
         assert last_update.args[2]["trade_type"] == "CNC"
@@ -256,7 +259,7 @@ class TestResumePartialTrade:
             _fill("SELL", "50", "510"),
         ]
 
-        result = await engine.run(session, _USER, _INST, "MIS", "EQ")
+        result = await engine.run(session, _USER, _ACCOUNT, _INST, "MIS", "EQ")
 
         assert result.fills_processed == 1
         assert result.trades_closed == 1
@@ -273,7 +276,7 @@ class TestErrorConditions:
         ]
 
         with pytest.raises(PositionCrossingZeroError):
-            await engine.run(session, _USER, _INST, "MIS", "EQ")
+            await engine.run(session, _USER, _ACCOUNT, _INST, "MIS", "EQ")
 
     async def test_e2_product_type_family_mismatch(self):
         engine, fill_repo, trade_repo, lot_repo, session = _make_engine()
@@ -284,7 +287,7 @@ class TestErrorConditions:
         ]
 
         with pytest.raises(ReconstructionDataError, match="family"):
-            await engine.run(session, _USER, _INST, "MIS", "EQ")
+            await engine.run(session, _USER, _ACCOUNT, _INST, "MIS", "EQ")
 
     async def test_e4_missing_lot_on_exit(self):
         engine, fill_repo, trade_repo, lot_repo, session = _make_engine()
@@ -296,7 +299,7 @@ class TestErrorConditions:
         lot_repo.get_open_lot.return_value = None
 
         with pytest.raises(ReconstructionConsistencyError, match="E4"):
-            await engine.run(session, _USER, _INST, "CNC", "EQ")
+            await engine.run(session, _USER, _ACCOUNT, _INST, "CNC", "EQ")
 
     async def test_e4_missing_lot_on_scale_in_regression(self):
         """Regression: F1 fix — scale-in with no tax lot must raise E4, not silently return."""
@@ -309,7 +312,7 @@ class TestErrorConditions:
         lot_repo.get_lot_for_trade.return_value = None
 
         with pytest.raises(ReconstructionConsistencyError, match="E4"):
-            await engine.run(session, _USER, _INST, "CNC", "EQ")
+            await engine.run(session, _USER, _ACCOUNT, _INST, "CNC", "EQ")
 
     async def test_e5_ambiguous_ordering(self):
         engine, fill_repo, trade_repo, lot_repo, session = _make_engine()
@@ -320,4 +323,74 @@ class TestErrorConditions:
         ]
 
         with pytest.raises(ReconstructionAmbiguityError):
-            await engine.run(session, _USER, _INST, "MIS", "EQ")
+            await engine.run(session, _USER, _ACCOUNT, _INST, "MIS", "EQ")
+
+
+class TestMultiAccountIsolation:
+    """Regression suite — BUG-2: reconstruction must be scoped to one account.
+
+    Verifies that the engine passes account_id to both repo queries so fills
+    and open trades from a different account are never mixed with the target
+    account's data.
+    """
+
+    async def test_fill_query_receives_correct_account_id(self):
+        """get_unprocessed_fills must be called with the exact account_id passed to run()."""
+        engine, fill_repo, trade_repo, lot_repo, session = _make_engine()
+        trade_repo.get_open_trade_with_lock.return_value = None
+        fill_repo.get_unprocessed_fills.return_value = []
+
+        target_account = uuid.UUID("aaaaaaaa-0000-0000-0000-000000000001")
+        other_account = uuid.UUID("bbbbbbbb-0000-0000-0000-000000000002")
+        assert target_account != other_account
+
+        await engine.run(session, _USER, target_account, _INST, "MIS", "EQ")
+
+        _, kwargs = fill_repo.get_unprocessed_fills.call_args
+        assert kwargs.get("account_id") == target_account or (
+            fill_repo.get_unprocessed_fills.call_args.args[2] == target_account
+        )
+
+    async def test_open_trade_query_receives_correct_account_id(self):
+        """get_open_trade_with_lock must be called with the exact account_id passed to run()."""
+        engine, fill_repo, trade_repo, lot_repo, session = _make_engine()
+        trade_repo.get_open_trade_with_lock.return_value = None
+        fill_repo.get_unprocessed_fills.return_value = []
+
+        target_account = uuid.UUID("aaaaaaaa-0000-0000-0000-000000000001")
+
+        await engine.run(session, _USER, target_account, _INST, "MIS", "EQ")
+
+        _, kwargs = trade_repo.get_open_trade_with_lock.call_args
+        assert kwargs.get("account_id") == target_account or (
+            trade_repo.get_open_trade_with_lock.call_args.args[2] == target_account
+        )
+
+    async def test_second_account_fills_not_mixed_with_first(self):
+        """Fills returned for account_B are ignored when running for account_A.
+
+        The mock repo returns fills only for account_B (wrong account).
+        After the engine scopes to account_A, the repo is queried with account_A
+        and the mock returns [] (empty) — so no trade is created.
+        """
+        account_a = uuid.UUID("aaaaaaaa-0000-0000-0000-000000000001")
+        account_b = uuid.UUID("bbbbbbbb-0000-0000-0000-000000000002")
+
+        engine, fill_repo, trade_repo, lot_repo, session = _make_engine()
+        trade_repo.get_open_trade_with_lock.return_value = None
+
+        # Simulate: repo only knows about account_B fills; account_A query returns []
+        def _fills_by_account(*args, **kwargs):
+            queried_account = kwargs.get("account_id") or (args[2] if len(args) > 2 else None)
+            if queried_account == account_a:
+                return []
+            return [_fill("BUY", "100", "500", account_id=account_b)]
+
+        fill_repo.get_unprocessed_fills.side_effect = _fills_by_account
+
+        result = await engine.run(session, _USER, account_a, _INST, "MIS", "EQ")
+
+        # No fills found for account_A → no trade created
+        assert result.trades_opened == 0
+        assert result.fills_processed == 0
+        trade_repo.create_trade.assert_not_called()

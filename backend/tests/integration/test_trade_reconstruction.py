@@ -149,10 +149,27 @@ async def _insert_instrument(
     return instrument_id
 
 
+async def _insert_trading_account(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+) -> uuid.UUID:
+    account_id = uuid.uuid4()
+    await session.execute(
+        text(
+            "INSERT INTO trading_accounts "
+            "(id, user_id, broker, display_name, account_type, base_currency, status) "
+            "VALUES (:id, :uid, 'ZERODHA', 'Test Account', 'INDIVIDUAL', 'INR', 'ACTIVE')"
+        ),
+        {"id": str(account_id), "uid": str(user_id)},
+    )
+    return account_id
+
+
 async def _insert_fill(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
+    account_id: uuid.UUID,
     instrument_id: uuid.UUID,
     side: str,
     quantity: str,
@@ -168,14 +185,15 @@ async def _insert_fill(
     await session.execute(
         text(
             "INSERT INTO execution_fills "
-            "(id, user_id, instrument_id, fill_timestamp, trade_date, session, "
+            "(id, user_id, account_id, instrument_id, fill_timestamp, trade_date, session, "
             " side, quantity, price, product_type, broker, import_source, fill_id) "
-            "VALUES (:id, :uid, :iid, :ts, :td, 'REGULAR', "
+            "VALUES (:id, :uid, :aid, :iid, :ts, :td, 'REGULAR', "
             " :side, :qty, :price, :pt, 'ZERODHA', :src, :fid)"
         ),
         {
             "id": str(fill_pk),
             "uid": str(user_id),
+            "aid": str(account_id),
             "iid": str(instrument_id),
             "ts": fill_timestamp,
             "td": td,
@@ -207,11 +225,13 @@ async def test_simple_long_trade(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -222,6 +242,7 @@ async def test_simple_long_trade(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -230,7 +251,7 @@ async def test_simple_long_trade(
         fill_id_str="F002",
     )
 
-    result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
 
     assert result.fills_processed == 2
     assert result.trades_opened == 1
@@ -271,11 +292,13 @@ async def test_scaled_entry_average_price(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -286,6 +309,7 @@ async def test_scaled_entry_average_price(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -296,6 +320,7 @@ async def test_scaled_entry_average_price(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="200",
@@ -304,7 +329,7 @@ async def test_scaled_entry_average_price(
         fill_id_str="F003",
     )
 
-    result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
 
     assert result.fills_processed == 3
     assert result.trades_opened == 1
@@ -329,11 +354,13 @@ async def test_partial_exit_then_full_close(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="200",
@@ -344,6 +371,7 @@ async def test_partial_exit_then_full_close(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -354,6 +382,7 @@ async def test_partial_exit_then_full_close(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -362,7 +391,7 @@ async def test_partial_exit_then_full_close(
         fill_id_str="F003",
     )
 
-    result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
 
     assert result.fills_processed == 3
     assert result.trades_opened == 1
@@ -388,12 +417,14 @@ async def test_reentry_after_close_creates_new_trade(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     # Trade A
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -404,6 +435,7 @@ async def test_reentry_after_close_creates_new_trade(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -415,6 +447,7 @@ async def test_reentry_after_close_creates_new_trade(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="50",
@@ -423,7 +456,7 @@ async def test_reentry_after_close_creates_new_trade(
         fill_id_str="F003",
     )
 
-    result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
 
     assert result.fills_processed == 3
     assert result.trades_opened == 2
@@ -447,11 +480,13 @@ async def test_reentry_after_close_creates_new_trade(
 
 async def test_short_trade(session: AsyncSession, engine_under_test: ReconstructionEngine) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -462,6 +497,7 @@ async def test_short_trade(session: AsyncSession, engine_under_test: Reconstruct
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -470,7 +506,7 @@ async def test_short_trade(session: AsyncSession, engine_under_test: Reconstruct
         fill_id_str="F002",
     )
 
-    result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
 
     assert result.fills_processed == 2
 
@@ -496,12 +532,14 @@ async def test_cnc_tax_lot_created_and_closed(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     # Open on day 15, close on day 16 → CNC (overnight)
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -514,6 +552,7 @@ async def test_cnc_tax_lot_created_and_closed(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -524,7 +563,7 @@ async def test_cnc_tax_lot_created_and_closed(
         trade_date=_date(16),
     )
 
-    result = await engine_under_test.run(session, user_id, instrument_id, "CNC", "EQ")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "CNC", "EQ")
 
     assert result.tax_lots_created == 1
     assert result.tax_lots_updated == 1  # decrement on exit
@@ -553,11 +592,13 @@ async def test_cnc_same_day_trade_type(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -570,6 +611,7 @@ async def test_cnc_same_day_trade_type(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -580,7 +622,7 @@ async def test_cnc_same_day_trade_type(
         trade_date=_date(15),
     )
 
-    await engine_under_test.run(session, user_id, instrument_id, "CNC", "EQ")
+    await engine_under_test.run(session, user_id, account_id, instrument_id, "CNC", "EQ")
 
     trade = await session.execute(
         text("SELECT trade_type FROM trades WHERE user_id=:uid"), {"uid": str(user_id)}
@@ -597,11 +639,13 @@ async def test_cnc_scale_in_updates_lot(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -615,6 +659,7 @@ async def test_cnc_scale_in_updates_lot(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -625,7 +670,7 @@ async def test_cnc_scale_in_updates_lot(
         trade_date=_date(15),
     )
 
-    await engine_under_test.run(session, user_id, instrument_id, "CNC", "EQ")
+    await engine_under_test.run(session, user_id, account_id, instrument_id, "CNC", "EQ")
 
     lot = await session.execute(
         text("SELECT * FROM tax_lots WHERE user_id=:uid"), {"uid": str(user_id)}
@@ -646,11 +691,13 @@ async def test_idempotency_second_run_is_noop(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -661,6 +708,7 @@ async def test_idempotency_second_run_is_noop(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -669,8 +717,8 @@ async def test_idempotency_second_run_is_noop(
         fill_id_str="F002",
     )
 
-    result1 = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
-    result2 = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result1 = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
+    result2 = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
 
     assert result1.fills_processed == 2
     assert result2.fills_processed == 0  # all fills already assigned, nothing new
@@ -690,12 +738,14 @@ async def test_open_trade_resumption(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     # Run 1: entry fill only
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -703,7 +753,7 @@ async def test_open_trade_resumption(
         fill_timestamp=_ts(9, 31),
         fill_id_str="F001",
     )
-    result1 = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result1 = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
     assert result1.trades_opened == 1
     assert result1.trades_closed == 0
 
@@ -711,6 +761,7 @@ async def test_open_trade_resumption(
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="100",
@@ -720,7 +771,7 @@ async def test_open_trade_resumption(
     )
 
     # Run 2: picks up the exit fill and closes the existing trade.
-    result2 = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result2 = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
     assert result2.fills_processed == 1
     assert result2.trades_opened == 0
     assert result2.trades_closed == 1
@@ -741,11 +792,13 @@ async def test_e1_position_crossing_zero(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -757,6 +810,7 @@ async def test_e1_position_crossing_zero(
     crossing_fill_id = await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="SELL",
         quantity="150",
@@ -766,7 +820,7 @@ async def test_e1_position_crossing_zero(
     )
 
     with pytest.raises(PositionCrossingZeroError) as exc_info:
-        await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+        await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
 
     assert exc_info.value.fill_id == crossing_fill_id
 
@@ -797,6 +851,7 @@ async def test_e5_ambiguous_ordering(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     shared_ts = _ts(9, 31, 0)
@@ -805,14 +860,15 @@ async def test_e5_ambiguous_ordering(
     await session.execute(
         text(
             "INSERT INTO execution_fills "
-            "(id, user_id, instrument_id, fill_timestamp, trade_date, session, "
+            "(id, user_id, account_id, instrument_id, fill_timestamp, trade_date, session, "
             " side, quantity, price, product_type, broker, import_source, fill_id, created_at) "
-            "VALUES (:id, :uid, :iid, :ts, :td, 'REGULAR', "
+            "VALUES (:id, :uid, :aid, :iid, :ts, :td, 'REGULAR', "
             " 'BUY', 100, 250.00, 'MIS', 'ZERODHA', 'MANUAL', NULL, :created_at)"
         ),
         {
             "id": str(uuid.uuid4()),
             "uid": str(user_id),
+            "aid": str(account_id),
             "iid": str(instrument_id),
             "ts": shared_ts,
             "td": _date(15),
@@ -822,14 +878,15 @@ async def test_e5_ambiguous_ordering(
     await session.execute(
         text(
             "INSERT INTO execution_fills "
-            "(id, user_id, instrument_id, fill_timestamp, trade_date, session, "
+            "(id, user_id, account_id, instrument_id, fill_timestamp, trade_date, session, "
             " side, quantity, price, product_type, broker, import_source, fill_id, created_at) "
-            "VALUES (:id, :uid, :iid, :ts, :td, 'REGULAR', "
+            "VALUES (:id, :uid, :aid, :iid, :ts, :td, 'REGULAR', "
             " 'BUY', 50, 251.00, 'MIS', 'ZERODHA', 'MANUAL', NULL, :created_at)"
         ),
         {
             "id": str(uuid.uuid4()),
             "uid": str(user_id),
+            "aid": str(account_id),
             "iid": str(instrument_id),
             "ts": shared_ts,
             "td": _date(15),
@@ -838,7 +895,7 @@ async def test_e5_ambiguous_ordering(
     )
 
     with pytest.raises(ReconstructionAmbiguityError):
-        await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+        await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
 
 
 # ---------------------------------------------------------------------------
@@ -850,12 +907,14 @@ async def test_excluded_fill_is_skipped(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
 
     # The crossing-zero fill that needs exclusion.
     fill_pk = await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="100",
@@ -878,7 +937,7 @@ async def test_excluded_fill_is_skipped(
     )
 
     # With the fill excluded, the engine finds zero unprocessed fills.
-    result = await engine_under_test.run(session, user_id, instrument_id, "MIS", "EQ")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "MIS", "EQ")
     assert result.fills_processed == 0
     assert result.trades_opened == 0
 
@@ -898,11 +957,13 @@ async def test_nrml_fut_trade_type(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session, instrument_type="FUT", symbol="NIFTY_JAN_FUT")
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="50",
@@ -912,7 +973,7 @@ async def test_nrml_fut_trade_type(
         product_type="NRML",
     )
 
-    result = await engine_under_test.run(session, user_id, instrument_id, "NRML", "FUT")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "NRML", "FUT")
 
     assert result.trades_opened == 1
     trade = await session.execute(
@@ -930,11 +991,13 @@ async def test_nrml_opt_trade_type(
     session: AsyncSession, engine_under_test: ReconstructionEngine
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session, instrument_type="CE", symbol="NIFTY_24000_CE")
 
     await _insert_fill(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         side="BUY",
         quantity="50",
@@ -944,7 +1007,7 @@ async def test_nrml_opt_trade_type(
         product_type="NRML",
     )
 
-    result = await engine_under_test.run(session, user_id, instrument_id, "NRML", "CE")
+    result = await engine_under_test.run(session, user_id, account_id, instrument_id, "NRML", "CE")
 
     assert result.trades_opened == 1
     trade = await session.execute(

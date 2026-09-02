@@ -78,15 +78,19 @@ class ReconstructionEngine:
         self,
         session: AsyncSession,
         user_id: uuid.UUID,
+        account_id: uuid.UUID,
         instrument_id: uuid.UUID,
         product_type: str,
         instrument_type: str,
     ) -> ReconstructionResult:
-        """Reconstruct trades for one processing unit (user, instrument, product_type_family).
+        """Reconstruct trades for one processing unit (account, instrument, product_type_family).
 
         Args:
             session: Active async DB session owned by the caller.
             user_id: Owner of the fills being processed.
+            account_id: Trading account whose fills are being processed.  Scopes
+                both the fill query and the open-trade lock to one account so
+                a user's multiple accounts never mix fills or trade state.
             instrument_id: The instrument being reconstructed.
             product_type: Raw broker product_type ('MIS', 'CNC', 'NRML').
             instrument_type: From instruments.instrument_type ('EQ', 'FUT', 'CE', 'PE').
@@ -107,12 +111,12 @@ class ReconstructionEngine:
 
         # --- Step 1: lock the open trade for this processing unit (§11) ------
         open_trade = await self._trades.get_open_trade_with_lock(
-            session, user_id, instrument_id, family
+            session, user_id, account_id, instrument_id, family
         )
 
         # --- Step 2: fetch unprocessed fills (§2 query) ----------------------
         fills = await self._fills.get_unprocessed_fills(
-            session, user_id, instrument_id, product_type
+            session, user_id, account_id, instrument_id, product_type
         )
         if not fills:
             result.fills_skipped_no_unprocessed = 0
@@ -186,6 +190,7 @@ class ReconstructionEngine:
                     session,
                     pk=trade_id,
                     user_id=user_id,
+                    account_id=fill.account_id,
                     instrument_id=instrument_id,
                     trade_type=trade_type,
                     direction=direction,

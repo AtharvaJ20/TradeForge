@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -15,6 +16,8 @@ from tradeforge.domain.pnl.types import PnlResult, TradeSnapshot
 from tradeforge.infrastructure.models.journal import JournalEntry
 from tradeforge.infrastructure.models.trade_domain import ExecutionFill, Instrument, Trade
 from tradeforge.infrastructure.models.trade_pnl import TradePnl
+
+logger = logging.getLogger(__name__)
 
 
 class PnlRepository:
@@ -46,7 +49,19 @@ class PnlRepository:
         if broker is None:
             return None
 
-        planned_risk = await self._get_planned_risk(trade_id)
+        planned_risk = await self.get_planned_risk(trade_id)
+
+        missing = (
+            trade.average_entry is None
+            or trade.average_exit is None
+            or trade.total_entry_quantity is None
+        )
+        if missing:
+            logger.warning(
+                "get_trade_snapshot: trade %s has NULL price/quantity fields — skipping",
+                trade_id,
+            )
+            return None
 
         def d(v: object) -> Decimal:
             return Decimal(str(v))
@@ -54,6 +69,7 @@ class PnlRepository:
         return TradeSnapshot(
             trade_id=trade.id,
             user_id=trade.user_id,
+            account_id=trade.account_id,
             trade_type=trade.trade_type,
             trade_date=trade.trade_date,
             direction=trade.direction,
@@ -80,7 +96,7 @@ class PnlRepository:
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def _get_planned_risk(self, trade_id: uuid.UUID) -> Decimal | None:
+    async def get_planned_risk(self, trade_id: uuid.UUID) -> Decimal | None:
         """Return planned_risk_amount from journal_entries for this trade."""
         stmt = select(JournalEntry.planned_risk_amount).where(
             JournalEntry.trade_id == trade_id,
@@ -104,6 +120,7 @@ class PnlRepository:
         values: dict[str, Any] = {
             "trade_id": result.trade_id,
             "user_id": result.user_id,
+            "account_id": result.account_id,
             "gross_pnl": result.gross_pnl,
             "net_pnl": result.net_pnl,
             "total_charges": result.total_charges,

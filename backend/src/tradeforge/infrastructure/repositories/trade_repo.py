@@ -28,6 +28,7 @@ class TradeRepository:
         self,
         session: AsyncSession,
         user_id: uuid.UUID,
+        account_id: uuid.UUID,
         instrument_id: uuid.UUID,
         family: ProductTypeFamily,
     ) -> OpenTradeSnapshot | None:
@@ -40,16 +41,22 @@ class TradeRepository:
         Query (§11):
             SELECT * FROM trades
             WHERE user_id = $user_id
+              AND account_id = $account_id
               AND instrument_id = $instrument_id
               AND status IN ('OPEN', 'PARTIAL')
               AND trade_type IN ($types_for_product_type_family)
             FOR UPDATE
+
+        The account_id predicate prevents scalar_one_or_none() from failing with
+        MultipleResultsFound when a user has open trades for the same instrument
+        in two different accounts.
         """
         trade_types = TRADE_TYPES_FOR_FAMILY[family]
         stmt = (
             select(Trade)
             .where(
                 Trade.user_id == user_id,
+                Trade.account_id == account_id,
                 Trade.instrument_id == instrument_id,
                 Trade.status.in_(("OPEN", "PARTIAL")),
                 Trade.trade_type.in_(trade_types),
@@ -66,6 +73,7 @@ class TradeRepository:
         *,
         pk: uuid.UUID,
         user_id: uuid.UUID,
+        account_id: uuid.UUID | None = None,
         instrument_id: uuid.UUID,
         trade_type: str,
         direction: str,
@@ -80,6 +88,7 @@ class TradeRepository:
         trade = Trade(
             id=pk,
             user_id=user_id,
+            account_id=account_id,
             instrument_id=instrument_id,
             trade_type=trade_type,
             direction=direction,

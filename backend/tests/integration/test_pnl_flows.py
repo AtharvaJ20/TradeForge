@@ -34,8 +34,10 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tradeforge.application.pnl_service import PnlService
 from tradeforge.domain.pnl.types import PNL_ENGINE_VERSION, PnlResult
 from tradeforge.infrastructure.repositories.charge_schedule_repo import ChargeScheduleRepository
 from tradeforge.infrastructure.repositories.pnl_repo import PnlRepository
@@ -90,6 +92,22 @@ async def _insert_user(session: AsyncSession) -> uuid.UUID:
     return uid
 
 
+async def _insert_trading_account(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+) -> uuid.UUID:
+    account_id = uuid.uuid4()
+    await session.execute(
+        text(
+            "INSERT INTO trading_accounts "
+            "(id, user_id, broker, display_name, account_type, base_currency, status) "
+            "VALUES (:id, :uid, 'ZERODHA', 'Test Account', 'INDIVIDUAL', 'INR', 'ACTIVE')"
+        ),
+        {"id": str(account_id), "uid": str(user_id)},
+    )
+    return account_id
+
+
 async def _insert_instrument(session: AsyncSession, *, instrument_type: str = "EQ") -> uuid.UUID:
     iid = uuid.uuid4()
     sym = f"SYM_{str(iid).replace('-', '')[:8]}"
@@ -107,6 +125,7 @@ async def _insert_closed_trade(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
+    account_id: uuid.UUID,
     instrument_id: uuid.UUID,
     trade_type: str = "MIS",
     direction: str = "LONG",
@@ -121,15 +140,16 @@ async def _insert_closed_trade(
     await session.execute(
         text(
             "INSERT INTO trades "
-            "(id, user_id, instrument_id, trade_type, direction, status, "
+            "(id, user_id, account_id, instrument_id, trade_type, direction, status, "
             " trade_date, first_fill_at, total_entry_quantity, total_exit_quantity, "
             " net_position, average_entry, average_exit) "
-            "VALUES (:id, :uid, :iid, :tt, :dir, 'CLOSED', "
+            "VALUES (:id, :uid, :aid, :iid, :tt, :dir, 'CLOSED', "
             " :td, :ts, :teq, :teq, 0, :avg_e, :avg_x)"
         ),
         {
             "id": str(tid),
             "uid": str(user_id),
+            "aid": str(account_id),
             "iid": str(instrument_id),
             "tt": trade_type,
             "dir": direction,
@@ -147,6 +167,7 @@ async def _insert_open_trade(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
+    account_id: uuid.UUID,
     instrument_id: uuid.UUID,
 ) -> uuid.UUID:
     tid = uuid.uuid4()
@@ -154,15 +175,16 @@ async def _insert_open_trade(
     await session.execute(
         text(
             "INSERT INTO trades "
-            "(id, user_id, instrument_id, trade_type, direction, status, "
+            "(id, user_id, account_id, instrument_id, trade_type, direction, status, "
             " trade_date, first_fill_at, total_entry_quantity, total_exit_quantity, "
             " net_position, average_entry) "
-            "VALUES (:id, :uid, :iid, 'MIS', 'LONG', 'OPEN', "
+            "VALUES (:id, :uid, :aid, :iid, 'MIS', 'LONG', 'OPEN', "
             " :td, :ts, 100, 0, 100, 250.0000)"
         ),
         {
             "id": str(tid),
             "uid": str(user_id),
+            "aid": str(account_id),
             "iid": str(instrument_id),
             "td": date(2026, 1, 15),
             "ts": now,
@@ -175,6 +197,7 @@ async def _insert_entry_fill(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
+    account_id: uuid.UUID,
     instrument_id: uuid.UUID,
     trade_id: uuid.UUID,
     broker: str = "ZERODHA",
@@ -183,14 +206,15 @@ async def _insert_entry_fill(
     await session.execute(
         text(
             "INSERT INTO execution_fills "
-            "(id, user_id, instrument_id, trade_id, fill_timestamp, trade_date, session, "
-            " side, quantity, price, product_type, broker, import_source, fill_role) "
-            "VALUES (:id, :uid, :iid, :tid, :ts, :td, 'REGULAR', "
+            "(id, user_id, account_id, instrument_id, trade_id, fill_timestamp, trade_date, "
+            " session, side, quantity, price, product_type, broker, import_source, fill_role) "
+            "VALUES (:id, :uid, :aid, :iid, :tid, :ts, :td, 'REGULAR', "
             " 'BUY', 100, 250.00, 'MIS', :broker, 'BROKER', 'ENTRY')"
         ),
         {
             "id": str(uuid.uuid4()),
             "uid": str(user_id),
+            "aid": str(account_id),
             "iid": str(instrument_id),
             "tid": str(trade_id),
             "ts": now,
@@ -228,6 +252,7 @@ async def _insert_journal_entry(
 def _build_pnl_result(
     trade_id: uuid.UUID,
     user_id: uuid.UUID,
+    account_id: uuid.UUID,
     *,
     gross_pnl: str = "1000.0000",
     net_pnl: str = "950.0000",
@@ -238,6 +263,7 @@ def _build_pnl_result(
     return PnlResult(
         trade_id=trade_id,
         user_id=user_id,
+        account_id=account_id,
         gross_pnl=Decimal(gross_pnl),
         net_pnl=Decimal(net_pnl),
         r_multiple=Decimal(r_multiple) if r_multiple is not None else None,
@@ -268,10 +294,17 @@ async def test_get_trade_snapshot_returns_none_for_unknown_trade(session: AsyncS
 
 async def test_get_trade_snapshot_returns_none_for_open_trade(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_open_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_open_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     await _insert_entry_fill(
-        session, user_id=user_id, instrument_id=instrument_id, trade_id=trade_id
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
     )
 
     repo = PnlRepository(session)
@@ -281,17 +314,24 @@ async def test_get_trade_snapshot_returns_none_for_open_trade(session: AsyncSess
 
 async def test_get_trade_snapshot_assembles_correct_fields(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
     trade_id = await _insert_closed_trade(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         average_entry="250.0000",
         average_exit="260.0000",
         total_entry_quantity="100.0000",
     )
     await _insert_entry_fill(
-        session, user_id=user_id, instrument_id=instrument_id, trade_id=trade_id, broker="ZERODHA"
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
+        broker="ZERODHA",
     )
 
     repo = PnlRepository(session)
@@ -314,10 +354,17 @@ async def test_get_trade_snapshot_includes_planned_risk_from_journal(
     session: AsyncSession,
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_closed_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     await _insert_entry_fill(
-        session, user_id=user_id, instrument_id=instrument_id, trade_id=trade_id
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
     )
     await _insert_journal_entry(
         session, user_id=user_id, trade_id=trade_id, planned_risk_amount="500.0000"
@@ -335,8 +382,11 @@ async def test_get_trade_snapshot_returns_none_when_no_entry_fill(
 ) -> None:
     """get_trade_snapshot requires at least one ENTRY fill to determine broker."""
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_closed_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     # No fills inserted — _get_broker_for_trade returns None
 
     repo = PnlRepository(session)
@@ -351,11 +401,14 @@ async def test_get_trade_snapshot_returns_none_when_no_entry_fill(
 
 async def test_upsert_creates_trade_pnl_row(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_closed_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
 
     repo = PnlRepository(session)
-    pnl = _build_pnl_result(trade_id, user_id)
+    pnl = _build_pnl_result(trade_id, user_id, account_id)
     await repo.upsert(pnl)
     await session.flush()
 
@@ -373,18 +426,21 @@ async def test_upsert_creates_trade_pnl_row(session: AsyncSession) -> None:
 async def test_upsert_is_idempotent(session: AsyncSession) -> None:
     """Calling upsert twice must update in place — no duplicate rows."""
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_closed_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
 
     repo = PnlRepository(session)
     await repo.upsert(
-        _build_pnl_result(trade_id, user_id, gross_pnl="1000.0000", net_pnl="950.0000")
+        _build_pnl_result(trade_id, user_id, account_id, gross_pnl="1000.0000", net_pnl="950.0000")
     )
     await session.flush()
 
     # Second upsert with different values
     await repo.upsert(
-        _build_pnl_result(trade_id, user_id, gross_pnl="1200.0000", net_pnl="1150.0000")
+        _build_pnl_result(trade_id, user_id, account_id, gross_pnl="1200.0000", net_pnl="1150.0000")
     )
     await session.flush()
 
@@ -407,11 +463,14 @@ async def test_get_for_trade_returns_none_when_not_found(session: AsyncSession) 
 
 async def test_update_r_multiple(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_closed_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
 
     repo = PnlRepository(session)
-    await repo.upsert(_build_pnl_result(trade_id, user_id, r_multiple=None))
+    await repo.upsert(_build_pnl_result(trade_id, user_id, account_id, r_multiple=None))
     await session.flush()
 
     await repo.update_r_multiple(trade_id, Decimal("3.500000"))
@@ -424,11 +483,14 @@ async def test_update_r_multiple(session: AsyncSession) -> None:
 
 async def test_update_r_multiple_to_none_clears_it(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_closed_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_closed_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
 
     repo = PnlRepository(session)
-    await repo.upsert(_build_pnl_result(trade_id, user_id, r_multiple="2.000000"))
+    await repo.upsert(_build_pnl_result(trade_id, user_id, account_id, r_multiple="2.000000"))
     await session.flush()
 
     await repo.update_r_multiple(trade_id, None)
@@ -503,3 +565,410 @@ async def test_charge_schedule_effective_date_selects_latest_before_trade_date(
     # The 2024-10-01 row is the post-Budget row; effective dates must differ
     assert before.effective_from < after.effective_from
     assert after.effective_from == date(2024, 10, 1)
+
+
+# ---------------------------------------------------------------------------
+# TC-G3: PnlService integration tests
+# ---------------------------------------------------------------------------
+
+
+def _make_pnl_service(session: AsyncSession) -> PnlService:
+    return PnlService(
+        pnl_repo=PnlRepository(session),
+        charge_schedule_repo=ChargeScheduleRepository(session),
+    )
+
+
+async def test_tc_g3_001_new_closed_trade_creates_row_r_multiple_none(
+    session: AsyncSession,
+) -> None:
+    """TC-G3-001: closed trade with no journal entry → row inserted, r_multiple=None."""
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+    trade_id = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_type="MIS",
+        direction="LONG",
+        average_entry="2450.0000",
+        average_exit="2480.0000",
+        total_entry_quantity="100.0000",
+        trade_date=date(2025, 3, 15),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
+        broker="ZERODHA",
+    )
+    # No journal entry → planned_risk_amount=None
+
+    svc = _make_pnl_service(session)
+    await svc.calculate_and_store(trade_id, user_id)
+    await session.flush()
+
+    repo = PnlRepository(session)
+    row = await repo.get_for_trade(trade_id)
+    assert row is not None
+    assert row.r_multiple is None
+    assert row.engine_version == PNL_ENGINE_VERSION
+    assert row.broker == "ZERODHA"
+    assert row.gross_pnl is not None
+    assert row.net_pnl is not None
+    assert row.total_charges is not None
+
+
+async def test_tc_g3_002_planned_stop_set_r_multiple_computed(session: AsyncSession) -> None:
+    """TC-G3-002: closed trade with planned_stop → r_multiple is not None."""
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+    trade_id = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        average_entry="2450.0000",
+        average_exit="2480.0000",
+        total_entry_quantity="100.0000",
+        trade_date=date(2025, 3, 15),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
+    )
+    await _insert_journal_entry(
+        session, user_id=user_id, trade_id=trade_id, planned_risk_amount="1000.0000"
+    )
+
+    svc = _make_pnl_service(session)
+    await svc.calculate_and_store(trade_id, user_id)
+    await session.flush()
+
+    repo = PnlRepository(session)
+    row = await repo.get_for_trade(trade_id)
+    assert row is not None
+    assert row.r_multiple is not None
+    assert row.r_multiple > Decimal("0")
+
+
+async def test_tc_g3_003_total_charges_identity_holds_in_db(session: AsyncSession) -> None:
+    """TC-G3-003: total_charges == sum of 7 components in the persisted row."""
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+    trade_id = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        average_entry="2450.0000",
+        average_exit="2480.0000",
+        total_entry_quantity="100.0000",
+        trade_date=date(2025, 3, 15),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
+    )
+
+    svc = _make_pnl_service(session)
+    await svc.calculate_and_store(trade_id, user_id)
+    await session.flush()
+
+    repo = PnlRepository(session)
+    row = await repo.get_for_trade(trade_id)
+    assert row is not None
+    components_sum = (
+        Decimal(str(row.brokerage))
+        + Decimal(str(row.stt))
+        + Decimal(str(row.exchange_charges))
+        + Decimal(str(row.sebi_charges))
+        + Decimal(str(row.stamp_duty))
+        + Decimal(str(row.gst))
+        + Decimal(str(row.ipft))
+    )
+    assert Decimal(str(row.total_charges)) == components_sum
+
+
+async def test_tc_g3_004_recalculate_r_multiple_after_stop_added(session: AsyncSession) -> None:
+    """TC-G3-004: r_multiple updated via recalculate_r_multiple after journal entry added."""
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+    trade_id = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        average_entry="2450.0000",
+        average_exit="2480.0000",
+        total_entry_quantity="100.0000",
+        trade_date=date(2025, 3, 15),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
+    )
+
+    svc = _make_pnl_service(session)
+    # First call: no planned_risk → r_multiple=None
+    await svc.calculate_and_store(trade_id, user_id)
+    await session.flush()
+
+    repo = PnlRepository(session)
+    row_before = await repo.get_for_trade(trade_id)
+    assert row_before is not None
+    assert row_before.r_multiple is None
+
+    # Now add journal entry with planned_risk_amount
+    await _insert_journal_entry(
+        session, user_id=user_id, trade_id=trade_id, planned_risk_amount="1000.0000"
+    )
+
+    # Recalculate r_multiple
+    await svc.recalculate_r_multiple(trade_id, user_id)
+    await session.flush()
+
+    row_after = await repo.get_for_trade(trade_id)
+    assert row_after is not None
+    assert row_after.r_multiple is not None
+
+
+async def test_tc_g3_006_calculate_and_store_is_idempotent(session: AsyncSession) -> None:
+    """TC-G3-006: calling calculate_and_store twice produces exactly one DB row."""
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+    trade_id = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        average_entry="2450.0000",
+        average_exit="2480.0000",
+        total_entry_quantity="100.0000",
+        trade_date=date(2025, 3, 15),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
+    )
+
+    svc = _make_pnl_service(session)
+    await svc.calculate_and_store(trade_id, user_id)
+    await session.flush()
+    await svc.calculate_and_store(trade_id, user_id)
+    await session.flush()
+
+    count = await session.execute(
+        text("SELECT COUNT(*) FROM trade_pnl WHERE trade_id = :tid"), {"tid": str(trade_id)}
+    )
+    assert count.scalar_one() == 1
+
+
+async def test_tc_g3_007_skips_open_trade(session: AsyncSession) -> None:
+    """TC-G3-007: calculate_and_store on OPEN trade → no row inserted."""
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+    trade_id = await _insert_open_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id,
+    )
+
+    svc = _make_pnl_service(session)
+    await svc.calculate_and_store(trade_id, user_id)
+    await session.flush()
+
+    count = await session.execute(
+        text("SELECT COUNT(*) FROM trade_pnl WHERE trade_id = :tid"), {"tid": str(trade_id)}
+    )
+    assert count.scalar_one() == 0
+
+
+async def test_tc_g3_008_backfill_processes_closed_trades(session: AsyncSession) -> None:
+    """TC-G3-008: backfill_all_closed processes all closed trades for the user."""
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+
+    # Two closed trades without existing PNL rows
+    trade_id_1 = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        average_entry="2450.0000",
+        average_exit="2480.0000",
+        total_entry_quantity="100.0000",
+        trade_date=date(2025, 3, 15),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id_1,
+    )
+
+    trade_id_2 = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        average_entry="500.0000",
+        average_exit="510.0000",
+        total_entry_quantity="50.0000",
+        trade_date=date(2025, 3, 16),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id_2,
+    )
+
+    svc = _make_pnl_service(session)
+    succeeded, failed = await svc.backfill_all_closed(user_id)
+    await session.flush()
+
+    assert succeeded == 2
+    assert failed == 0
+
+    repo = PnlRepository(session)
+    assert await repo.get_for_trade(trade_id_1) is not None
+    assert await repo.get_for_trade(trade_id_2) is not None
+
+
+async def test_tc_g3_009_check_constraint_rejects_mismatched_total_charges(
+    session: AsyncSession,
+) -> None:
+    """TC-G3-009: inserting a row where total_charges != component sum raises IntegrityError."""
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+    trade_id = await _insert_closed_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
+
+    now = datetime.now(UTC)
+    bad_id = str(uuid.uuid4())
+    # total_charges deliberately does NOT equal the sum of the 7 components
+    with pytest.raises(IntegrityError):
+        await session.execute(
+            text(
+                "INSERT INTO trade_pnl "
+                "(id, trade_id, user_id, account_id, gross_pnl, net_pnl, total_charges, "
+                " brokerage, stt, exchange_charges, sebi_charges, stamp_duty, gst, ipft, "
+                " broker, charge_schedule_version, engine_version, "
+                " calculated_at, created_at, updated_at) "
+                "VALUES (:id, :tid, :uid, :aid, 3000.0000, 2862.0000, 999.9999, "
+                " 40.0000, 62.0000, 17.0085, 0.4930, 7.3500, 10.3503, 0.4930, "
+                " 'ZERODHA', 'ZERODHA_MIS_NSE_EQ_20241001', '1.0.0', "
+                " :now, :now, :now)"
+            ),
+            {
+                "id": bad_id,
+                "tid": str(trade_id),
+                "uid": str(user_id),
+                "aid": str(account_id),
+                "now": now,
+            },
+        )
+        await session.flush()
+
+
+async def test_tc_g3_def003_backfill_skips_already_calculated_trades(
+    session: AsyncSession,
+) -> None:
+    """DEF-003 regression: backfill_all_closed must not reprocess trades that already
+    have a trade_pnl row.
+
+    One trade pre-calculated, one trade orphan.  After backfill:
+      - succeeded == 1 (only the orphan was processed)
+      - pre-calculated trade: row count stays at 1
+      - orphan trade: row count becomes 1
+    """
+    user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
+    instrument_id = await _insert_instrument(session)
+
+    # Trade 1: pre-existing PnL row — must be skipped
+    trade_id_precalc = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        average_entry="2450.0000",
+        average_exit="2480.0000",
+        total_entry_quantity="100.0000",
+        trade_date=date(2025, 3, 15),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id_precalc,
+    )
+    repo = PnlRepository(session)
+    await repo.upsert(_build_pnl_result(trade_id_precalc, user_id, account_id))
+    await session.flush()
+
+    # Trade 2: orphan — no PnL row, must be processed
+    trade_id_orphan = await _insert_closed_trade(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        average_entry="500.0000",
+        average_exit="510.0000",
+        total_entry_quantity="50.0000",
+        trade_date=date(2025, 3, 16),
+    )
+    await _insert_entry_fill(
+        session,
+        user_id=user_id,
+        account_id=account_id,
+        instrument_id=instrument_id,
+        trade_id=trade_id_orphan,
+    )
+
+    svc = _make_pnl_service(session)
+    succeeded, failed = await svc.backfill_all_closed(user_id)
+    await session.flush()
+
+    assert succeeded == 1
+    assert failed == 0
+
+    count_precalc = await session.execute(
+        text("SELECT COUNT(*) FROM trade_pnl WHERE trade_id = :tid"),
+        {"tid": str(trade_id_precalc)},
+    )
+    assert count_precalc.scalar_one() == 1
+    assert await repo.get_for_trade(trade_id_orphan) is not None
