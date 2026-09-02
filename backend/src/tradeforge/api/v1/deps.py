@@ -7,6 +7,8 @@ Security notes:
     against a degraded session store (SR-AUTH-021 Rule D).
 """
 
+from __future__ import annotations
+
 import ipaddress
 import uuid
 
@@ -92,7 +94,7 @@ def get_client_ip(request: Request) -> str:
 
 async def get_auth_service(
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
+    redis: Redis[str] = Depends(get_redis),
 ) -> AuthService:
     return AuthService(
         user_repo=UserRepository(db),
@@ -105,7 +107,7 @@ async def get_auth_service(
 
 
 async def get_current_user_id(
-    redis: Redis = Depends(get_redis),
+    redis: Redis[str] = Depends(get_redis),
     tf_session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> uuid.UUID:
     """Resolve the session cookie to an authenticated user_id (fail-closed on Redis errors)."""

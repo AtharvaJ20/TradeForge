@@ -114,10 +114,27 @@ async def _insert_instrument(session: AsyncSession) -> uuid.UUID:
     return iid
 
 
+async def _insert_trading_account(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+) -> uuid.UUID:
+    account_id = uuid.uuid4()
+    await session.execute(
+        text(
+            "INSERT INTO trading_accounts "
+            "(id, user_id, broker, display_name, account_type, base_currency, status) "
+            "VALUES (:id, :uid, 'ZERODHA', 'Test Account', 'INDIVIDUAL', 'INR', 'ACTIVE')"
+        ),
+        {"id": str(account_id), "uid": str(user_id)},
+    )
+    return account_id
+
+
 async def _insert_trade(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
+    account_id: uuid.UUID,
     instrument_id: uuid.UUID,
     average_entry: str = "500.0000",
     total_entry_quantity: str = "100.0000",
@@ -127,15 +144,16 @@ async def _insert_trade(
     await session.execute(
         text(
             "INSERT INTO trades "
-            "(id, user_id, instrument_id, trade_type, direction, status, "
+            "(id, user_id, account_id, instrument_id, trade_type, direction, status, "
             " trade_date, first_fill_at, total_entry_quantity, total_exit_quantity, "
             " net_position, average_entry) "
-            "VALUES (:id, :uid, :iid, 'MIS', 'LONG', 'OPEN', "
+            "VALUES (:id, :uid, :aid, :iid, 'MIS', 'LONG', 'OPEN', "
             " :td, :ts, :teq, 0, :teq, :avg)"
         ),
         {
             "id": str(tid),
             "uid": str(user_id),
+            "aid": str(account_id),
             "iid": str(instrument_id),
             "td": now.date(),
             "ts": now,
@@ -161,8 +179,11 @@ def _svc(session: AsyncSession) -> JournalService:
 
 async def test_create_and_read_journal_entry(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
 
     svc = _svc(session)
     data = JournalEntryWrite(
@@ -192,8 +213,11 @@ async def test_create_and_read_journal_entry(session: AsyncSession) -> None:
 
 async def test_upsert_creates_entry_when_none_exists(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
 
     svc = _svc(session)
     with pytest.raises(JournalEntryNotFoundError):
@@ -214,8 +238,11 @@ async def test_upsert_twice_writes_audit_log_for_changed_fields_only(
     session: AsyncSession,
 ) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     # First write: no existing entry — no audit log yet
@@ -262,8 +289,11 @@ async def test_upsert_twice_writes_audit_log_for_changed_fields_only(
 
 async def test_audit_history_returned_by_service(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     await svc.upsert_entry(user_id, trade_id, JournalEntryWrite(discipline_score=7))
@@ -288,8 +318,11 @@ async def test_cross_user_idor_get_entry(session: AsyncSession) -> None:
     """User B must not retrieve user A's journal entry."""
     user_a = await _insert_user(session, "a")
     user_b = await _insert_user(session, "b")
+    account_id_a = await _insert_trading_account(session, user_a)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_a, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_a, account_id=account_id_a, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     # User A creates entry
@@ -304,9 +337,12 @@ async def test_cross_user_idor_upsert(session: AsyncSession) -> None:
     """User B must not upsert against user A's trade (trade not found for user B)."""
     user_a = await _insert_user(session, "ua")
     user_b = await _insert_user(session, "ub")
+    account_id_a = await _insert_trading_account(session, user_a)
     instrument_id = await _insert_instrument(session)
     # trade belongs to user A
-    trade_id = await _insert_trade(session, user_id=user_a, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_a, account_id=account_id_a, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     with pytest.raises(TradeNotFoundError):
@@ -320,8 +356,11 @@ async def test_cross_user_idor_upsert(session: AsyncSession) -> None:
 
 async def test_attachment_presign_confirm_delete_lifecycle(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     # Need an existing journal entry for attachment flow
@@ -377,8 +416,11 @@ async def test_attachment_cross_user_confirm_rejected(session: AsyncSession) -> 
     """User B must not confirm user A's pending attachment (returns 404)."""
     user_a = await _insert_user(session, "atta")
     user_b = await _insert_user(session, "attb")
+    account_id_a = await _insert_trading_account(session, user_a)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_a, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_a, account_id=account_id_a, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     await svc.upsert_entry(user_a, trade_id, JournalEntryWrite())
@@ -400,8 +442,11 @@ async def test_attachment_cross_user_confirm_rejected(session: AsyncSession) -> 
 async def test_attachment_svg_rejected_by_service(session: AsyncSession) -> None:
     """SVG is explicitly excluded (XSS vector) — must raise AttachmentContentTypeNotAllowedError."""
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     await svc.upsert_entry(user_id, trade_id, JournalEntryWrite())
@@ -426,10 +471,12 @@ async def test_attachment_svg_rejected_by_service(session: AsyncSession) -> None
 async def test_planned_risk_amount_computation(session: AsyncSession) -> None:
     """abs(avg_entry − planned_stop) × total_entry_qty = abs(500 − 490) × 100 = 1000"""
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
     trade_id = await _insert_trade(
         session,
         user_id=user_id,
+        account_id=account_id,
         instrument_id=instrument_id,
         average_entry="500.0000",
         total_entry_quantity="100.0000",
@@ -443,8 +490,11 @@ async def test_planned_risk_amount_computation(session: AsyncSession) -> None:
 
 async def test_planned_risk_amount_cleared_when_stop_removed(session: AsyncSession) -> None:
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     # Set stop
@@ -464,8 +514,11 @@ async def test_planned_risk_amount_cleared_when_stop_removed(session: AsyncSessi
 async def test_audit_log_immutable_trigger(session: AsyncSession) -> None:
     """The trg_audit_log_immutable trigger must raise if we attempt an UPDATE."""
     user_id = await _insert_user(session)
+    account_id = await _insert_trading_account(session, user_id)
     instrument_id = await _insert_instrument(session)
-    trade_id = await _insert_trade(session, user_id=user_id, instrument_id=instrument_id)
+    trade_id = await _insert_trade(
+        session, user_id=user_id, account_id=account_id, instrument_id=instrument_id
+    )
     svc = _svc(session)
 
     # Write two upserts to produce an audit row

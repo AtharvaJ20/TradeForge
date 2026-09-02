@@ -12,6 +12,8 @@ Key schema:
   auth_attempts_ip:{ip}     → integer counter  TTL=60s (fixed window) — register/verify-email/reset
 """
 
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass
 
@@ -38,7 +40,7 @@ class SessionData:
 
 
 class SessionRepository:
-    def __init__(self, redis: Redis) -> None:
+    def __init__(self, redis: Redis[str]) -> None:
         self._r = redis
 
     # ------------------------------------------------------------------

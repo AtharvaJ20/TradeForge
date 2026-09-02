@@ -177,8 +177,9 @@ class JournalService:
             if audit_entries:
                 await self._repo.append_audit_entries(existing.id, user_id, audit_entries)
             # Re-fetch to pick up updated_at
-            entry = await self._repo.get_entry(trade_id, user_id)
-            assert entry is not None  # just updated, cannot be None
+            refreshed = await self._repo.get_entry(trade_id, user_id)
+            assert refreshed is not None  # just updated, cannot be None
+            entry = refreshed
 
         has_pnl = await self._repo.has_pnl_row(trade_id)
         pnl_status = _compute_pnl_status(entry.planned_stop, has_pnl)
