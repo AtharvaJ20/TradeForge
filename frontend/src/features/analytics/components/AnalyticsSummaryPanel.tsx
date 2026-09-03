@@ -1,30 +1,43 @@
 import { useAnalyticsSummary } from '../hooks/useAnalyticsSummary'
+import type { AnalyticsFilterParams } from '../types'
+import { PnlSummaryCard } from './PnlSummaryCard'
+import { OutcomeCard } from './OutcomeCard'
+import { ExpectancyCard } from './ExpectancyCard'
+import { ProfitFactorCard } from './ProfitFactorCard'
+import { PlannedRRCard } from './PlannedRRCard'
+import { DrawdownCard } from './DrawdownCard'
 import { RiskAdjustedCard } from './RiskAdjustedCard'
+import { DirectionBreakdownTable } from './DirectionBreakdownTable'
+import { ChargesCard } from './ChargesCard'
 
-/** Skeleton placeholder matching RiskAdjustedCard dimensions. */
-function SkeletonRiskAdjustedCard() {
+function SkeletonPanel() {
   return (
     <div
-      className="rounded-xl border border-border bg-surface-base p-5"
+      className="space-y-4"
       role="status"
       aria-busy="true"
       aria-label="Loading analytics"
     >
-      <div className="mb-4 h-3 w-36 animate-pulse rounded bg-surface-subtle" />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="h-24 animate-pulse rounded-lg bg-surface-subtle" />
-        <div className="h-24 animate-pulse rounded-lg bg-surface-subtle" />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="h-40 animate-pulse rounded-xl bg-surface-subtle" />
+        <div className="h-40 animate-pulse rounded-xl bg-surface-subtle" />
       </div>
-      <div className="mt-3 h-3 w-48 animate-pulse rounded bg-surface-subtle" />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="h-40 animate-pulse rounded-xl bg-surface-subtle" />
+        <div className="h-40 animate-pulse rounded-xl bg-surface-subtle" />
+      </div>
+      <div className="h-36 animate-pulse rounded-xl bg-surface-subtle" />
+      <div className="h-36 animate-pulse rounded-xl bg-surface-subtle" />
+      <div className="h-48 animate-pulse rounded-xl bg-surface-subtle" />
     </div>
   )
 }
 
-/** Fetches /v1/analytics/summary and renders risk-adjusted metrics. */
-export function AnalyticsSummaryPanel() {
-  const { data, isLoading, isError } = useAnalyticsSummary()
+/** Fetches /v1/analytics/summary and renders all 9 analytics sections. */
+export function AnalyticsSummaryPanel({ params }: { params?: AnalyticsFilterParams } = {}) {
+  const { data, isLoading, isError } = useAnalyticsSummary(params)
 
-  if (isLoading) return <SkeletonRiskAdjustedCard />
+  if (isLoading) return <SkeletonPanel />
 
   if (isError) {
     return (
@@ -43,9 +56,30 @@ export function AnalyticsSummaryPanel() {
   if (!data) return null
 
   return (
-    <RiskAdjustedCard
-      sharpe={data.risk_adjusted.sharpe}
-      sortino={data.risk_adjusted.sortino}
-    />
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <PnlSummaryCard pnl={data.pnl} />
+        <OutcomeCard outcome={data.outcome} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <ExpectancyCard expectancy={data.expectancy} />
+        <ProfitFactorCard profitFactor={data.profit_factor} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <PlannedRRCard plannedRR={data.planned_rr} />
+        <DrawdownCard drawdown={data.drawdown} />
+      </div>
+
+      <RiskAdjustedCard
+        sharpe={data.risk_adjusted.sharpe}
+        sortino={data.risk_adjusted.sortino}
+      />
+
+      <DirectionBreakdownTable rows={data.direction} />
+
+      <ChargesCard charges={data.charges} />
+    </div>
   )
 }
