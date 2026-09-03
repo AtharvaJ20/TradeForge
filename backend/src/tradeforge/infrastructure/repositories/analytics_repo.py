@@ -14,11 +14,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import Integer, case, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.domain.analytics.types import (
+    AccountDimension,
     AnalyticsFilter,
     ChargesBreakdown,
     EquityCurvePoint,
@@ -34,6 +36,7 @@ from tradeforge.domain.analytics.types import (
 )
 from tradeforge.infrastructure.models.trade_domain import ExecutionFill, Instrument, Trade
 from tradeforge.infrastructure.models.trade_pnl import TradePnl
+from tradeforge.infrastructure.models.trading_account import TradingAccount
 
 _ZERO = Decimal("0")
 _HUNDRED = Decimal("100")
@@ -689,3 +692,61 @@ class AnalyticsRepository:
             stmt = self._apply_instrument_clauses(stmt, f)
 
         return [r for r in (await self._db.execute(stmt)).scalars() if r is not None]
+
+    # ------------------------------------------------------------------
+    # Filter dimension endpoints (B-4) — unfiltered, user-scoped
+    # ------------------------------------------------------------------
+
+    async def get_distinct_accounts(self, user_id: UUID) -> list[AccountDimension]:
+        """Distinct account IDs present in the user's CLOSED trades, with display_name label.
+
+        LEFT OUTER JOIN to TradingAccount so a deleted account still appears —
+        the UUID is used as the label fallback (acceptance criterion B-1).
+        """
+        stmt = (
+            select(Trade.account_id, TradingAccount.display_name)
+            .select_from(Trade)
+            .outerjoin(TradingAccount, Trade.account_id == TradingAccount.id)
+            .where(
+                Trade.user_id == user_id,
+                Trade.status == "CLOSED",
+                Trade.account_id.is_not(None),
+            )
+            .distinct(Trade.account_id)
+            .order_by(Trade.account_id)
+        )
+        rows = (await self._db.execute(stmt)).all()
+        return [
+            AccountDimension(
+                id=r.account_id,
+                label=r.display_name if r.display_name is not None else str(r.account_id),
+            )
+            for r in rows
+        ]
+
+    async def get_distinct_setups(self, user_id: UUID) -> list[str]:
+        """Distinct setup_name values present in the user's CLOSED trades.
+
+        NULL setup_name is converted to the sentinel string "(no setup)" at this layer
+        so the service and API see a clean list[str] (decision D-2).
+        """
+        stmt = (
+            select(Trade.setup_name)
+            .where(Trade.user_id == user_id, Trade.status == "CLOSED")
+            .distinct()
+            .order_by(Trade.setup_name)
+        )
+        rows = (await self._db.execute(stmt)).scalars().all()
+        return [r if r is not None else "(no setup)" for r in rows]
+
+    async def get_distinct_brokers(self, user_id: UUID) -> list[str]:
+        """Distinct broker values present in the user's CLOSED trades, alphabetically sorted."""
+        stmt = (
+            select(TradePnl.broker)
+            .select_from(Trade)
+            .join(TradePnl, TradePnl.trade_id == Trade.id)
+            .where(Trade.user_id == user_id, Trade.status == "CLOSED")
+            .distinct()
+            .order_by(TradePnl.broker)
+        )
+        return list((await self._db.execute(stmt)).scalars().all())

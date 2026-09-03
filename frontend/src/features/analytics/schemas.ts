@@ -102,6 +102,19 @@ const ChargesBreakdownSchema = z.object({
   charges_added_to_loss: decimalString,
 })
 
+// ---------------------------------------------------------------------------
+// Filter dimension schemas (Step 12.4)
+// ---------------------------------------------------------------------------
+
+export const AccountDimensionSchema = z.object({
+  id: z.string().uuid(),
+  label: z.string(),
+})
+
+export const FilterAccountsSchema = z.array(AccountDimensionSchema)
+export const FilterSetupsSchema = z.array(z.string())
+export const FilterBrokersSchema = z.array(z.string())
+
 export const AnalyticsSummarySchema = z.object({
   pnl: PnlSummarySchema,
   outcome: OutcomeDistributionSchema,

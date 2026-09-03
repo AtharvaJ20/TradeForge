@@ -17,6 +17,7 @@ export type {
   SharpeResult,
   SortinoResult,
   AnalyticsFilterParams,
+  AccountDimension,
   PnlSummary,
   OutcomeDistribution,
   ExpectancyResult,
@@ -26,3 +27,5 @@ export type {
   DirectionPerformance,
   ChargesBreakdown,
 } from './types'
+export { useFilterDimensions } from './hooks/useFilterDimensions'
+export { countActiveFilterDimensions } from './utils'

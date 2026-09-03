@@ -1,6 +1,11 @@
 import { apiClient } from '@/lib/api-client'
-import { AnalyticsSummarySchema } from './schemas'
-import type { AnalyticsSummary, AnalyticsFilterParams } from './types'
+import {
+  AnalyticsSummarySchema,
+  FilterAccountsSchema,
+  FilterBrokersSchema,
+  FilterSetupsSchema,
+} from './schemas'
+import type { AccountDimension, AnalyticsSummary, AnalyticsFilterParams } from './types'
 
 function buildQueryString(params: AnalyticsFilterParams): string {
   const parts: string[] = []
@@ -23,4 +28,19 @@ export async function fetchAnalyticsSummary(
   const qs = buildQueryString(params)
   const raw = await apiClient.get(`/v1/analytics/summary${qs}`)
   return AnalyticsSummarySchema.parse(raw)
+}
+
+export async function fetchFilterAccounts(): Promise<AccountDimension[]> {
+  const raw = await apiClient.get('/v1/analytics/filters/accounts')
+  return FilterAccountsSchema.parse(raw)
+}
+
+export async function fetchFilterSetups(): Promise<string[]> {
+  const raw = await apiClient.get('/v1/analytics/filters/setups')
+  return FilterSetupsSchema.parse(raw)
+}
+
+export async function fetchFilterBrokers(): Promise<string[]> {
+  const raw = await apiClient.get('/v1/analytics/filters/brokers')
+  return FilterBrokersSchema.parse(raw)
 }
