@@ -1,11 +1,13 @@
 import type { z } from 'zod'
 import type {
+  AccountDimensionSchema,
   AnalyticsSummarySchema,
   RiskAdjustedSchema,
   SharpeResultSchema,
   SortinoResultSchema,
 } from './schemas'
 
+export type AccountDimension = z.infer<typeof AccountDimensionSchema>
 export type AnalyticsSummary = z.infer<typeof AnalyticsSummarySchema>
 export type RiskAdjusted = z.infer<typeof RiskAdjustedSchema>
 export type SharpeResult = z.infer<typeof SharpeResultSchema>

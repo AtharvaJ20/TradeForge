@@ -9,6 +9,7 @@ ADR-007:
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 from tradeforge.domain.analytics.calculators import (
     compute_drawdown_stats,
@@ -19,6 +20,7 @@ from tradeforge.domain.analytics.calculators import (
     compute_streak_stats,
 )
 from tradeforge.domain.analytics.types import (
+    AccountDimension,
     AnalyticsFilter,
     AnalyticsSummary,
     ChargesBreakdown,
@@ -162,6 +164,19 @@ class AnalyticsService:
     ) -> MonteCarloResult:
         r_multiples = await self._repo.get_r_multiples_for_monte_carlo(f)
         return compute_monte_carlo(r_multiples, n_simulations=n_simulations)
+
+    # ------------------------------------------------------------------
+    # Filter dimension pass-throughs (B-5)
+    # ------------------------------------------------------------------
+
+    async def get_filter_accounts(self, user_id: UUID) -> list[AccountDimension]:
+        return await self._repo.get_distinct_accounts(user_id)
+
+    async def get_filter_setups(self, user_id: UUID) -> list[str]:
+        return await self._repo.get_distinct_setups(user_id)
+
+    async def get_filter_brokers(self, user_id: UUID) -> list[str]:
+        return await self._repo.get_distinct_brokers(user_id)
 
 
 # ---------------------------------------------------------------------------

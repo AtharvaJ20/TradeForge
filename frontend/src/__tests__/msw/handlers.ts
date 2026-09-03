@@ -135,10 +135,34 @@ export const CONFIRM_FIXTURE = {
   confirmed_at: '2026-08-23T10:01:00Z',
 }
 
+// ---------------------------------------------------------------------------
+// Filter dimension fixtures
+// ---------------------------------------------------------------------------
+
+export const FILTER_ACCOUNTS_FIXTURE = [
+  { id: '00000000-0000-0000-0000-000000000011', label: 'Zerodha Main' },
+  { id: '00000000-0000-0000-0000-000000000022', label: 'Upstox Secondary' },
+]
+
+export const FILTER_SETUPS_FIXTURE = ['Breakout', 'VWAP Reversion', '(no setup)']
+
+export const FILTER_BROKERS_FIXTURE = ['UPSTOX', 'ZERODHA']
+
 export const handlers = [
   // GET analytics summary
   http.get(`${BASE}/v1/analytics/summary`, () => {
     return HttpResponse.json(ANALYTICS_SUMMARY_FIXTURE)
+  }),
+
+  // GET filter dimensions
+  http.get(`${BASE}/v1/analytics/filters/accounts`, () => {
+    return HttpResponse.json(FILTER_ACCOUNTS_FIXTURE)
+  }),
+  http.get(`${BASE}/v1/analytics/filters/setups`, () => {
+    return HttpResponse.json(FILTER_SETUPS_FIXTURE)
+  }),
+  http.get(`${BASE}/v1/analytics/filters/brokers`, () => {
+    return HttpResponse.json(FILTER_BROKERS_FIXTURE)
   }),
 
   // GET journal entry — success

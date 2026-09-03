@@ -301,6 +301,13 @@ class MonteCarloResponse(BaseModel):
     p95_max_consecutive_losses: int
 
 
+class AccountDimensionResponse(BaseModel):
+    """One entry returned by GET /analytics/filters/accounts (B-6)."""
+
+    id: UUID
+    label: str
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -406,3 +413,39 @@ async def get_monte_carlo(
 ) -> MonteCarloResponse:
     result = await svc.get_monte_carlo(f, n_simulations=n_simulations)
     return MonteCarloResponse.model_validate(result)
+
+
+# ---------------------------------------------------------------------------
+# Filter dimension endpoints (B-1, B-2, B-3)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/filters/accounts", response_model=list[AccountDimensionResponse])
+async def get_filter_accounts(
+    user_id: UUID = Depends(get_current_user_id),
+    svc: AnalyticsService = Depends(get_analytics_service),
+) -> list[AccountDimensionResponse]:
+    """Distinct account IDs present in the authenticated user's CLOSED trades."""
+    dims = await svc.get_filter_accounts(user_id)
+    return [AccountDimensionResponse(id=d.id, label=d.label) for d in dims]
+
+
+@router.get("/filters/setups", response_model=list[str])
+async def get_filter_setups(
+    user_id: UUID = Depends(get_current_user_id),
+    svc: AnalyticsService = Depends(get_analytics_service),
+) -> list[str]:
+    """Distinct setup names present in the authenticated user's CLOSED trades.
+
+    NULL setup_name is returned as the sentinel string "(no setup)".
+    """
+    return await svc.get_filter_setups(user_id)
+
+
+@router.get("/filters/brokers", response_model=list[str])
+async def get_filter_brokers(
+    user_id: UUID = Depends(get_current_user_id),
+    svc: AnalyticsService = Depends(get_analytics_service),
+) -> list[str]:
+    """Distinct broker values in the authenticated user's CLOSED trades, alphabetically sorted."""
+    return await svc.get_filter_brokers(user_id)

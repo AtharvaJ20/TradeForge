@@ -300,6 +300,14 @@ class RiskAdjustedResult:
 
 
 @dataclass
+class AccountDimension:
+    """One entry in the /filters/accounts dimension list."""
+
+    id: UUID
+    label: str
+
+
+@dataclass
 class AnalyticsSummary:
     """Composite response for GET /v1/analytics/summary.
 
