@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tradeforge.api.v1.deps import get_client_ip, get_current_user_id
 from tradeforge.application.journal.service import JournalService
 from tradeforge.application.journal.storage import StubStorage
+from tradeforge.application.pnl_service import PnlService
 from tradeforge.domain.journal.errors import (
     AttachmentContentTypeNotAllowedError,
     AttachmentExpiredError,
@@ -43,7 +44,9 @@ from tradeforge.domain.journal.types import (
 )
 from tradeforge.infrastructure.db import get_db
 from tradeforge.infrastructure.repositories.auth_repo import AuditLogRepository
+from tradeforge.infrastructure.repositories.charge_schedule_repo import ChargeScheduleRepository
 from tradeforge.infrastructure.repositories.journal_repo import JournalRepository
+from tradeforge.infrastructure.repositories.pnl_repo import PnlRepository
 
 router = APIRouter(prefix="/journal", tags=["journal"])
 
@@ -56,10 +59,15 @@ router = APIRouter(prefix="/journal", tags=["journal"])
 async def get_journal_service(
     db: AsyncSession = Depends(get_db),
 ) -> JournalService:
+    pnl_service = PnlService(
+        pnl_repo=PnlRepository(db),
+        charge_schedule_repo=ChargeScheduleRepository(db),
+    )
     return JournalService(
         journal_repo=JournalRepository(db),
         audit_repo=AuditLogRepository(db),
         storage=StubStorage(),
+        pnl_service=pnl_service,
     )
 
 

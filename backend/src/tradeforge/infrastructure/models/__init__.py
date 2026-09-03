@@ -3,6 +3,7 @@
 from .auth import PendingEmailVerification, PendingPasswordReset, SecurityAuditLog
 from .base import Base
 from .charge_schedule import ChargeSchedule
+from .import_record import ImportRecord
 from .journal import JournalAttachment, JournalAuditLog, JournalEntry
 from .trade_domain import (
     ExecutionFill,
@@ -14,6 +15,7 @@ from .trade_domain import (
     Trade,
 )
 from .trade_pnl import TradePnl
+from .trading_account import TradingAccount
 from .user import User
 
 __all__ = [
@@ -22,6 +24,8 @@ __all__ = [
     "PendingEmailVerification",
     "PendingPasswordReset",
     "SecurityAuditLog",
+    "TradingAccount",
+    "ImportRecord",
     "Instrument",
     "LotSizeHistory",
     "Trade",

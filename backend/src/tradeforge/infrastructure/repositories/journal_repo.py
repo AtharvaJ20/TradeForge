@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,7 +47,7 @@ class JournalRepository:
                 Trade.total_entry_quantity,
             ).where(Trade.id == trade_id, Trade.user_id == user_id)
         )
-        return result.one_or_none()
+        return cast("tuple[uuid.UUID, uuid.UUID, Any, Any] | None", result.one_or_none())
 
     # ------------------------------------------------------------------
     # Journal entry CRUD

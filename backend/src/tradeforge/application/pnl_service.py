@@ -82,7 +82,7 @@ class PnlService:
         if existing is None:
             return
 
-        planned_risk = await self._pnl_repo._get_planned_risk(trade_id)
+        planned_risk = await self._pnl_repo.get_planned_risk(trade_id)
         from decimal import Decimal
 
         net_pnl = Decimal(str(existing.net_pnl))
@@ -106,10 +106,16 @@ class PnlService:
         from sqlalchemy import select
 
         from tradeforge.infrastructure.models.trade_domain import Trade
+        from tradeforge.infrastructure.models.trade_pnl import TradePnl
 
-        stmt = select(Trade.id).where(
-            Trade.user_id == user_id,
-            Trade.status == "CLOSED",
+        stmt = (
+            select(Trade.id)
+            .outerjoin(TradePnl, TradePnl.trade_id == Trade.id)
+            .where(
+                Trade.user_id == user_id,
+                Trade.status == "CLOSED",
+                TradePnl.trade_id.is_(None),
+            )
         )
         result = await self._pnl_repo._db.execute(stmt)
         trade_ids = list(result.scalars().all())

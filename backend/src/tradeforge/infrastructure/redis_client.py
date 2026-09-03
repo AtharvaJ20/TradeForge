@@ -4,14 +4,17 @@ The connection pool is a module-level singleton. Each request borrows a
 connection via `get_redis()` and returns it to the pool on completion.
 """
 
+from __future__ import annotations
+
 import functools
 from collections.abc import AsyncGenerator
+from typing import Any, cast
 
 from redis.asyncio import ConnectionPool, Redis
 
 
 @functools.lru_cache(maxsize=1)
-def _pool() -> ConnectionPool:
+def _pool() -> ConnectionPool[Any]:
     from tradeforge.settings import get_settings
 
     settings = get_settings()
@@ -22,10 +25,10 @@ def _pool() -> ConnectionPool:
     )
 
 
-async def get_redis() -> AsyncGenerator[Redis, None]:
+async def get_redis() -> AsyncGenerator[Redis, None]:  # type: ignore[type-arg]
     """FastAPI dependency: yields a per-request Redis client backed by the shared pool."""
-    client: Redis = Redis(connection_pool=_pool())
+    client = cast("Redis[str]", Redis(connection_pool=_pool()))
     try:
         yield client
     finally:
-        await client.aclose()
+        await client.close()

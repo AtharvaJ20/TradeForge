@@ -15,6 +15,7 @@ from decimal import Decimal
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tradeforge.domain.import_domain.types import NormalizedFill
 from tradeforge.domain.trade.types import FillRecord
 from tradeforge.infrastructure.models.trade_domain import ExecutionFill, FillExclusion
 
@@ -24,6 +25,7 @@ class FillRepository:
         self,
         session: AsyncSession,
         user_id: uuid.UUID,
+        account_id: uuid.UUID,
         instrument_id: uuid.UUID,
         product_type: str,
     ) -> list[FillRecord]:
@@ -32,12 +34,15 @@ class FillRepository:
         Query (§2):
             SELECT * FROM execution_fills
             WHERE user_id = $user_id
+              AND account_id = $account_id
               AND instrument_id = $instrument_id
               AND product_type = $product_type
               AND trade_id IS NULL
               AND id NOT IN (SELECT fill_id FROM fill_exclusions)
             ORDER BY fill_timestamp ASC, fill_id ASC NULLS LAST, created_at ASC
 
+        The account_id predicate ensures fills from different accounts owned by
+        the same user are never mixed during reconstruction.
         The fill_exclusions subquery is evaluated once by PostgreSQL. The ordering
         satisfies the deterministic fill-ordering guarantee (§3) and gives the engine
         the correct sequence without additional in-process sorting.
@@ -48,6 +53,7 @@ class FillRepository:
             select(ExecutionFill)
             .where(
                 ExecutionFill.user_id == user_id,
+                ExecutionFill.account_id == account_id,
                 ExecutionFill.instrument_id == instrument_id,
                 ExecutionFill.product_type == product_type,
                 ExecutionFill.trade_id.is_(None),
@@ -82,6 +88,64 @@ class FillRepository:
         )
         result = await session.execute(stmt)
         return [self._to_record(r) for r in result.scalars().all()]
+
+    async def fill_exists(
+        self,
+        session: AsyncSession,
+        broker_trade_id: str,
+        account_id: uuid.UUID,
+    ) -> bool:
+        """Return True if a fill with this broker trade_id already exists for the account.
+
+        Used by ImportService for fill-level deduplication before insertion.
+        """
+        stmt = (
+            select(ExecutionFill.id)
+            .where(
+                ExecutionFill.fill_id == broker_trade_id,
+                ExecutionFill.account_id == account_id,
+            )
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    async def insert_normalized_fill(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        instrument_id: uuid.UUID,
+        fill: NormalizedFill,
+    ) -> uuid.UUID:
+        """Insert one NormalizedFill into execution_fills.  Returns the new row PK.
+
+        The caller is responsible for dedup-checking via fill_exists() before calling
+        this method. No ON CONFLICT logic here — a duplicate insert will raise IntegrityError
+        from the partial unique index (uq_fills_broker_trade_account).
+        """
+        pk = uuid.uuid4()
+        obj = ExecutionFill(
+            id=pk,
+            user_id=user_id,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            fill_timestamp=fill.fill_timestamp,
+            trade_date=fill.trade_date,
+            session=fill.session,
+            side=fill.side,
+            quantity=fill.quantity,
+            price=fill.price,
+            product_type=fill.product_type,
+            broker=fill.broker,
+            import_source=fill.import_source,
+            fill_id=fill.broker_trade_id,
+            order_id=fill.broker_order_id,
+            exit_type="EXPIRY_SQUAREOFF" if fill.is_expiry_squareoff else None,
+        )
+        session.add(obj)
+        return pk
 
     async def assign_trade(
         self,
@@ -119,4 +183,5 @@ class FillRepository:
             fill_id_str=row.fill_id,  # the broker fill ID string (nullable)
             created_at=row.created_at,
             import_source=row.import_source,
+            account_id=row.account_id,
         )

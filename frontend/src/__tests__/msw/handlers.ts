@@ -2,6 +2,84 @@ import { http, HttpResponse } from 'msw'
 
 const BASE = 'http://localhost:8000'
 
+// ---------------------------------------------------------------------------
+// Analytics fixtures
+// ---------------------------------------------------------------------------
+
+export const ANALYTICS_SUMMARY_FIXTURE = {
+  pnl: { total_trades: 30, gross_pnl: '29000.00', net_pnl: '27500.00', total_charges: '1500.00' },
+  outcome: {
+    win_count: 20, loss_count: 10, breakeven_count: 0, total_n: 30,
+    win_rate: '0.67', loss_rate: '0.33', breakeven_rate: '0.00',
+  },
+  expectancy: {
+    expectancy_r: '1.25', avg_r_win: '2.00', avg_r_loss: '-1.50',
+    r_coverage_count: 30, total_count: 30, r_coverage_pct: '1.00',
+    insufficient_sample: false,
+  },
+  profit_factor: { profit_factor: '3.14', gross_profit: '19000.00', gross_loss: '-6050.00' },
+  planned_rr: { avg_planned_rr: null, trade_count_with_rr: 0, total_count: 30, coverage_pct: '0.00' },
+  drawdown: {
+    max_drawdown_pct: null, max_drawdown_inr: null,
+    avg_drawdown_pct: null, current_drawdown_pct: null,
+  },
+  direction: [{
+    direction: 'LONG', trade_count: 30, win_count: 20, loss_count: 10,
+    breakeven_count: 0, win_rate: '0.67', avg_net_pnl: '916.67',
+    total_net_pnl: '27500.00', avg_r_multiple: '0.75',
+  }],
+  charges: {
+    total_brokerage: '600.00', total_stt: '300.00', total_exchange_charges: '240.00',
+    total_sebi_charges: '60.00', total_stamp_duty: '150.00', total_gst: '120.00',
+    total_ipft: '30.00', total_charges: '1500.00', total_gross_pnl: '29000.00',
+    charge_drag_pct: '5.17', charges_added_to_loss: null,
+  },
+  risk_adjusted: {
+    sharpe: {
+      sharpe_ratio: '2.34', mean_r: '0.45', std_r: '0.61',
+      n_per_year: 252, r_coverage_count: 30, insufficient_sample: false,
+    },
+    sortino: {
+      sortino_ratio: '1.89', mean_r: '0.45', downside_dev: '0.75',
+      n_per_year: 252, r_coverage_count: 30, insufficient_sample: false,
+      no_downside_trades: false,
+    },
+  },
+}
+
+/** Variant: fewer than 30 trades → insufficient_sample for both ratios. */
+export const ANALYTICS_SUMMARY_INSUFFICIENT_FIXTURE = {
+  ...ANALYTICS_SUMMARY_FIXTURE,
+  risk_adjusted: {
+    sharpe: {
+      sharpe_ratio: null, mean_r: null, std_r: null,
+      n_per_year: 252, r_coverage_count: 5, insufficient_sample: true,
+    },
+    sortino: {
+      sortino_ratio: null, mean_r: null, downside_dev: null,
+      n_per_year: 252, r_coverage_count: 5, insufficient_sample: true,
+      no_downside_trades: false,
+    },
+  },
+}
+
+/** Variant: no negative-R trades → sortino has no_downside_trades flag. */
+export const ANALYTICS_SUMMARY_NO_DOWNSIDE_FIXTURE = {
+  ...ANALYTICS_SUMMARY_FIXTURE,
+  risk_adjusted: {
+    ...ANALYTICS_SUMMARY_FIXTURE.risk_adjusted,
+    sortino: {
+      sortino_ratio: null, mean_r: '0.45', downside_dev: null,
+      n_per_year: 252, r_coverage_count: 30, insufficient_sample: false,
+      no_downside_trades: true,
+    },
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Journal fixtures
+// ---------------------------------------------------------------------------
+
 /** Minimal valid journal entry fixture. */
 export const ENTRY_FIXTURE = {
   id: 'aaa-111',
@@ -58,6 +136,11 @@ export const CONFIRM_FIXTURE = {
 }
 
 export const handlers = [
+  // GET analytics summary
+  http.get(`${BASE}/v1/analytics/summary`, () => {
+    return HttpResponse.json(ANALYTICS_SUMMARY_FIXTURE)
+  }),
+
   // GET journal entry — success
   http.get(`${BASE}/v1/journal/trades/:tradeId`, () => {
     return HttpResponse.json(ENTRY_FIXTURE)

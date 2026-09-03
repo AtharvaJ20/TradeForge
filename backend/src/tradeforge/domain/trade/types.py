@@ -154,6 +154,7 @@ class FillRecord:
     fill_id_str: str | None  # broker fill_id string — NOT the PK UUID; used for tie-breaking
     created_at: datetime
     import_source: str
+    account_id: uuid.UUID | None = None  # NULL on pre-Step-11 fills; always set on import fills
 
 
 @dataclass

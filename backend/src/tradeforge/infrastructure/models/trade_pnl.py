@@ -27,6 +27,9 @@ class TradePnl(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("trading_accounts.id"), nullable=True
+    )
     # Core P&L
     gross_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     net_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
