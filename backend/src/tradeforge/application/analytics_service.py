@@ -105,9 +105,7 @@ class AnalyticsService:
         coverage_count = stats.get("coverage_count") or 0
         total_count = stats.get("total_count") or 0
         coverage_pct = (
-            Decimal(coverage_count) / Decimal(total_count) * _HUNDRED
-            if total_count
-            else _ZERO
+            Decimal(coverage_count) / Decimal(total_count) * _HUNDRED if total_count else _ZERO
         )
 
         return RMultipleDistribution(

@@ -190,12 +190,12 @@ class AnalyticsRepository:
     async def get_profit_factor(self, f: AnalyticsFilter) -> ProfitFactorResult:
         stmt = (
             select(
-                func.coalesce(
-                    func.sum(TradePnl.net_pnl).filter(TradePnl.net_pnl > 0), _ZERO
-                ).label("gross_profit"),
-                func.coalesce(
-                    func.sum(TradePnl.net_pnl).filter(TradePnl.net_pnl < 0), _ZERO
-                ).label("gross_loss"),
+                func.coalesce(func.sum(TradePnl.net_pnl).filter(TradePnl.net_pnl > 0), _ZERO).label(
+                    "gross_profit"
+                ),
+                func.coalesce(func.sum(TradePnl.net_pnl).filter(TradePnl.net_pnl < 0), _ZERO).label(
+                    "gross_loss"
+                ),
             )
             .select_from(Trade)
             .join(TradePnl, TradePnl.trade_id == Trade.id)
@@ -430,7 +430,7 @@ class AnalyticsRepository:
                     avg_net_pnl=r.avg_net_pnl or _ZERO,
                     total_net_pnl=r.total_net_pnl or _ZERO,
                     avg_r_multiple=r.avg_r,
-                    expectancy_r=None,   # service computes from r_multiple series
+                    expectancy_r=None,  # service computes from r_multiple series
                     profit_factor=None,  # service computes
                 )
             )
@@ -440,9 +440,7 @@ class AnalyticsRepository:
     # M-10: By direction
     # ------------------------------------------------------------------
 
-    async def get_by_direction(
-        self, f: AnalyticsFilter
-    ) -> list[dict[str, Any]]:
+    async def get_by_direction(self, f: AnalyticsFilter) -> list[dict[str, Any]]:
         stmt = (
             select(
                 Trade.direction,
@@ -504,7 +502,7 @@ class AnalyticsRepository:
             total_ipft=row.ipft,
             total_charges=row.total_charges,
             total_gross_pnl=row.gross_pnl,
-            charge_drag_pct=None,   # suppression logic in service
+            charge_drag_pct=None,  # suppression logic in service
             charges_added_to_loss=None,
         )
 
@@ -532,14 +530,15 @@ class AnalyticsRepository:
     # M-13: Hold duration distribution
     # ------------------------------------------------------------------
 
-    async def get_hold_duration_distribution(
-        self, f: AnalyticsFilter
-    ) -> HoldDurationDistribution:
+    async def get_hold_duration_distribution(self, f: AnalyticsFilter) -> HoldDurationDistribution:
         """Bucket hold durations by EXTRACT(EPOCH FROM last_fill_at - first_fill_at) / 60."""
-        duration_minutes = func.extract(
-            "epoch",
-            Trade.last_fill_at - Trade.first_fill_at,
-        ) / 60
+        duration_minutes = (
+            func.extract(
+                "epoch",
+                Trade.last_fill_at - Trade.first_fill_at,
+            )
+            / 60
+        )
 
         bucket_expr = case(
             (duration_minutes < 15, literal("< 15 min")),
@@ -603,7 +602,8 @@ class AnalyticsRepository:
                 avg_net_pnl=r.avg_net_pnl,
                 win_rate=(
                     Decimal(r.win_count) / Decimal(r.bucket_count) * _HUNDRED
-                    if r.bucket_count else _ZERO
+                    if r.bucket_count
+                    else _ZERO
                 ),
             )
             for r in rows
@@ -663,7 +663,8 @@ class AnalyticsRepository:
                 trade_count=r.trade_count,
                 win_rate=(
                     Decimal(r.win_count) / Decimal(r.trade_count) * _HUNDRED
-                    if r.trade_count else _ZERO
+                    if r.trade_count
+                    else _ZERO
                 ),
                 avg_net_pnl=r.avg_net_pnl,
                 avg_r_multiple=r.avg_r,

@@ -232,12 +232,8 @@ def compute_streak_stats(net_pnls: Sequence[Decimal]) -> StreakStats:
     max_win_streak = max(win_streaks, default=0)
     max_loss_streak = max(loss_streaks, default=0)
 
-    avg_win = (
-        sum(win_streaks, 0) / Decimal(len(win_streaks)) if win_streaks else _ZERO
-    )
-    avg_loss = (
-        sum(loss_streaks, 0) / Decimal(len(loss_streaks)) if loss_streaks else _ZERO
-    )
+    avg_win = sum(win_streaks, 0) / Decimal(len(win_streaks)) if win_streaks else _ZERO
+    avg_loss = sum(loss_streaks, 0) / Decimal(len(loss_streaks)) if loss_streaks else _ZERO
 
     return StreakStats(
         current_win_streak=current_win_streak,
@@ -254,7 +250,7 @@ def compute_streak_stats(net_pnls: Sequence[Decimal]) -> StreakStats:
 # ---------------------------------------------------------------------------
 
 _N_PER_YEAR_DEFAULT = 252  # G-CONF-12.1-A: NSE-aligned fixed annualization convention
-_MIN_SAMPLE = 30           # Karna M-8/M-9 minimum; consistent with G-ADV-01
+_MIN_SAMPLE = 30  # Karna M-8/M-9 minimum; consistent with G-ADV-01
 
 
 def compute_sharpe_ratio(
@@ -473,8 +469,8 @@ def compute_monte_carlo(
         median_final_r=_percentile(final_rs, 50),
         p5_final_r=_percentile(final_rs, 5),
         p95_final_r=_percentile(final_rs, 95),
-        p5_max_drawdown_pct=_percentile(max_drawdown_pcts, 95),   # 5th worst = 95th percentile
-        p1_max_drawdown_pct=_percentile(max_drawdown_pcts, 99),   # 1st worst = 99th percentile
+        p5_max_drawdown_pct=_percentile(max_drawdown_pcts, 95),  # 5th worst = 95th percentile
+        p1_max_drawdown_pct=_percentile(max_drawdown_pcts, 99),  # 1st worst = 99th percentile
         worst_max_drawdown_pct=max_drawdown_pcts[-1] if max_drawdown_pcts else _ZERO,
         risk_of_ruin_pct=Decimal(ruin_count) / Decimal(n_simulations) * _HUNDRED,
         p95_max_consecutive_losses=_percentile(max_consecutive_losses, 95),

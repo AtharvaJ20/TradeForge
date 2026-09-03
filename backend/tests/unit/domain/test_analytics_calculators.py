@@ -48,7 +48,7 @@ def _point(net_pnl: str, cum: str) -> EquityCurvePoint:
 class TestComputeExpectancy:
     def test_positive_expectancy(self) -> None:
         wins = [_D("2.0"), _D("1.5"), _D("3.0")]  # avg = 2.167
-        losses = [_D("-1.0"), _D("-0.8")]           # avg_abs = 0.9
+        losses = [_D("-1.0"), _D("-0.8")]  # avg_abs = 0.9
         # win_rate = 3/5=0.6, loss_rate=2/5=0.4
         # expectancy = 0.6*2.167 - 0.4*0.9 = 1.300 - 0.36 = 0.94
         result = compute_expectancy(
@@ -61,7 +61,7 @@ class TestComputeExpectancy:
         assert result.avg_r_loss is not None
         assert result.avg_r_loss > _D("0")  # must be positive (absolute value)
         assert result.r_coverage_count == 5
-        assert result.insufficient_sample is True   # < 30
+        assert result.insufficient_sample is True  # < 30
 
     def test_insufficient_sample_flag_uses_r_coverage(self) -> None:
         """G-ADV-01: insufficient_sample is based on r_coverage_count < 30, not total_count."""
@@ -75,7 +75,7 @@ class TestComputeExpectancy:
         )
         assert result.r_coverage_count == 20
         assert result.total_count == 35
-        assert result.insufficient_sample is True   # 20 < 30
+        assert result.insufficient_sample is True  # 20 < 30
 
     def test_sufficient_sample_flag(self) -> None:
         """insufficient_sample is False when r_coverage_count >= 30."""
@@ -140,16 +140,16 @@ class TestPlannedRR:
 
     def test_long_trade_rr(self) -> None:
         entry = _D("100")
-        stop = _D("98")    # risk = 2
-        target = _D("106") # reward = 6
+        stop = _D("98")  # risk = 2
+        target = _D("106")  # reward = 6
         planned_rr = (target - entry) / (entry - stop)
         assert planned_rr == _D("3")
 
     def test_short_trade_rr(self) -> None:
         """G-CONF-01: short-trade planned R:R formula. Sign cancels — result is positive."""
         entry = _D("100")
-        stop = _D("102")    # risk = 2 (stop is above entry for short)
-        target = _D("94")   # reward = 6 (target is below entry for short)
+        stop = _D("102")  # risk = 2 (stop is above entry for short)
+        target = _D("94")  # reward = 6 (target is below entry for short)
         planned_rr = (entry - target) / (stop - entry)
         assert planned_rr == _D("3")
         assert planned_rr > _D("0"), "Short planned R:R must be positive"
@@ -293,6 +293,7 @@ class TestComputeMonteCarlo:
     def test_percentile_order(self) -> None:
         """p5_final_r <= median_final_r <= p95_final_r for any non-trivial series."""
         import random as rnd
+
         rnd.seed(42)
         r_series = [_D(str(round(rnd.uniform(-1, 3), 2))) for _ in range(80)]
         result = compute_monte_carlo(r_series, n_simulations=500)

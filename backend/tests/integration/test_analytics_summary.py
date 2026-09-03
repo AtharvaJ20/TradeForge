@@ -188,7 +188,9 @@ async def _seed(
             instrument_id=instrument_id,
             trade_date=base + timedelta(days=i),
         )
-        await repo.upsert(_pnl_row(trade_id, user_id, account_id, net_pnl=net_pnl, r_multiple=r_multiple))
+        await repo.upsert(
+            _pnl_row(trade_id, user_id, account_id, net_pnl=net_pnl, r_multiple=r_multiple)
+        )
     await session.flush()
 
 
@@ -205,10 +207,9 @@ _TRADES_30: list[tuple[Decimal, Decimal]] = (
 )
 
 # TC-RA-002: 3 wins + 2 losses (total = 5, below _MIN_SAMPLE = 30).
-_TRADES_5: list[tuple[Decimal, Decimal]] = (
-    [(Decimal("950"), Decimal("2"))] * 3
-    + [(Decimal("-1050"), Decimal("-1"))] * 2
-)
+_TRADES_5: list[tuple[Decimal, Decimal]] = [(Decimal("950"), Decimal("2"))] * 3 + [
+    (Decimal("-1050"), Decimal("-1"))
+] * 2
 
 
 # ---------------------------------------------------------------------------
@@ -242,19 +243,25 @@ async def _cleanup(session_factory: async_sessionmaker[AsyncSession], user_id: u
             # Delete in FK dependency order: trade_pnl → trades → trading_accounts → users
             await session.execute(text("DELETE FROM trade_pnl WHERE user_id = :uid"), {"uid": uid})
             await session.execute(text("DELETE FROM trades WHERE user_id = :uid"), {"uid": uid})
-            await session.execute(text("DELETE FROM trading_accounts WHERE user_id = :uid"), {"uid": uid})
+            await session.execute(
+                text("DELETE FROM trading_accounts WHERE user_id = :uid"), {"uid": uid}
+            )
             await session.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": uid})
 
 
 @pytest.fixture
-async def user_30_trades(session_factory: async_sessionmaker[AsyncSession]) -> AsyncGenerator[uuid.UUID, None]:
+async def user_30_trades(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[uuid.UUID, None]:
     user_id = await _create_and_commit(session_factory, _TRADES_30)
     yield user_id
     await _cleanup(session_factory, user_id)
 
 
 @pytest.fixture
-async def user_5_trades(session_factory: async_sessionmaker[AsyncSession]) -> AsyncGenerator[uuid.UUID, None]:
+async def user_5_trades(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[uuid.UUID, None]:
     user_id = await _create_and_commit(session_factory, _TRADES_5)
     yield user_id
     await _cleanup(session_factory, user_id)
@@ -285,10 +292,24 @@ async def test_tc_ra_001_risk_adjusted_present_with_sufficient_sample(
     sortino = ra["sortino"]
 
     # --- Shape: all fields present ---
-    for key in ("sharpe_ratio", "mean_r", "std_r", "n_per_year", "r_coverage_count", "insufficient_sample"):
+    for key in (
+        "sharpe_ratio",
+        "mean_r",
+        "std_r",
+        "n_per_year",
+        "r_coverage_count",
+        "insufficient_sample",
+    ):
         assert key in sharpe, f"sharpe missing field: {key}"
-    for key in ("sortino_ratio", "mean_r", "downside_dev", "n_per_year", "r_coverage_count",
-                "insufficient_sample", "no_downside_trades"):
+    for key in (
+        "sortino_ratio",
+        "mean_r",
+        "downside_dev",
+        "n_per_year",
+        "r_coverage_count",
+        "insufficient_sample",
+        "no_downside_trades",
+    ):
         assert key in sortino, f"sortino missing field: {key}"
 
     # --- Sharpe: sufficient sample, non-null ratio ---

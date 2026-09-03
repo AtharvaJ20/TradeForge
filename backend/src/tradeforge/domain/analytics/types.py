@@ -23,12 +23,12 @@ class AnalyticsFilter:
     date_from: date | None = None
     date_to: date | None = None
     account_ids: tuple[UUID, ...] = field(default_factory=tuple)
-    instrument_types: tuple[str, ...] = field(default_factory=tuple)   # EQ | FUT | CE | PE
+    instrument_types: tuple[str, ...] = field(default_factory=tuple)  # EQ | FUT | CE | PE
     exchange_segments: tuple[str, ...] = field(default_factory=tuple)  # NSE_EQ | NSE_FO | BSE_EQ
-    trade_types: tuple[str, ...] = field(default_factory=tuple)        # MIS | CNC | NRML_FUT …
-    directions: tuple[str, ...] = field(default_factory=tuple)         # LONG | SHORT
+    trade_types: tuple[str, ...] = field(default_factory=tuple)  # MIS | CNC | NRML_FUT …
+    directions: tuple[str, ...] = field(default_factory=tuple)  # LONG | SHORT
     setup_names: tuple[str, ...] = field(default_factory=tuple)
-    brokers: tuple[str, ...] = field(default_factory=tuple)            # ZERODHA | UPSTOX …
+    brokers: tuple[str, ...] = field(default_factory=tuple)  # ZERODHA | UPSTOX …
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ class ExpectancyResult:
 
     expectancy_r: Decimal | None
     avg_r_win: Decimal | None
-    avg_r_loss: Decimal | None   # absolute value (positive)
+    avg_r_loss: Decimal | None  # absolute value (positive)
     r_coverage_count: int
     total_count: int
     r_coverage_pct: Decimal
