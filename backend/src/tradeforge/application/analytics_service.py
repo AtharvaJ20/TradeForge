@@ -24,6 +24,7 @@ from tradeforge.domain.analytics.types import (
     AnalyticsFilter,
     AnalyticsSummary,
     ChargesBreakdown,
+    DimensionBreakdown,
     DirectionPerformanceRow,
     EquityCurvePoint,
     ExitTypeRow,
@@ -119,7 +120,10 @@ class AnalyticsService:
             coverage_count=coverage_count,
             total_count=total_count,
             coverage_pct=coverage_pct,
-            insufficient_sample=coverage_count < 30,
+            # G-ADV-M6: insufficient_sample when fewer than 5 trades have a non-null
+            # r_multiple — below this threshold the distribution is too sparse to be
+            # meaningful (Step 12.6 spec; G-ADV-01 uses 30 for expectancy, 5 for distribution).
+            insufficient_sample=coverage_count < 5,
             buckets=buckets,
         )
 
@@ -151,6 +155,26 @@ class AnalyticsService:
 
     async def get_by_exit_type(self, f: AnalyticsFilter) -> list[ExitTypeRow]:
         return await self._repo.get_by_exit_type(f)
+
+    # ------------------------------------------------------------------
+    # M-10 dimension breakdown (Step 12.6)
+    # ------------------------------------------------------------------
+
+    async def get_dimension_breakdown(
+        self,
+        f: AnalyticsFilter,
+        *,
+        dimension: str,
+    ) -> DimensionBreakdown:
+        """Return per-group performance metrics for the requested dimension.
+
+        Allowed dimensions: direction | setup | instrument | trade_type | segment.
+        NULL setup_name groups as "(no setup)" (consistent with filter dimension convention).
+        NULL r_multiple values are excluded from avg_r_multiple (not treated as 0);
+        groups where all trades have NULL r_multiple return avg_r_multiple=None.
+        """
+        rows = await self._repo.get_dimension_breakdown(f, dimension=dimension)
+        return DimensionBreakdown(dimension=dimension, groups=rows)
 
     # ------------------------------------------------------------------
     # N-3 Monte Carlo

@@ -152,6 +152,50 @@ export const ExitTypeRowSchema = z.object({
 
 export const ExitTypesSchema = z.array(ExitTypeRowSchema)
 
+// ---------------------------------------------------------------------------
+// M-6 R-Multiple Distribution schemas (Step 12.6)
+// ---------------------------------------------------------------------------
+
+export const RBucketSchema = z.object({
+  label: z.string(),
+  lower: decimalString,
+  upper: decimalString,
+  count: z.number().int(),
+})
+
+export const RDistributionSchema = z.object({
+  mean_r: decimalString,
+  median_r: decimalString,
+  stddev_r: decimalString,
+  p25_r: decimalString,
+  p75_r: decimalString,
+  coverage_count: z.number().int(),
+  total_count: z.number().int(),
+  coverage_pct: z.string(),
+  insufficient_sample: z.boolean(),
+  buckets: z.array(RBucketSchema),
+})
+
+// ---------------------------------------------------------------------------
+// M-10 Dimension Breakdown schemas (Step 12.6)
+// ---------------------------------------------------------------------------
+
+export const DimensionGroupSchema = z.object({
+  label: z.string(),
+  trade_count: z.number().int(),
+  win_count: z.number().int(),
+  win_rate: z.string(),
+  total_net_pnl: z.string(),
+  avg_net_pnl: z.string(),
+  avg_r_multiple: decimalString,
+  avg_hold_duration_minutes: decimalString,
+})
+
+export const DimensionBreakdownSchema = z.object({
+  dimension: z.string(),
+  groups: z.array(DimensionGroupSchema),
+})
+
 export const AnalyticsSummarySchema = z.object({
   pnl: PnlSummarySchema,
   outcome: OutcomeDistributionSchema,

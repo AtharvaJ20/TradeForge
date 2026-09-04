@@ -9,7 +9,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -308,6 +308,30 @@ class AccountDimensionResponse(BaseModel):
     label: str
 
 
+class DimensionGroupResponse(BaseModel):
+    """One group row in a dimension breakdown response."""
+
+    model_config = {"from_attributes": True}
+
+    label: str
+    trade_count: int
+    win_count: int
+    win_rate: Decimal
+    total_net_pnl: Decimal
+    avg_net_pnl: Decimal
+    avg_r_multiple: Decimal | None
+    avg_hold_duration_minutes: Decimal | None
+
+
+class DimensionBreakdownResponse(BaseModel):
+    """Response for GET /analytics/breakdown."""
+
+    model_config = {"from_attributes": True}
+
+    dimension: str
+    groups: list[DimensionGroupResponse]
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -413,6 +437,39 @@ async def get_monte_carlo(
 ) -> MonteCarloResponse:
     result = await svc.get_monte_carlo(f, n_simulations=n_simulations)
     return MonteCarloResponse.model_validate(result)
+
+
+# ---------------------------------------------------------------------------
+# M-10: Dimension breakdown (Step 12.6)
+# ---------------------------------------------------------------------------
+
+_VALID_BREAKDOWN_DIMENSIONS = frozenset(
+    {"direction", "setup", "instrument", "trade_type", "segment"}
+)
+
+
+@router.get("/breakdown", response_model=DimensionBreakdownResponse)
+async def get_breakdown(
+    dimension: str = Query(default="direction"),
+    f: AnalyticsFilter = Depends(get_analytics_filter),
+    svc: AnalyticsService = Depends(get_analytics_service),
+) -> DimensionBreakdownResponse:
+    """Return per-group performance metrics grouped by the requested dimension.
+
+    dimension: direction | setup | instrument | trade_type | segment
+    Default: direction (preserves existing direction breakdown behavior).
+    """
+    if dimension not in _VALID_BREAKDOWN_DIMENSIONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid dimension '{dimension}'. Must be one of: "
+            f"{sorted(_VALID_BREAKDOWN_DIMENSIONS)}",
+        )
+    result = await svc.get_dimension_breakdown(f, dimension=dimension)
+    return DimensionBreakdownResponse(
+        dimension=result.dimension,
+        groups=[DimensionGroupResponse.model_validate(g) for g in result.groups],
+    )
 
 
 # ---------------------------------------------------------------------------

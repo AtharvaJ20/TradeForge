@@ -12,6 +12,8 @@ import { ChargesCard } from './ChargesCard'
 import { StreaksCard } from './StreaksCard'
 import { HoldDurationCard } from './HoldDurationCard'
 import { ExitTypeCard } from './ExitTypeCard'
+import { RDistributionCard } from './RDistributionCard'
+import { DimensionBreakdownCard } from './DimensionBreakdownCard'
 
 function SkeletonPanel() {
   return (
@@ -90,6 +92,10 @@ export function AnalyticsSummaryPanel({ params }: { params?: AnalyticsFilterPara
       </div>
 
       <ExitTypeCard params={params} />
+
+      <RDistributionCard params={params} />
+
+      <DimensionBreakdownCard params={params} />
     </div>
   )
 }

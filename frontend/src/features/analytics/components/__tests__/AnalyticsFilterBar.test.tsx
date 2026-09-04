@@ -347,3 +347,4 @@ describe('AnalyticsFilterBar — dimension error degradation', () => {
     expect(screen.getByRole('checkbox', { name: 'LONG' })).toBeInTheDocument()
   })
 })
+

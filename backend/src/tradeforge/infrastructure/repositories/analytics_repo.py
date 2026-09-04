@@ -23,6 +23,7 @@ from tradeforge.domain.analytics.types import (
     AccountDimension,
     AnalyticsFilter,
     ChargesBreakdown,
+    DimensionBreakdownRow,
     EquityCurvePoint,
     ExitTypeRow,
     HoldDurationBucket,
@@ -692,6 +693,102 @@ class AnalyticsRepository:
             stmt = self._apply_instrument_clauses(stmt, f)
 
         return [r for r in (await self._db.execute(stmt)).scalars() if r is not None]
+
+    # ------------------------------------------------------------------
+    # M-10: Dimension breakdown (Step 12.6)
+    # ------------------------------------------------------------------
+
+    _ALLOWED_DIMENSIONS = frozenset({"direction", "setup", "instrument", "trade_type", "segment"})
+
+    async def get_dimension_breakdown(
+        self,
+        f: AnalyticsFilter,
+        *,
+        dimension: str,
+    ) -> list[DimensionBreakdownRow]:
+        """Return per-group performance metrics grouped by the requested dimension.
+
+        Dimension mapping:
+          direction   → Trade.direction
+          setup       → COALESCE(Trade.setup_name, '(no setup)')
+          instrument  → Instrument.symbol  (always joins instruments)
+          trade_type  → Trade.trade_type
+          segment     → Instrument.exchange_segment  (always joins instruments)
+
+        NULL r_multiple values are excluded from the avg by PostgreSQL's native AVG
+        semantics (AVG ignores NULLs). Groups where every trade has NULL r_multiple
+        return avg_r_multiple=None (not 0).
+        avg_hold_duration_minutes: computed from (last_fill_at - first_fill_at) in minutes;
+        NULL last_fill_at rows are excluded from the average.
+        """
+        if dimension not in self._ALLOWED_DIMENSIONS:
+            raise ValueError(
+                f"Invalid dimension: {dimension!r}. Must be one of {self._ALLOWED_DIMENSIONS}"
+            )
+
+        needs_instrument = dimension in ("instrument", "segment")
+
+        duration_minutes = func.extract("epoch", Trade.last_fill_at - Trade.first_fill_at) / 60
+
+        if dimension == "direction":
+            group_col = Trade.direction
+        elif dimension == "setup":
+            group_col = func.coalesce(Trade.setup_name, "(no setup)")
+        elif dimension == "instrument":
+            group_col = Instrument.symbol
+        elif dimension == "trade_type":
+            group_col = Trade.trade_type
+        else:  # segment
+            group_col = Instrument.exchange_segment
+
+        stmt = (
+            select(
+                group_col.label("label"),
+                func.count(Trade.id).label("trade_count"),
+                func.count().filter(TradePnl.net_pnl > 0).label("win_count"),
+                func.coalesce(func.sum(TradePnl.net_pnl), _ZERO).label("total_net_pnl"),
+                func.coalesce(func.avg(TradePnl.net_pnl), _ZERO).label("avg_net_pnl"),
+                # PostgreSQL AVG naturally excludes NULLs → returns None when all NULL
+                func.avg(TradePnl.r_multiple).label("avg_r_multiple"),
+                # first_fill_at is NOT NULL; only last_fill_at can be NULL → filter it out
+                func.avg(duration_minutes)
+                .filter(Trade.last_fill_at.is_not(None))
+                .label("avg_hold_duration_minutes"),
+            )
+            .select_from(Trade)
+            .join(TradePnl, TradePnl.trade_id == Trade.id)
+            .where(*self._base_where(f))
+            .group_by(group_col)
+            .order_by(func.sum(TradePnl.net_pnl).desc())
+        )
+
+        # Join instruments when the dimension or filter requires it
+        if needs_instrument or self._needs_instrument_join(f):
+            stmt = stmt.join(Instrument, Trade.instrument_id == Instrument.id)
+            if self._needs_instrument_join(f):
+                stmt = self._apply_instrument_clauses(stmt, f)
+        elif not needs_instrument and not self._needs_instrument_join(f):
+            pass  # no instrument join needed
+
+        rows = (await self._db.execute(stmt)).all()
+
+        result: list[DimensionBreakdownRow] = []
+        for r in rows:
+            tc = r.trade_count or 0
+            wc = r.win_count or 0
+            result.append(
+                DimensionBreakdownRow(
+                    label=str(r.label) if r.label is not None else "(no setup)",
+                    trade_count=tc,
+                    win_count=wc,
+                    win_rate=(Decimal(wc) / Decimal(tc) * _HUNDRED) if tc else _ZERO,
+                    total_net_pnl=r.total_net_pnl or _ZERO,
+                    avg_net_pnl=r.avg_net_pnl or _ZERO,
+                    avg_r_multiple=r.avg_r_multiple,
+                    avg_hold_duration_minutes=r.avg_hold_duration_minutes,
+                )
+            )
+        return result
 
     # ------------------------------------------------------------------
     # Filter dimension endpoints (B-4) — unfiltered, user-scoped

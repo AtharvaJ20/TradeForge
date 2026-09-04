@@ -136,6 +136,111 @@ export const CONFIRM_FIXTURE = {
 }
 
 // ---------------------------------------------------------------------------
+// M-6 R-Multiple Distribution fixtures (Step 12.6)
+// ---------------------------------------------------------------------------
+
+export const R_DISTRIBUTION_FIXTURE = {
+  mean_r: '0.45',
+  median_r: '0.50',
+  stddev_r: '1.20',
+  p25_r: '-0.50',
+  p75_r: '1.25',
+  coverage_count: 20,
+  total_count: 22,
+  coverage_pct: '0.91',
+  insufficient_sample: false,
+  buckets: [
+    { label: '< −2R', lower: null, upper: '-2', count: 2 },
+    { label: '−2R to −1R', lower: '-2', upper: '-1', count: 3 },
+    { label: '−1R to 0', lower: '-1', upper: '0', count: 4 },
+    { label: '0 to +1R', lower: '0', upper: '1', count: 5 },
+    { label: '+1R to +2R', lower: '1', upper: '2', count: 4 },
+    { label: '> +2R', lower: '2', upper: null, count: 2 },
+  ],
+}
+
+export const R_DISTRIBUTION_INSUFFICIENT_FIXTURE = {
+  mean_r: null,
+  median_r: null,
+  stddev_r: null,
+  p25_r: null,
+  p75_r: null,
+  coverage_count: 3,
+  total_count: 5,
+  coverage_pct: '0.60',
+  insufficient_sample: true,
+  buckets: [
+    { label: '< −2R', lower: null, upper: '-2', count: 0 },
+    { label: '−2R to −1R', lower: '-2', upper: '-1', count: 1 },
+    { label: '−1R to 0', lower: '-1', upper: '0', count: 0 },
+    { label: '0 to +1R', lower: '0', upper: '1', count: 2 },
+    { label: '+1R to +2R', lower: '1', upper: '2', count: 0 },
+    { label: '> +2R', lower: '2', upper: null, count: 0 },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// M-10 Dimension Breakdown fixtures (Step 12.6)
+// ---------------------------------------------------------------------------
+
+export const DIMENSION_BREAKDOWN_DIRECTION_FIXTURE = {
+  dimension: 'direction',
+  groups: [
+    {
+      label: 'LONG',
+      trade_count: 18,
+      win_count: 12,
+      win_rate: '0.67',
+      total_net_pnl: '22500.00',
+      avg_net_pnl: '1250.00',
+      avg_r_multiple: '0.85',
+      avg_hold_duration_minutes: '72.50',
+    },
+    {
+      label: 'SHORT',
+      trade_count: 8,
+      win_count: 4,
+      win_rate: '0.50',
+      total_net_pnl: '5000.00',
+      avg_net_pnl: '625.00',
+      avg_r_multiple: null,
+      avg_hold_duration_minutes: '45.00',
+    },
+  ],
+}
+
+export const DIMENSION_BREAKDOWN_SETUP_FIXTURE = {
+  dimension: 'setup',
+  groups: [
+    {
+      label: 'Breakout',
+      trade_count: 10,
+      win_count: 7,
+      win_rate: '0.70',
+      total_net_pnl: '15000.00',
+      avg_net_pnl: '1500.00',
+      avg_r_multiple: '1.20',
+      avg_hold_duration_minutes: '60.00',
+    },
+    {
+      label: '(no setup)',
+      trade_count: 5,
+      win_count: 2,
+      win_rate: '0.40',
+      total_net_pnl: '-2000.00',
+      avg_net_pnl: '-400.00',
+      avg_r_multiple: null,
+      avg_hold_duration_minutes: null,
+    },
+  ],
+}
+
+export const DIMENSION_BREAKDOWN_EMPTY_FIXTURE = {
+  dimension: 'instrument',
+  groups: [],
+}
+
+// ---------------------------------------------------------------------------
 // Behavioral analytics fixtures (Step 12.5)
 // ---------------------------------------------------------------------------
 
@@ -216,6 +321,16 @@ export const handlers = [
   }),
   http.get(`${BASE}/v1/analytics/by-exit-type`, () => {
     return HttpResponse.json(EXIT_TYPES_FIXTURE)
+  }),
+
+  // GET R-Multiple Distribution
+  http.get(`${BASE}/v1/analytics/r-distribution`, () => {
+    return HttpResponse.json(R_DISTRIBUTION_FIXTURE)
+  }),
+
+  // GET Dimension Breakdown
+  http.get(`${BASE}/v1/analytics/breakdown`, () => {
+    return HttpResponse.json(DIMENSION_BREAKDOWN_DIRECTION_FIXTURE)
   }),
 
   // GET filter dimensions
