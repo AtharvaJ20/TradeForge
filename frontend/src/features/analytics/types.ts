@@ -2,10 +2,14 @@ import type { z } from 'zod'
 import type {
   AccountDimensionSchema,
   AnalyticsSummarySchema,
+  DimensionBreakdownSchema,
+  DimensionGroupSchema,
   ExitTypeRowSchema,
   ExitTypesSchema,
   HoldDurationBucketSchema,
   HoldDurationSchema,
+  RBucketSchema,
+  RDistributionSchema,
   RiskAdjustedSchema,
   SharpeResultSchema,
   SortinoResultSchema,
@@ -24,6 +28,12 @@ export type HoldDurationBucket = z.infer<typeof HoldDurationBucketSchema>
 export type HoldDuration = z.infer<typeof HoldDurationSchema>
 export type ExitTypeRow = z.infer<typeof ExitTypeRowSchema>
 export type ExitTypes = z.infer<typeof ExitTypesSchema>
+
+// Step 12.6 M-6 + M-10 types
+export type RBucket = z.infer<typeof RBucketSchema>
+export type RDistribution = z.infer<typeof RDistributionSchema>
+export type DimensionGroup = z.infer<typeof DimensionGroupSchema>
+export type DimensionBreakdown = z.infer<typeof DimensionBreakdownSchema>
 
 // Sub-types derived from the top-level summary — used as component prop types.
 export type PnlSummary = AnalyticsSummary['pnl']

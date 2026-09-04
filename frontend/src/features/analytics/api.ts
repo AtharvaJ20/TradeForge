@@ -1,19 +1,23 @@
 import { apiClient } from '@/lib/api-client'
 import {
   AnalyticsSummarySchema,
+  DimensionBreakdownSchema,
   ExitTypesSchema,
   FilterAccountsSchema,
   FilterBrokersSchema,
   FilterSetupsSchema,
   HoldDurationSchema,
+  RDistributionSchema,
   StreaksSchema,
 } from './schemas'
 import type {
   AccountDimension,
   AnalyticsSummary,
   AnalyticsFilterParams,
+  DimensionBreakdown,
   ExitTypes,
   HoldDuration,
+  RDistribution,
   Streaks,
 } from './types'
 
@@ -73,4 +77,23 @@ export async function fetchExitTypes(params: AnalyticsFilterParams = {}): Promis
   const qs = buildQueryString(params)
   const raw = await apiClient.get(`/v1/analytics/by-exit-type${qs}`)
   return ExitTypesSchema.parse(raw)
+}
+
+export async function fetchRDistribution(
+  params: AnalyticsFilterParams = {},
+): Promise<RDistribution> {
+  const qs = buildQueryString(params)
+  const raw = await apiClient.get(`/v1/analytics/r-distribution${qs}`)
+  return RDistributionSchema.parse(raw)
+}
+
+export async function fetchDimensionBreakdown(
+  params: AnalyticsFilterParams = {},
+  dimension = 'direction',
+): Promise<DimensionBreakdown> {
+  const filterQs = buildQueryString(params)
+  const dimParam = `dimension=${encodeURIComponent(dimension)}`
+  const qs = filterQs ? `${filterQs}&${dimParam}` : `?${dimParam}`
+  const raw = await apiClient.get(`/v1/analytics/breakdown${qs}`)
+  return DimensionBreakdownSchema.parse(raw)
 }
