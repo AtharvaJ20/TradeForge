@@ -132,6 +132,7 @@ def compute_drawdown_stats(points: Sequence[EquityCurvePoint]) -> DrawdownStats:
             max_drawdown_inr=None,
             avg_drawdown_pct=None,
             current_drawdown_pct=None,
+            current_drawdown_inr=None,
         )
 
     peak = points[0].cumulative_net_pnl
@@ -158,8 +159,10 @@ def compute_drawdown_stats(points: Sequence[EquityCurvePoint]) -> DrawdownStats:
     last_cum = points[-1].cumulative_net_pnl
     if peak > _ZERO and last_cum < peak:
         current_dd_pct = (peak - last_cum) / peak * _HUNDRED
+        current_dd_inr = peak - last_cum
     else:
         current_dd_pct = _ZERO
+        current_dd_inr = _ZERO
 
     avg_dd_pct: Decimal | None = None
     if drawdown_pcts:
@@ -170,6 +173,7 @@ def compute_drawdown_stats(points: Sequence[EquityCurvePoint]) -> DrawdownStats:
         max_drawdown_inr=max_dd_inr if max_dd_pct is not None else None,
         avg_drawdown_pct=avg_dd_pct,
         current_drawdown_pct=current_dd_pct,
+        current_drawdown_inr=current_dd_inr,
     )
 
 

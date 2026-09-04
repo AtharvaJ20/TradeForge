@@ -100,6 +100,11 @@ def create_app() -> FastAPI:
 
     app.include_router(analytics.router, prefix="/v1")
 
+    # Risk router (Step 13)
+    from tradeforge.api.v1 import risk
+
+    app.include_router(risk.router, prefix="/v1")
+
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}

@@ -140,6 +140,7 @@ class DrawdownStats:
     max_drawdown_inr: Decimal | None
     avg_drawdown_pct: Decimal | None
     current_drawdown_pct: Decimal | None
+    current_drawdown_inr: Decimal | None = None  # added for Step 13 risk surfacing
 
 
 @dataclass
