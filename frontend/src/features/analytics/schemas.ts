@@ -115,6 +115,43 @@ export const FilterAccountsSchema = z.array(AccountDimensionSchema)
 export const FilterSetupsSchema = z.array(z.string())
 export const FilterBrokersSchema = z.array(z.string())
 
+// ---------------------------------------------------------------------------
+// Behavioral analytics schemas (Step 12.5 — M-12, M-13, M-14)
+// ---------------------------------------------------------------------------
+
+export const StreaksSchema = z.object({
+  current_win_streak: z.number().int(),
+  current_loss_streak: z.number().int(),
+  max_win_streak: z.number().int(),
+  max_loss_streak: z.number().int(),
+  avg_win_streak: z.string(),
+  avg_loss_streak: z.string(),
+})
+
+export const HoldDurationBucketSchema = z.object({
+  bucket: z.string(),
+  bucket_order: z.number().int(),
+  count: z.number().int(),
+  avg_net_pnl: z.string(),
+  win_rate: z.string(),
+})
+
+export const HoldDurationSchema = z.object({
+  buckets: z.array(HoldDurationBucketSchema),
+  avg_duration_minutes: z.string().nullable(),
+  median_duration_minutes: z.string().nullable(),
+})
+
+export const ExitTypeRowSchema = z.object({
+  exit_type: z.string().nullable(),
+  trade_count: z.number().int(),
+  win_rate: z.string(),
+  avg_net_pnl: z.string(),
+  avg_r_multiple: z.string().nullable(),
+})
+
+export const ExitTypesSchema = z.array(ExitTypeRowSchema)
+
 export const AnalyticsSummarySchema = z.object({
   pnl: PnlSummarySchema,
   outcome: OutcomeDistributionSchema,
