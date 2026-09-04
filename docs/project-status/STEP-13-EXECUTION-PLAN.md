@@ -122,16 +122,17 @@ class DailyRiskResponse(BaseModel):
 **Query: total_at_risk_inr**
 
 ```sql
--- Dhanvantari correction: no trade_date filter — open trades from prior days are still at risk
+-- Dhanvantari: no trade_date filter — open trades from prior days are still at risk
+-- G-RISK-01-A: include PARTIAL trades — a partially-exited position is still open and at risk
 SELECT
-    COUNT(*)                AS open_trade_count,
+    COUNT(*)                 AS open_trade_count,
     SUM(planned_risk_amount) AS total_at_risk_inr
 FROM trades
 WHERE account_id = :account_id
-  AND status = 'OPEN'
+  AND status IN ('OPEN', 'PARTIAL')
 ```
 
-`total_at_risk_inr` is `None` when no open trades have `planned_risk_amount` set (SUM of all-NULL returns NULL). This must be communicated to the frontend as "—" (data unavailable), not "₹0". A swing trade opened three days ago with no `planned_risk_amount` contributes to `open_trade_count` but not `total_at_risk_inr`.
+`total_at_risk_inr` is `None` when no open/partial trades have `planned_risk_amount` set (SUM of all-NULL returns NULL). This must be communicated to the frontend as "—" (data unavailable), not "₹0". A trade in `PARTIAL` status (e.g., 50 of 100 CNC shares still held) appears at its full `planned_risk_amount` — no pro-ration by remaining quantity. This overstates risk for partially-exited trades; overstating is the safe direction for a risk metric. Pro-ration deferred to Phase 2 (see G-RISK-01-B).
 
 **Daily loss definition note (Dhanvantari):** `daily_loss_inr` filters by `t.trade_date = CURRENT_DATE`. For intraday (MIS) traders this is correct — trades open and close on the same day. For swing/CNC traders, a position opened previously and closed today would be excluded. Phase 1 targets intraday traders; this is acceptable. Revisit in Phase 2 when positional traders are a primary segment.
 
@@ -209,6 +210,7 @@ app.include_router(risk_router, prefix="/v1/risk", tags=["risk"])
 | U-13-03 | `get_daily_risk` returns `daily_loss_inr=0.00` when no closed losing trades today |
 | U-13-04 | `get_summary` aggregates drawdown and streak from analytics service correctly |
 | U-13-05 | `get_summary` returns `max_drawdown_inr=None` when analytics returns no drawdown data |
+| U-13-06 | `get_daily_risk` returns `open_trade_count=2` and correct `total_at_risk_inr` when account has 1 OPEN trade and 1 PARTIAL trade, each with `planned_risk_amount` set (G-RISK-01-A) |
 
 **Integration tests** (`tests/integration/test_risk_api.py`):
 
@@ -217,6 +219,7 @@ app.include_router(risk_router, prefix="/v1/risk", tags=["risk"])
 | I-13-01 | `GET /v1/risk/daily-summary` returns 200 with correct totals for account with 1 open trade |
 | I-13-02 | `GET /v1/risk/daily-summary` returns `total_at_risk_inr=null` when open trade has no `planned_risk_amount` |
 | I-13-02b | `GET /v1/risk/daily-summary` includes open trades from prior trade_dates in `open_trade_count` and `total_at_risk_inr` (Dhanvantari regression guard — no date filter on open trades) |
+| I-13-06 | `GET /v1/risk/daily-summary` includes a `status='PARTIAL'` CNC trade (50 of 100 shares exited) in `open_trade_count` and `total_at_risk_inr` at the full `planned_risk_amount` — not pro-rated (G-RISK-01-A/B regression guard) |
 | I-13-03 | `GET /v1/risk/summary` returns 200 with all fields present including `current_loss_streak` |
 | I-13-04 | `GET /v1/risk/summary` returns 401 for unauthenticated request |
 | I-13-05 | `GET /v1/risk/daily-summary` scopes to correct account — trade from another account does not appear |
@@ -257,7 +260,7 @@ Use `decimalString` (`z.string()`) consistent with all other analytics hooks.
   - **Max Loss Streak** — `max_loss_streak` as `N trades`
   - **Current Loss Streak** — `current_loss_streak` as `N trades`; coloured amber at ≥ 3, red at ≥ 5; neutral (grey) at 0
   - **Today's Loss** — `daily_loss_inr` formatted as `−₹X,XXX.XX` (red) or `₹0.00` (neutral)
-  - **At Risk (Open)** — `total_at_risk_inr` formatted as `₹X,XXX.XX` or "—" if null
+  - **Planned At-Risk** — `total_at_risk_inr` formatted as `₹X,XXX.XX` or "—" if null (G-RISK-01-C: label is "Planned At-Risk", not "At Risk (Open)" — reflects full planned risk at entry, not proportional current risk on remaining position)
   - **Open Trades** — `open_trade_count` as plain integer
 - Loading skeleton: `role="status"`, `aria-label="Loading risk summary"`
 - Error state: text "Failed to load risk summary"
@@ -344,7 +347,7 @@ Bhima and Arjun work can proceed in parallel after step 1.
 | # | Item | Owner | Required by |
 |---|------|-------|-------------|
 | OI-5 | Dhanvantari: review and sign off on this execution plan as the Phase 1 risk spec | Dhanvantari | ✅ **RESOLVED 2026-09-04** — two corrections applied (open trade date scoping removed; `current_loss_streak` added) |
-| OI-3 | Ganesha: FIFO multi-lot treatment for CNC delivery — does it affect open trade at-risk calculation? | Ganesha | Before Step 13 implementation (check if partial fills affect `planned_risk_amount` scoping) |
+| OI-3 | Ganesha: FIFO multi-lot treatment for CNC delivery — does it affect open trade at-risk calculation? | Ganesha | ✅ **RESOLVED 2026-09-04** — ruling G-RISK-01: query must use `status IN ('OPEN', 'PARTIAL')`; use full `planned_risk_amount` without pro-ration (Phase 1); label "Planned At-Risk"; tests I-13-06 + U-13-06 added |
 
 ---
 
