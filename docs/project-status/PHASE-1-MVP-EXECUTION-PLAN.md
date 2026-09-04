@@ -96,15 +96,20 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Goal:** Deliver the remaining Karna spec analytics that complete the §13 Phase 1 analytics requirement.  
 **Owners:** Bhima (backend), Arjun (frontend)  
 **Estimate:** 1–2 sessions  
-**Dependency:** Step 12.6 accepted  
+**Dependency:** Step 12.6 accepted ✅  
+**Execution plan:** `docs/project-status/STEP-12-7-EXECUTION-PLAN.md`
 
 **Scope:**
-- **N-1 — Rolling Expectancy:** 20-trade rolling window expectancy. Backend: sliding window query. Frontend: sparkline or tabular rolling values.
-- **N-2 — Time-of-Day Performance:** Performance breakdown by hour-of-day band (pre-market, morning, midday, afternoon, post-market for NSE session). Backend: EXTRACT(HOUR FROM first_fill_at) bucketed. Frontend: heatmap or bar table.
-- **N-4 — Kelly Fraction:** Full Kelly and Half-Kelly from win rate + avg win/loss R. Frontend: single stat with a plain-language risk-of-ruin note.
+- **N-1 — Rolling Expectancy:** 20-trade sliding-window expectancy. Backend: pure Python over ordered equity curve. Frontend: scrollable table (last 20 points visible).
+- **N-2 — Time-of-Day Performance:** Performance by NSE session band (Pre-Open, Open Volatility, Mid-Morning, Lunch, Afternoon, Close) bucketed from `first_fill_at AT TIME ZONE 'Asia/Kolkata'`. Frontend: 6-row table.
+- **N-4 — Kelly Fraction:** Full Kelly and Half-Kelly from Expectancy_R / AVG(positive R). Frontend: two stat numbers + plain-language note. Min N: 30 trades with valid R.
+
+**Order of work:** N-4 → N-2 → N-1 (increasing complexity).
 
 **Explicitly NOT in 12.7:**
 - N-3 Monte Carlo → Phase 2
+- N-5 MAE/MFE → Phase 2
+- Sparkline chart for rolling expectancy → Phase 2 (table is MVP)
 
 **Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
 
