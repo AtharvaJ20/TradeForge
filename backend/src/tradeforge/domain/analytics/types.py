@@ -300,6 +300,28 @@ class RiskAdjustedResult:
 
 
 @dataclass
+class DimensionBreakdownRow:
+    """M-10: One group row for a dimension breakdown."""
+
+    label: str
+    trade_count: int
+    win_count: int
+    win_rate: Decimal
+    total_net_pnl: Decimal
+    avg_net_pnl: Decimal
+    avg_r_multiple: Decimal | None
+    avg_hold_duration_minutes: Decimal | None
+
+
+@dataclass
+class DimensionBreakdown:
+    """M-10: Full dimension breakdown response."""
+
+    dimension: str
+    groups: list[DimensionBreakdownRow]
+
+
+@dataclass
 class AccountDimension:
     """One entry in the /filters/accounts dimension list."""
 
