@@ -15,6 +15,7 @@ from tradeforge.domain.analytics.calculators import (
     compute_drawdown_stats,
     compute_expectancy,
     compute_monte_carlo,
+    compute_rolling_expectancy,
     compute_sharpe_ratio,
     compute_sortino_ratio,
     compute_streak_stats,
@@ -29,16 +30,30 @@ from tradeforge.domain.analytics.types import (
     EquityCurvePoint,
     ExitTypeRow,
     HoldDurationDistribution,
+    KellyResult,
     MonteCarloResult,
     RiskAdjustedResult,
     RMultipleDistribution,
+    RollingExpectancyResult,
     SetupPerformanceRow,
     StreakStats,
+    TimeOfDayBucket,
+    TimeOfDayResult,
 )
 from tradeforge.infrastructure.repositories.analytics_repo import AnalyticsRepository
 
 _ZERO = Decimal("0")
 _HUNDRED = Decimal("100")
+
+# Canonical NSE session-band order and display labels for N-2 time-of-day
+_TOD_CANONICAL: list[tuple[str, str]] = [
+    ("pre_open", "Pre-Open"),
+    ("open_volatility", "Open Volatility"),
+    ("mid_morning", "Mid-Morning"),
+    ("lunch", "Lunch"),
+    ("afternoon", "Afternoon"),
+    ("close", "Close"),
+]
 
 
 class AnalyticsService:
@@ -188,6 +203,125 @@ class AnalyticsService:
     ) -> MonteCarloResult:
         r_multiples = await self._repo.get_r_multiples_for_monte_carlo(f)
         return compute_monte_carlo(r_multiples, n_simulations=n_simulations)
+
+    # ------------------------------------------------------------------
+    # N-4: Kelly Fraction
+    # ------------------------------------------------------------------
+
+    async def get_kelly_fraction(self, f: AnalyticsFilter) -> KellyResult:
+        """Compute Full Kelly and Half-Kelly position-sizing fractions (N-4).
+
+        Formula: kelly_pct = expectancy_R / avg_positive_R
+        Guard: insufficient_sample=True when trades_with_r < 30 or avg_positive_r <= 0.
+        """
+        _min_n = 30
+        inputs = await self._repo.get_kelly_inputs(f)
+
+        trades_with_r = int(inputs.get("trades_with_r") or 0)
+        if trades_with_r < _min_n:
+            return KellyResult(
+                kelly_pct=None,
+                half_kelly_pct=None,
+                trades_with_r=trades_with_r,
+                insufficient_sample=True,
+            )
+
+        avg_positive_r: Decimal | None = inputs.get("avg_positive_r")
+        if avg_positive_r is None or avg_positive_r <= _ZERO:
+            return KellyResult(
+                kelly_pct=None,
+                half_kelly_pct=None,
+                trades_with_r=trades_with_r,
+                insufficient_sample=True,
+            )
+
+        win_r_count = int(inputs.get("win_r_count") or 0)
+        loss_r_count = int(inputs.get("loss_r_count") or 0)
+        r_count = win_r_count + loss_r_count
+        if r_count == 0:
+            return KellyResult(
+                kelly_pct=None,
+                half_kelly_pct=None,
+                trades_with_r=trades_with_r,
+                insufficient_sample=True,
+            )
+
+        avg_win_r: Decimal | None = inputs.get("avg_win_r")
+        avg_loss_r: Decimal | None = inputs.get("avg_loss_r")  # negative value from DB
+
+        win_rate = Decimal(win_r_count) / Decimal(r_count)
+        loss_rate = Decimal(loss_r_count) / Decimal(r_count)
+        if avg_win_r is not None and avg_loss_r is not None:
+            expectancy_r = win_rate * avg_win_r - loss_rate * abs(avg_loss_r)
+        elif avg_win_r is not None:
+            expectancy_r = avg_win_r
+        else:
+            expectancy_r = -(abs(avg_loss_r) if avg_loss_r is not None else _ZERO)
+
+        kelly_pct = expectancy_r / avg_positive_r
+        return KellyResult(
+            kelly_pct=kelly_pct,
+            half_kelly_pct=kelly_pct / Decimal("2"),
+            trades_with_r=trades_with_r,
+            insufficient_sample=False,
+        )
+
+    # ------------------------------------------------------------------
+    # N-2: Time-of-Day analysis
+    # ------------------------------------------------------------------
+
+    async def get_time_of_day(self, f: AnalyticsFilter) -> TimeOfDayResult:
+        """Return performance aggregated by NSE session band (N-2).
+
+        Always returns all 6 buckets in session order; missing buckets get zero values.
+        """
+        raw = await self._repo.get_time_of_day(f)
+        by_bucket: dict[str, dict] = {r["bucket"]: r for r in raw}  # type: ignore[type-arg]
+
+        buckets: list[TimeOfDayBucket] = []
+        for bucket_key, label in _TOD_CANONICAL:
+            row = by_bucket.get(bucket_key)
+            if row:
+                tc = int(row.get("trade_count") or 0)
+                wc = int(row.get("win_count") or 0)
+                wr = (Decimal(wc) / Decimal(tc) * _HUNDRED) if tc else _ZERO
+                buckets.append(
+                    TimeOfDayBucket(
+                        bucket=bucket_key,
+                        label=label,
+                        trade_count=tc,
+                        win_count=wc,
+                        win_rate=wr,
+                        expectancy_inr=row.get("expectancy_inr"),
+                        total_net_pnl=row.get("total_net_pnl") or _ZERO,
+                    )
+                )
+            else:
+                buckets.append(
+                    TimeOfDayBucket(
+                        bucket=bucket_key,
+                        label=label,
+                        trade_count=0,
+                        win_count=0,
+                        win_rate=_ZERO,
+                        expectancy_inr=None,
+                        total_net_pnl=_ZERO,
+                    )
+                )
+        return TimeOfDayResult(buckets=buckets)
+
+    # ------------------------------------------------------------------
+    # N-1: Rolling Expectancy
+    # ------------------------------------------------------------------
+
+    async def get_rolling_expectancy(self, f: AnalyticsFilter) -> RollingExpectancyResult:
+        """Compute 20-trade rolling expectancy series (N-1).
+
+        Delegates ordering (G-CONF-03) to the repo; calculator handles windowing.
+        Returns insufficient_sample=True when total trades < 20.
+        """
+        points = await self._repo.get_trade_series(f)
+        return compute_rolling_expectancy(points)
 
     # ------------------------------------------------------------------
     # Filter dimension pass-throughs (B-5)

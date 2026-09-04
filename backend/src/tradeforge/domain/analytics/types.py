@@ -329,6 +329,90 @@ class AccountDimension:
     label: str
 
 
+# ---------------------------------------------------------------------------
+# N-4: Kelly Fraction
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class KellyResult:
+    """N-4: Full Kelly and Half-Kelly position-sizing fractions."""
+
+    kelly_pct: Decimal | None  # None when insufficient_sample
+    half_kelly_pct: Decimal | None  # None when insufficient_sample
+    trades_with_r: int
+    insufficient_sample: bool
+    min_n: int = 30
+
+
+# ---------------------------------------------------------------------------
+# N-2: Time-of-Day analysis
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TimeOfDayBucket:
+    """One NSE session band row for the time-of-day breakdown."""
+
+    bucket: str  # e.g. "pre_open"
+    label: str  # e.g. "Pre-Open"
+    trade_count: int
+    win_count: int
+    win_rate: Decimal  # 0–1
+    expectancy_inr: Decimal | None  # None when trade_count == 0
+    total_net_pnl: Decimal
+
+
+@dataclass
+class TimeOfDayResult:
+    """N-2: Full time-of-day response — always 6 buckets in session order."""
+
+    buckets: list[TimeOfDayBucket]
+
+
+# ---------------------------------------------------------------------------
+# N-1: Rolling Expectancy
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TradeSeriesPoint:
+    """One closed trade row used for rolling-window analytics (N-1).
+
+    Ordered by (trade_date ASC, last_fill_at ASC, id ASC) — G-CONF-03.
+    r_multiple is None when planned_risk_amount was not set on the trade.
+    """
+
+    trade_date: date
+    trade_id: UUID
+    net_pnl: Decimal
+    r_multiple: Decimal | None
+
+
+@dataclass
+class RollingExpectancyPoint:
+    """One data point in the rolling 20-trade expectancy series."""
+
+    trade_index: int  # 1-based, starts at 20
+    trade_date: date
+    rolling_exp_r: Decimal | None  # None when window has no trades with valid r_multiple
+    rolling_exp_inr: Decimal  # AVG(net_pnl) across the window
+
+
+@dataclass
+class RollingExpectancyResult:
+    """N-1: Full rolling expectancy response."""
+
+    window: int  # always 20
+    insufficient_sample: bool
+    data: list[RollingExpectancyPoint]
+
+
+# ---------------------------------------------------------------------------
+# Composite summary
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class AnalyticsSummary:
     """Composite response for GET /v1/analytics/summary.

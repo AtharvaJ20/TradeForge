@@ -18,11 +18,12 @@ from tradeforge.domain.analytics.calculators import (
     compute_drawdown_stats,
     compute_expectancy,
     compute_monte_carlo,
+    compute_rolling_expectancy,
     compute_sharpe_ratio,
     compute_sortino_ratio,
     compute_streak_stats,
 )
-from tradeforge.domain.analytics.types import EquityCurvePoint
+from tradeforge.domain.analytics.types import EquityCurvePoint, TradeSeriesPoint
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -511,3 +512,92 @@ class TestComputeSortinoRatio:
         r = [_D("1.0")] * 3  # insufficient
         result = compute_sortino_ratio(r, n_per_year=200)
         assert result.n_per_year == 200
+
+
+# ---------------------------------------------------------------------------
+# TC-RE: compute_rolling_expectancy (N-1)
+# ---------------------------------------------------------------------------
+
+
+def _tsp(
+    net_pnl: str,
+    r_multiple: str | None = None,
+    d: date = date(2024, 1, 1),
+) -> TradeSeriesPoint:
+    return TradeSeriesPoint(
+        trade_date=d,
+        trade_id=uuid.uuid4(),
+        net_pnl=_D(net_pnl),
+        r_multiple=_D(r_multiple) if r_multiple is not None else None,
+    )
+
+
+class TestComputeRollingExpectancy:
+    def test_insufficient_sample_below_20_trades(self) -> None:
+        """B-N1-02: fewer than 20 points → insufficient_sample=True, data=[]."""
+        points = [_tsp("100", "1.0")] * 19
+        result = compute_rolling_expectancy(points)
+        assert result.insufficient_sample is True
+        assert result.data == []
+        assert result.window == 20
+
+    def test_exact_20_trades_produces_one_point(self) -> None:
+        """B-N1-01: exactly 20 trades → 1 data point with trade_index=20."""
+        points = [_tsp("100", "1.0")] * 20
+        result = compute_rolling_expectancy(points)
+        assert result.insufficient_sample is False
+        assert len(result.data) == 1
+        assert result.data[0].trade_index == 20
+
+    def test_21_trades_produces_two_points(self) -> None:
+        """n trades → n - window + 1 data points."""
+        points = [_tsp("100", "1.0")] * 21
+        result = compute_rolling_expectancy(points)
+        assert len(result.data) == 2
+        assert result.data[0].trade_index == 20
+        assert result.data[1].trade_index == 21
+
+    def test_rolling_exp_inr_is_avg_net_pnl(self) -> None:
+        """rolling_exp_inr = AVG(net_pnl) over the 20-trade window."""
+        wins = [_tsp("200")] * 10  # 10 trades at +200
+        losses = [_tsp("-100")] * 10  # 10 trades at -100
+        points = wins + losses  # 20 trades, avg = (2000 - 1000) / 20 = 50
+        result = compute_rolling_expectancy(points)
+        assert len(result.data) == 1
+        assert result.data[0].rolling_exp_inr == _D("50")
+
+    def test_rolling_exp_r_none_when_no_r_multiples_in_window(self) -> None:
+        """rolling_exp_r=None when every trade in the window has r_multiple=None."""
+        points = [_tsp("100", None)] * 20
+        result = compute_rolling_expectancy(points)
+        assert len(result.data) == 1
+        assert result.data[0].rolling_exp_r is None
+        # rolling_exp_inr still defined
+        assert result.data[0].rolling_exp_inr == _D("100")
+
+    def test_rolling_exp_r_computed_from_wins_and_losses(self) -> None:
+        """rolling_exp_r uses compute_expectancy with G-CORR-01 split.
+
+        Window: 10 wins at r=+2.0, 10 losses at r=-1.0
+          win_rate = 0.5, loss_rate = 0.5
+          avg_win_r = 2.0, avg_loss_r_abs = 1.0
+          expectancy_r = 0.5 × 2.0 - 0.5 × 1.0 = 0.5
+        """
+        wins = [_tsp("100", "2.0")] * 10
+        losses = [_tsp("-50", "-1.0")] * 10
+        points = wins + losses
+        result = compute_rolling_expectancy(points)
+        assert result.data[0].rolling_exp_r is not None
+        assert abs(result.data[0].rolling_exp_r - _D("0.5")) < _D("0.000001")
+
+    def test_trade_date_is_last_trade_in_window(self) -> None:
+        """trade_date on each point should be the date of the last trade in the window."""
+        dates = [date(2024, 1, i + 1) for i in range(20)]
+        points = [_tsp("100", "1.0", d=dates[i]) for i in range(20)]
+        result = compute_rolling_expectancy(points)
+        assert result.data[0].trade_date == dates[-1]  # last date in window
+
+    def test_empty_input_returns_insufficient(self) -> None:
+        result = compute_rolling_expectancy([])
+        assert result.insufficient_sample is True
+        assert result.data == []
