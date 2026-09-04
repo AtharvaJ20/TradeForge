@@ -728,9 +728,7 @@ class AnalyticsRepository:
 
         needs_instrument = dimension in ("instrument", "segment")
 
-        duration_minutes = (
-            func.extract("epoch", Trade.last_fill_at - Trade.first_fill_at) / 60
-        )
+        duration_minutes = func.extract("epoch", Trade.last_fill_at - Trade.first_fill_at) / 60
 
         if dimension == "direction":
             group_col = Trade.direction
@@ -753,9 +751,9 @@ class AnalyticsRepository:
                 # PostgreSQL AVG naturally excludes NULLs → returns None when all NULL
                 func.avg(TradePnl.r_multiple).label("avg_r_multiple"),
                 # first_fill_at is NOT NULL; only last_fill_at can be NULL → filter it out
-                func.avg(duration_minutes).filter(
-                    Trade.last_fill_at.is_not(None)
-                ).label("avg_hold_duration_minutes"),
+                func.avg(duration_minutes)
+                .filter(Trade.last_fill_at.is_not(None))
+                .label("avg_hold_duration_minutes"),
             )
             .select_from(Trade)
             .join(TradePnl, TradePnl.trade_id == Trade.id)

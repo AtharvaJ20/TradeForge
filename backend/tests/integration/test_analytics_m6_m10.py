@@ -89,9 +89,7 @@ async def _insert_user(session: AsyncSession) -> uuid.UUID:
     return uid
 
 
-async def _insert_trading_account(
-    session: AsyncSession, user_id: uuid.UUID
-) -> uuid.UUID:
+async def _insert_trading_account(session: AsyncSession, user_id: uuid.UUID) -> uuid.UUID:
     account_id = uuid.uuid4()
     await session.execute(
         text(
@@ -125,7 +123,13 @@ async def _insert_instrument(
             "INSERT INTO instruments (id, symbol, exchange_segment, instrument_type, name) "
             "VALUES (:id, :sym, :seg, :itype, :name)"
         ),
-        {"id": str(iid), "sym": sym, "seg": exchange_segment, "itype": instrument_type, "name": sym},
+        {
+            "id": str(iid),
+            "sym": sym,
+            "seg": exchange_segment,
+            "itype": instrument_type,
+            "name": sym,
+        },
     )
     return iid, sym
 
@@ -201,9 +205,7 @@ async def _insert_pnl(
     )
 
 
-async def _cleanup(
-    session_factory: async_sessionmaker[AsyncSession], user_id: uuid.UUID
-) -> None:
+async def _cleanup(session_factory: async_sessionmaker[AsyncSession], user_id: uuid.UUID) -> None:
     async with session_factory() as session:
         async with session.begin():
             uid = str(user_id)
@@ -211,9 +213,7 @@ async def _cleanup(
             await session.execute(
                 text("DELETE FROM execution_fills WHERE user_id = :uid"), {"uid": uid}
             )
-            await session.execute(
-                text("DELETE FROM trade_pnl WHERE user_id = :uid"), {"uid": uid}
-            )
+            await session.execute(text("DELETE FROM trade_pnl WHERE user_id = :uid"), {"uid": uid})
             await session.execute(text("DELETE FROM trades WHERE user_id = :uid"), {"uid": uid})
             await session.execute(
                 text("DELETE FROM trading_accounts WHERE user_id = :uid"), {"uid": uid}
@@ -242,15 +242,15 @@ async def user_r_distribution(
       NULL r_multiple:            2 trades excluded from all bucket counts
     """
     r_values: list[Decimal | None] = [
-        Decimal("-3.0"),   # lt_neg2
-        Decimal("-1.5"),   # neg2_to_neg1
-        Decimal("-1.5"),   # neg2_to_neg1
-        Decimal("-0.5"),   # neg1_to_0
-        Decimal("0.5"),    # 0_to_1
-        Decimal("1.5"),    # 1_to_2
-        Decimal("2.5"),    # gt2
-        None,              # excluded
-        None,              # excluded
+        Decimal("-3.0"),  # lt_neg2
+        Decimal("-1.5"),  # neg2_to_neg1
+        Decimal("-1.5"),  # neg2_to_neg1
+        Decimal("-0.5"),  # neg1_to_0
+        Decimal("0.5"),  # 0_to_1
+        Decimal("1.5"),  # 1_to_2
+        Decimal("2.5"),  # gt2
+        None,  # excluded
+        None,  # excluded
     ]
     base_ts = datetime(2025, 5, 1, 9, 30, tzinfo=UTC)
 
@@ -332,7 +332,13 @@ async def user_r_direction_filter(
             iid, _sym = await _insert_instrument(session)
 
             directions = ["LONG", "LONG", "LONG", "SHORT", "SHORT"]
-            r_values = [Decimal("2.5"), Decimal("2.5"), Decimal("2.5"), Decimal("-1.5"), Decimal("-1.5")]
+            r_values = [
+                Decimal("2.5"),
+                Decimal("2.5"),
+                Decimal("2.5"),
+                Decimal("-1.5"),
+                Decimal("-1.5"),
+            ]
             for i, (direction, r) in enumerate(zip(directions, r_values, strict=True)):
                 tid = await _insert_trade(
                     session,
@@ -388,12 +394,8 @@ async def test_tc_rdist_001_all_buckets_correct_counts(
     assert by_label["-1R to 0R"] == 1, (
         f"neg1_to_0 bucket: expected 1, got {by_label.get('-1R to 0R')}"
     )
-    assert by_label["0R to 1R"] == 1, (
-        f"0_to_1 bucket: expected 1, got {by_label.get('0R to 1R')}"
-    )
-    assert by_label["1R to 2R"] == 1, (
-        f"1_to_2 bucket: expected 1, got {by_label.get('1R to 2R')}"
-    )
+    assert by_label["0R to 1R"] == 1, f"0_to_1 bucket: expected 1, got {by_label.get('0R to 1R')}"
+    assert by_label["1R to 2R"] == 1, f"1_to_2 bucket: expected 1, got {by_label.get('1R to 2R')}"
     assert by_label["> 2R"] == 1, f"gt2 bucket: expected 1, got {by_label.get('> 2R')}"
 
 
@@ -530,12 +532,12 @@ async def user_breakdown_multi(
 
             #      dir     ttype      setup       iid       r                  pnl
             trades = [
-                ("LONG",  "MIS",     "momentum", iid_eq,   Decimal("1.5"),    Decimal("500")),
-                ("SHORT", "CNC",     "momentum", iid_eq,   Decimal("-1.0"),   Decimal("-200")),
-                ("LONG",  "MIS",     None,       iid_fut,  Decimal("2.0"),    Decimal("800")),
-                ("SHORT", "CNC",     None,       iid_fut,  None,              Decimal("-300")),
-                ("LONG",  "NRML_FUT","trend",    iid_fut2, Decimal("0.5"),    Decimal("100")),
-                ("LONG",  "NRML_FUT","trend",    iid_fut2, None,              Decimal("-50")),
+                ("LONG", "MIS", "momentum", iid_eq, Decimal("1.5"), Decimal("500")),
+                ("SHORT", "CNC", "momentum", iid_eq, Decimal("-1.0"), Decimal("-200")),
+                ("LONG", "MIS", None, iid_fut, Decimal("2.0"), Decimal("800")),
+                ("SHORT", "CNC", None, iid_fut, None, Decimal("-300")),
+                ("LONG", "NRML_FUT", "trend", iid_fut2, Decimal("0.5"), Decimal("100")),
+                ("LONG", "NRML_FUT", "trend", iid_fut2, None, Decimal("-50")),
             ]
             for i, (direction, ttype, setup, iid, r, pnl) in enumerate(trades):
                 tid = await _insert_trade(
@@ -579,7 +581,9 @@ async def test_tc_break_001_direction_breakdown(user_breakdown_multi: dict) -> N
     app.dependency_overrides[get_current_user_id] = lambda: uid
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/v1/analytics/breakdown", params={"dimension": "direction"})
+            response = await client.get(
+                "/v1/analytics/breakdown", params={"dimension": "direction"}
+            )
     finally:
         app.dependency_overrides.pop(get_current_user_id, None)
 
@@ -591,11 +595,17 @@ async def test_tc_break_001_direction_breakdown(user_breakdown_multi: dict) -> N
     assert "LONG" in labels and "SHORT" in labels, f"Expected LONG and SHORT, got {labels}"
 
     long_group = next(g for g in body["groups"] if g["label"] == "LONG")
-    assert long_group["trade_count"] == 4, f"Expected 4 LONG trades, got {long_group['trade_count']}"
-    assert long_group["win_count"] == 3, f"Expected 3 LONG wins (pnl>0), got {long_group['win_count']}"
+    assert long_group["trade_count"] == 4, (
+        f"Expected 4 LONG trades, got {long_group['trade_count']}"
+    )
+    assert long_group["win_count"] == 3, (
+        f"Expected 3 LONG wins (pnl>0), got {long_group['win_count']}"
+    )
 
     short_group = next(g for g in body["groups"] if g["label"] == "SHORT")
-    assert short_group["trade_count"] == 2, f"Expected 2 SHORT trades, got {short_group['trade_count']}"
+    assert short_group["trade_count"] == 2, (
+        f"Expected 2 SHORT trades, got {short_group['trade_count']}"
+    )
 
     # Sorted by total_net_pnl descending → LONG first (total_net_pnl = 500+800+100-50=1350)
     assert body["groups"][0]["label"] == "LONG", "LONG group must be first (higher total_net_pnl)"
@@ -709,9 +719,7 @@ async def test_tc_break_005_segment_breakdown(user_breakdown_multi: dict) -> Non
     app.dependency_overrides[get_current_user_id] = lambda: uid
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get(
-                "/v1/analytics/breakdown", params={"dimension": "segment"}
-            )
+            response = await client.get("/v1/analytics/breakdown", params={"dimension": "segment"})
     finally:
         app.dependency_overrides.pop(get_current_user_id, None)
 
@@ -727,7 +735,9 @@ async def test_tc_break_005_segment_breakdown(user_breakdown_multi: dict) -> Non
     assert nse_eq["trade_count"] == 2, f"NSE_EQ has 2 trades (t1+t2), got {nse_eq['trade_count']}"
 
     nse_fo = next(g for g in body["groups"] if g["label"] == "NSE_FO")
-    assert nse_fo["trade_count"] == 4, f"NSE_FO has 4 trades (t3+t4+t5+t6), got {nse_fo['trade_count']}"
+    assert nse_fo["trade_count"] == 4, (
+        f"NSE_FO has 4 trades (t3+t4+t5+t6), got {nse_fo['trade_count']}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -756,17 +766,13 @@ async def test_tc_break_006_null_r_group_returns_null_avg(user_breakdown_multi: 
     assert response.status_code == 200, response.text
     body = response.json()
 
-    no_setup_group = next(
-        (g for g in body["groups"] if g["label"] == "(no setup)"), None
-    )
+    no_setup_group = next((g for g in body["groups"] if g["label"] == "(no setup)"), None)
     assert no_setup_group is not None, "Expected a '(no setup)' group for SHORT trades"
     assert no_setup_group["avg_r_multiple"] is None, (
         "Group where all trades have NULL r_multiple must return avg_r_multiple=null, not 0"
     )
 
-    momentum_group = next(
-        (g for g in body["groups"] if g["label"] == "momentum"), None
-    )
+    momentum_group = next((g for g in body["groups"] if g["label"] == "momentum"), None)
     assert momentum_group is not None, "Expected 'momentum' group for SHORT trades"
     assert momentum_group["avg_r_multiple"] is not None, (
         "momentum SHORT group has r=-1.0 → avg_r_multiple must be non-null"
@@ -810,7 +816,9 @@ async def test_tc_break_007_filter_passthrough(user_breakdown_multi: dict) -> No
 
     # sym_fut group (iid_fut): t3 is LONG (count=1), t4 is SHORT (excluded)
     fut_group = next((g for g in body["groups"] if g["label"] == sym_fut), None)
-    assert fut_group is not None, f"sym_fut instrument group missing; labels={[g['label'] for g in body['groups']]}"
+    assert fut_group is not None, (
+        f"sym_fut instrument group missing; labels={[g['label'] for g in body['groups']]}"
+    )
     assert fut_group["trade_count"] == 1, (
         f"sym_fut with LONG filter: only t3 (LONG), got {fut_group['trade_count']}"
     )
@@ -827,9 +835,7 @@ async def test_tc_break_008_invalid_dimension_returns_422() -> None:
     app.dependency_overrides[get_current_user_id] = lambda: dummy_uid
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get(
-                "/v1/analytics/breakdown", params={"dimension": "foobar"}
-            )
+            response = await client.get("/v1/analytics/breakdown", params={"dimension": "foobar"})
     finally:
         app.dependency_overrides.pop(get_current_user_id, None)
 

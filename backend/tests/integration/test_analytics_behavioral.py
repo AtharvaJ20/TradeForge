@@ -696,7 +696,9 @@ async def test_tc_beh_cov01_hold_duration_extended_buckets(
 
     bucket_names = {b["bucket"] for b in body["buckets"]}
     assert "4 – 24 hr" in bucket_names, f"Bucket '4 – 24 hr' missing from {bucket_names}"
-    assert "1 – 7 days" in bucket_names, f"Bucket '1 – 7 days' (multi_day) missing from {bucket_names}"
+    assert "1 – 7 days" in bucket_names, (
+        f"Bucket '1 – 7 days' (multi_day) missing from {bucket_names}"
+    )
     assert "> 7 days" in bucket_names, f"Bucket '> 7 days' missing from {bucket_names}"
 
     total_count = sum(b["count"] for b in body["buckets"])
@@ -723,9 +725,7 @@ async def test_tc_beh_cov02a_streaks_filter_passthrough(
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # All trades are in Jan 2025; filtering from 2099-01-01 yields zero trades
-            response = await client.get(
-                "/v1/analytics/streaks", params={"date_from": "2099-01-01"}
-            )
+            response = await client.get("/v1/analytics/streaks", params={"date_from": "2099-01-01"})
     finally:
         app.dependency_overrides.pop(get_current_user_id, None)
 
@@ -740,9 +740,7 @@ async def test_tc_beh_cov02a_streaks_filter_passthrough(
     app.dependency_overrides[get_current_user_id] = lambda: uid
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response2 = await client.get(
-                "/v1/analytics/streaks", params={"directions": "SHORT"}
-            )
+            response2 = await client.get("/v1/analytics/streaks", params={"directions": "SHORT"})
     finally:
         app.dependency_overrides.pop(get_current_user_id, None)
 
