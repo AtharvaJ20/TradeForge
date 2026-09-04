@@ -7,6 +7,8 @@ import {
   STREAKS_FIXTURE,
   HOLD_DURATION_FIXTURE,
   EXIT_TYPES_FIXTURE,
+  R_DISTRIBUTION_FIXTURE,
+  DIMENSION_BREAKDOWN_DIRECTION_FIXTURE,
 } from '@/__tests__/msw/handlers'
 
 // ---------------------------------------------------------------------------
@@ -29,15 +31,27 @@ vi.mock('../../hooks/useExitTypes', () => ({
   useExitTypes: vi.fn(),
 }))
 
+vi.mock('../../hooks/useRDistribution', () => ({
+  useRDistribution: vi.fn(),
+}))
+
+vi.mock('../../hooks/useDimensionBreakdown', () => ({
+  useDimensionBreakdown: vi.fn(),
+}))
+
 import { useAnalyticsSummary } from '../../hooks/useAnalyticsSummary'
 import { useStreaks } from '../../hooks/useStreaks'
 import { useHoldDuration } from '../../hooks/useHoldDuration'
 import { useExitTypes } from '../../hooks/useExitTypes'
+import { useRDistribution } from '../../hooks/useRDistribution'
+import { useDimensionBreakdown } from '../../hooks/useDimensionBreakdown'
 
 const mockUseAnalyticsSummary = vi.mocked(useAnalyticsSummary)
 const mockUseStreaks = vi.mocked(useStreaks)
 const mockUseHoldDuration = vi.mocked(useHoldDuration)
 const mockUseExitTypes = vi.mocked(useExitTypes)
+const mockUseRDistribution = vi.mocked(useRDistribution)
+const mockUseDimensionBreakdown = vi.mocked(useDimensionBreakdown)
 
 function mockBehavioralDataReady() {
   mockUseStreaks.mockReturnValue({
@@ -55,6 +69,16 @@ function mockBehavioralDataReady() {
     isLoading: false,
     isError: false,
   } as ReturnType<typeof useExitTypes>)
+  mockUseRDistribution.mockReturnValue({
+    data: R_DISTRIBUTION_FIXTURE,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useRDistribution>)
+  mockUseDimensionBreakdown.mockReturnValue({
+    data: DIMENSION_BREAKDOWN_DIRECTION_FIXTURE,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useDimensionBreakdown>)
 }
 
 function mockBehavioralLoading() {
@@ -62,6 +86,8 @@ function mockBehavioralLoading() {
   mockUseStreaks.mockReturnValue(loading as ReturnType<typeof useStreaks>)
   mockUseHoldDuration.mockReturnValue(loading as ReturnType<typeof useHoldDuration>)
   mockUseExitTypes.mockReturnValue(loading as ReturnType<typeof useExitTypes>)
+  mockUseRDistribution.mockReturnValue(loading as ReturnType<typeof useRDistribution>)
+  mockUseDimensionBreakdown.mockReturnValue(loading as ReturnType<typeof useDimensionBreakdown>)
 }
 
 // ---------------------------------------------------------------------------
