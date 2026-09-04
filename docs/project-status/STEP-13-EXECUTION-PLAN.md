@@ -87,17 +87,18 @@ class RiskSummaryResponse(BaseModel):
     current_drawdown_inr: Decimal | None    # None when equity at all-time high
     current_drawdown_pct: Decimal | None    # None when equity at all-time high
     max_loss_streak: int                    # 0 when no losses
+    current_loss_streak: int                # 0 when last closed trade was a win
 
     # Daily metrics — always today, account-scoped (new SQL)
     daily_loss_inr: Decimal                 # 0.00 when no losing trades today
     daily_loss_trade_count: int             # 0 when no losing trades today
-    total_at_risk_inr: Decimal | None       # None when no open trades with planned_risk
-    open_trade_count: int                   # 0 when no open trades today
+    total_at_risk_inr: Decimal | None       # None when no open trades have planned_risk_amount
+    open_trade_count: int                   # all open trades, regardless of trade_date
 
-    trade_date: str                         # ISO date string: today in IST
+    as_of_date: str                         # ISO date string: today in IST (response timestamp, not a filter)
 ```
 
-**Implementation note (Bhima):** Call `AnalyticsService.compute_summary(filter)` to get drawdown and streak stats. Extract `drawdown.max_drawdown_inr`, `drawdown.max_drawdown_pct`, `drawdown.current_drawdown_pct`, `streaks.max_loss_streak`. Compute `current_drawdown_inr` from `current_drawdown_pct × peak_equity` (or expose `current_drawdown_inr` directly in the drawdown dataclass if not already there — check `AnalyticsService` before deciding). Then run two new queries for the daily figures.
+**Implementation note (Bhima):** Call `AnalyticsService.compute_summary(filter)` to get drawdown and streak stats. Extract `drawdown.max_drawdown_inr`, `drawdown.max_drawdown_pct`, `drawdown.current_drawdown_pct`, `streaks.max_loss_streak`, `streaks.current_loss_streak`. Compute `current_drawdown_inr` from `current_drawdown_pct × peak_equity` (or expose `current_drawdown_inr` directly in the drawdown dataclass if not already there — check `AnalyticsService` before deciding). Then run two new queries for the daily figures.
 
 This is an intentional Phase 1 coupling — `RiskService` calls `AnalyticsService`. Document it; refactor to shared query utilities in Phase 2.
 
@@ -111,9 +112,9 @@ Lightweight endpoint: today's open-trade risk only. No historical metrics. Usefu
 
 ```python
 class DailyRiskResponse(BaseModel):
-    trade_date: str                         # ISO date in IST
-    open_trade_count: int
-    total_at_risk_inr: Decimal | None       # None when no planned_risk_amount set
+    as_of_date: str                         # ISO date in IST (response timestamp, not a filter)
+    open_trade_count: int                   # all open trades regardless of trade_date
+    total_at_risk_inr: Decimal | None       # None when no open trades have planned_risk_amount
     daily_loss_inr: Decimal                 # 0.00 when no losses today
     daily_loss_trade_count: int
 ```
@@ -121,17 +122,18 @@ class DailyRiskResponse(BaseModel):
 **Query: total_at_risk_inr**
 
 ```sql
+-- Dhanvantari correction: no trade_date filter — open trades from prior days are still at risk
 SELECT
-    COUNT(*)                            AS open_trade_count,
-    COALESCE(SUM(planned_risk_amount), NULL) AS total_at_risk_inr
+    COUNT(*)                AS open_trade_count,
+    SUM(planned_risk_amount) AS total_at_risk_inr
 FROM trades
 WHERE account_id = :account_id
   AND status = 'OPEN'
-  AND trade_date = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
-  AND planned_risk_amount IS NOT NULL
 ```
 
-Note: `total_at_risk_inr` is `None` (not 0) when no open trades have `planned_risk_amount` set — the user has open trades but didn't record their risk. This must be communicated to the frontend as "—" (data unavailable), not "₹0".
+`total_at_risk_inr` is `None` when no open trades have `planned_risk_amount` set (SUM of all-NULL returns NULL). This must be communicated to the frontend as "—" (data unavailable), not "₹0". A swing trade opened three days ago with no `planned_risk_amount` contributes to `open_trade_count` but not `total_at_risk_inr`.
+
+**Daily loss definition note (Dhanvantari):** `daily_loss_inr` filters by `t.trade_date = CURRENT_DATE`. For intraday (MIS) traders this is correct — trades open and close on the same day. For swing/CNC traders, a position opened previously and closed today would be excluded. Phase 1 targets intraday traders; this is acceptable. Revisit in Phase 2 when positional traders are a primary segment.
 
 **Query: daily_loss_inr**
 
@@ -156,8 +158,8 @@ from decimal import Decimal
 
 @dataclass
 class DailyRiskResult:
-    trade_date: str
-    open_trade_count: int
+    as_of_date: str
+    open_trade_count: int          # all open trades regardless of trade_date
     total_at_risk_inr: Decimal | None
     daily_loss_inr: Decimal
     daily_loss_trade_count: int
@@ -169,11 +171,12 @@ class RiskSummaryResult:
     current_drawdown_inr: Decimal | None
     current_drawdown_pct: Decimal | None
     max_loss_streak: int
+    current_loss_streak: int       # sourced from analytics streaks; 0 when last trade was a win
     daily_loss_inr: Decimal
     daily_loss_trade_count: int
     total_at_risk_inr: Decimal | None
-    open_trade_count: int
-    trade_date: str
+    open_trade_count: int          # all open trades regardless of trade_date
+    as_of_date: str
 ```
 
 #### New application service: `backend/src/tradeforge/application/risk_service.py`
@@ -213,7 +216,8 @@ app.include_router(risk_router, prefix="/v1/risk", tags=["risk"])
 |---------|-------------|
 | I-13-01 | `GET /v1/risk/daily-summary` returns 200 with correct totals for account with 1 open trade |
 | I-13-02 | `GET /v1/risk/daily-summary` returns `total_at_risk_inr=null` when open trade has no `planned_risk_amount` |
-| I-13-03 | `GET /v1/risk/summary` returns 200 with all fields present |
+| I-13-02b | `GET /v1/risk/daily-summary` includes open trades from prior trade_dates in `open_trade_count` and `total_at_risk_inr` (Dhanvantari regression guard — no date filter on open trades) |
+| I-13-03 | `GET /v1/risk/summary` returns 200 with all fields present including `current_loss_streak` |
 | I-13-04 | `GET /v1/risk/summary` returns 401 for unauthenticated request |
 | I-13-05 | `GET /v1/risk/daily-summary` scopes to correct account — trade from another account does not appear |
 
@@ -233,11 +237,12 @@ const RiskSummarySchema = z.object({
   current_drawdown_inr: decimalString.nullable(),
   current_drawdown_pct: decimalString.nullable(),
   max_loss_streak: z.number().int(),
+  current_loss_streak: z.number().int(),
   daily_loss_inr: decimalString,
   daily_loss_trade_count: z.number().int(),
   total_at_risk_inr: decimalString.nullable(),
   open_trade_count: z.number().int(),
-  trade_date: z.string(),
+  as_of_date: z.string(),
 })
 ```
 
@@ -246,10 +251,11 @@ Use `decimalString` (`z.string()`) consistent with all other analytics hooks.
 #### New component: `frontend/src/features/analytics/components/RiskSummaryCard.tsx`
 
 - `section` with `aria-labelledby` pointing to heading "Risk Summary"
-- Six stat cells laid out in a 2×3 or 3×2 grid:
+- Seven stat cells laid out in a grid:
   - **Max Drawdown** — `max_drawdown_pct` formatted as `−X.XX%` (always negative or "—")
   - **Current Drawdown** — `current_drawdown_pct` formatted as `−X.XX%` or "—" if at peak
-  - **Longest Loss Streak** — `max_loss_streak` as `N trades`
+  - **Max Loss Streak** — `max_loss_streak` as `N trades`
+  - **Current Loss Streak** — `current_loss_streak` as `N trades`; coloured amber at ≥ 3, red at ≥ 5; neutral (grey) at 0
   - **Today's Loss** — `daily_loss_inr` formatted as `−₹X,XXX.XX` (red) or `₹0.00` (neutral)
   - **At Risk (Open)** — `total_at_risk_inr` formatted as `₹X,XXX.XX` or "—" if null
   - **Open Trades** — `open_trade_count` as plain integer
@@ -274,7 +280,9 @@ Use hook mock pattern (`vi.mock` + `vi.mocked().mockReturnValue`).
 | F-13-01 | Renders section landmark and heading |
 | F-13-02 | Renders max drawdown pct formatted as `−8.50%` |
 | F-13-03 | Renders current drawdown pct formatted as `−2.80%` |
-| F-13-04 | Renders longest loss streak as `4 trades` |
+| F-13-04 | Renders max loss streak as `4 trades` |
+| F-13-04b | Renders current loss streak as `3 trades` in amber colour class |
+| F-13-04c | Renders current loss streak of 0 in neutral (no colour class) |
 | F-13-05 | Renders today's loss formatted as `−₹2,500.00` |
 | F-13-06 | Renders `—` for `total_at_risk_inr` when null |
 | F-13-07 | Renders `—` for drawdown fields when `max_drawdown_inr` is null |
@@ -307,7 +315,7 @@ Add MSW fixtures to `frontend/src/__tests__/msw/handlers.ts`:
 
 ## Order of Work
 
-1. **Dhanvantari** — review and sign off on this plan (closes OI-5)
+1. **Dhanvantari** — ✅ review and sign off on this plan (OI-5 closed 2026-09-04)
 2. **Bhima** — domain types + risk service + unit tests
 3. **Bhima** — `/v1/risk` router + integration tests
 4. **Arjun** — `useRiskSummary` hook + Zod schema + MSW fixtures
@@ -335,7 +343,7 @@ Bhima and Arjun work can proceed in parallel after step 1.
 
 | # | Item | Owner | Required by |
 |---|------|-------|-------------|
-| OI-5 | Dhanvantari: review and sign off on this execution plan as the Phase 1 risk spec | Dhanvantari | Before Bhima starts backend |
+| OI-5 | Dhanvantari: review and sign off on this execution plan as the Phase 1 risk spec | Dhanvantari | ✅ **RESOLVED 2026-09-04** — two corrections applied (open trade date scoping removed; `current_loss_streak` added) |
 | OI-3 | Ganesha: FIFO multi-lot treatment for CNC delivery — does it affect open trade at-risk calculation? | Ganesha | Before Step 13 implementation (check if partial fills affect `planned_risk_amount` scoping) |
 
 ---
@@ -344,7 +352,7 @@ Bhima and Arjun work can proceed in parallel after step 1.
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| Dhanvantari spec sign-off | Dhanvantari | This document reviewed; scope confirmed correct and complete for Phase 1 |
+| Dhanvantari spec sign-off | Dhanvantari | ✅ **SIGNED OFF 2026-09-04** — two corrections applied; Phase 1 scope confirmed |
 | Sahadeva QA | Sahadeva | All 5 backend integration tests pass; all 9 frontend component tests pass; no regressions in existing test suite |
 | Nakula CI | Nakula | `pytest --cov-fail-under=80` green; `npm run coverage` passes thresholds; ESLint/ruff/tsc clean |
 | Yudhishthira accept | Yudhishthira | Risk Summary card renders correctly; deduplication decisions reviewed and accepted |
