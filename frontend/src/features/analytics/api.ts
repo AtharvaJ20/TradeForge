@@ -1,11 +1,21 @@
 import { apiClient } from '@/lib/api-client'
 import {
   AnalyticsSummarySchema,
+  ExitTypesSchema,
   FilterAccountsSchema,
   FilterBrokersSchema,
   FilterSetupsSchema,
+  HoldDurationSchema,
+  StreaksSchema,
 } from './schemas'
-import type { AccountDimension, AnalyticsSummary, AnalyticsFilterParams } from './types'
+import type {
+  AccountDimension,
+  AnalyticsSummary,
+  AnalyticsFilterParams,
+  ExitTypes,
+  HoldDuration,
+  Streaks,
+} from './types'
 
 function buildQueryString(params: AnalyticsFilterParams): string {
   const parts: string[] = []
@@ -43,4 +53,24 @@ export async function fetchFilterSetups(): Promise<string[]> {
 export async function fetchFilterBrokers(): Promise<string[]> {
   const raw = await apiClient.get('/v1/analytics/filters/brokers')
   return FilterBrokersSchema.parse(raw)
+}
+
+export async function fetchStreaks(params: AnalyticsFilterParams = {}): Promise<Streaks> {
+  const qs = buildQueryString(params)
+  const raw = await apiClient.get(`/v1/analytics/streaks${qs}`)
+  return StreaksSchema.parse(raw)
+}
+
+export async function fetchHoldDuration(
+  params: AnalyticsFilterParams = {},
+): Promise<HoldDuration> {
+  const qs = buildQueryString(params)
+  const raw = await apiClient.get(`/v1/analytics/hold-duration${qs}`)
+  return HoldDurationSchema.parse(raw)
+}
+
+export async function fetchExitTypes(params: AnalyticsFilterParams = {}): Promise<ExitTypes> {
+  const qs = buildQueryString(params)
+  const raw = await apiClient.get(`/v1/analytics/by-exit-type${qs}`)
+  return ExitTypesSchema.parse(raw)
 }

@@ -270,6 +270,28 @@ class TestComputeStreakStats:
         assert result.avg_win_streak == _D("2")
         assert result.avg_loss_streak == _D("2")
 
+    def test_g_streak_01_wwbll(self) -> None:
+        """G-STREAK-01 reference case: W W B L L.
+
+        Breakeven resets the win streak; loss streak starts fresh after it.
+        Expected: max_win=2, max_loss=2, current_win=0, current_loss=2.
+        """
+        pnls = [_D("1"), _D("1"), _D("0"), _D("-1"), _D("-1")]
+        result = compute_streak_stats(pnls)
+        assert result.max_win_streak == 2
+        assert result.max_loss_streak == 2
+        assert result.current_win_streak == 0
+        assert result.current_loss_streak == 2
+
+    def test_breakeven_starts_no_new_streak(self) -> None:
+        """G-STREAK-01: a standalone breakeven starts neither a win nor a loss streak."""
+        pnls = [_D("0")]
+        result = compute_streak_stats(pnls)
+        assert result.current_win_streak == 0
+        assert result.current_loss_streak == 0
+        assert result.max_win_streak == 0
+        assert result.max_loss_streak == 0
+
 
 # ---------------------------------------------------------------------------
 # TC-MC: compute_monte_carlo

@@ -136,6 +136,59 @@ export const CONFIRM_FIXTURE = {
 }
 
 // ---------------------------------------------------------------------------
+// Behavioral analytics fixtures (Step 12.5)
+// ---------------------------------------------------------------------------
+
+export const STREAKS_FIXTURE = {
+  current_win_streak: 0,
+  current_loss_streak: 2,
+  max_win_streak: 2,
+  max_loss_streak: 2,
+  avg_win_streak: '2.00',
+  avg_loss_streak: '2.00',
+}
+
+export const STREAKS_EMPTY_FIXTURE = {
+  current_win_streak: 0,
+  current_loss_streak: 0,
+  max_win_streak: 0,
+  max_loss_streak: 0,
+  avg_win_streak: '0.00',
+  avg_loss_streak: '0.00',
+}
+
+export const HOLD_DURATION_FIXTURE = {
+  buckets: [
+    { bucket: '< 15 min', bucket_order: 1, count: 5, avg_net_pnl: '450.00', win_rate: '0.60' },
+    { bucket: '15 min – 1 hr', bucket_order: 2, count: 12, avg_net_pnl: '820.00', win_rate: '0.75' },
+    { bucket: '1 – 4 hr', bucket_order: 3, count: 8, avg_net_pnl: '-120.00', win_rate: '0.38' },
+    { bucket: '4 – 24 hr', bucket_order: 4, count: 3, avg_net_pnl: '200.00', win_rate: '0.67' },
+    { bucket: '> 7 days', bucket_order: 6, count: 2, avg_net_pnl: '1500.00', win_rate: '1.00' },
+  ],
+  avg_duration_minutes: '82.50',
+  median_duration_minutes: '45.00',
+}
+
+export const HOLD_DURATION_EMPTY_FIXTURE = {
+  buckets: [],
+  avg_duration_minutes: null,
+  median_duration_minutes: null,
+}
+
+export const EXIT_TYPES_FIXTURE = [
+  { exit_type: 'TARGET_HIT', trade_count: 12, win_rate: '1.00', avg_net_pnl: '950.00', avg_r_multiple: '2.10' },
+  { exit_type: 'STOP_HIT', trade_count: 10, win_rate: '0.00', avg_net_pnl: '-480.00', avg_r_multiple: '-1.00' },
+  { exit_type: 'DISCRETIONARY', trade_count: 5, win_rate: '0.60', avg_net_pnl: '120.00', avg_r_multiple: '0.40' },
+  { exit_type: null, trade_count: 3, win_rate: '0.33', avg_net_pnl: '-200.00', avg_r_multiple: null },
+]
+
+/** Variant: NULL exit_type > 20% of total — triggers data quality alert. */
+export const EXIT_TYPES_HIGH_UNTAGGED_FIXTURE = [
+  { exit_type: 'TARGET_HIT', trade_count: 3, win_rate: '1.00', avg_net_pnl: '900.00', avg_r_multiple: '2.00' },
+  { exit_type: null, trade_count: 7, win_rate: '0.43', avg_net_pnl: '-100.00', avg_r_multiple: null },
+]
+
+// ---------------------------------------------------------------------------
 // Filter dimension fixtures
 // ---------------------------------------------------------------------------
 
@@ -152,6 +205,17 @@ export const handlers = [
   // GET analytics summary
   http.get(`${BASE}/v1/analytics/summary`, () => {
     return HttpResponse.json(ANALYTICS_SUMMARY_FIXTURE)
+  }),
+
+  // GET behavioral analytics
+  http.get(`${BASE}/v1/analytics/streaks`, () => {
+    return HttpResponse.json(STREAKS_FIXTURE)
+  }),
+  http.get(`${BASE}/v1/analytics/hold-duration`, () => {
+    return HttpResponse.json(HOLD_DURATION_FIXTURE)
+  }),
+  http.get(`${BASE}/v1/analytics/by-exit-type`, () => {
+    return HttpResponse.json(EXIT_TYPES_FIXTURE)
   }),
 
   // GET filter dimensions

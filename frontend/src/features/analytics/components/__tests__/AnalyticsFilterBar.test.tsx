@@ -243,6 +243,89 @@ describe('AnalyticsFilterBar — loading skeleton (F-5)', () => {
 })
 
 // ---------------------------------------------------------------------------
+// OBS-12.3-02: date_to clear — emitted params must not contain date_to
+// ---------------------------------------------------------------------------
+
+describe('AnalyticsFilterBar — OBS-12.3-02: date_to clear', () => {
+  it('removes date_to from params when the date-to input is cleared', () => {
+    const onChange = vi.fn()
+    render(<AnalyticsFilterBar value={{ date_to: '2026-12-31' }} onChange={onChange} />)
+
+    fireEvent.change(screen.getByLabelText(/date to/i), {
+      target: { value: '' },
+    })
+
+    const emitted = onChange.mock.calls[0][0]
+    expect(emitted).not.toHaveProperty('date_to')
+  })
+
+  it('emits date_to when a value is entered', () => {
+    const onChange = vi.fn()
+    render(<AnalyticsFilterBar value={{}} onChange={onChange} />)
+
+    fireEvent.change(screen.getByLabelText(/date to/i), {
+      target: { value: '2026-06-30' },
+    })
+
+    expect(onChange).toHaveBeenCalledWith({ date_to: '2026-06-30' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// OBS-12.3-03: partial-uncheck — emitted array must contain exactly the remaining item
+// ---------------------------------------------------------------------------
+
+describe('AnalyticsFilterBar — OBS-12.3-03: partial multi-select uncheck', () => {
+  it('removes exactly the unchecked item from directions, keeping the other', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <AnalyticsFilterBar
+        value={{ directions: ['LONG', 'SHORT'] }}
+        onChange={onChange}
+      />,
+    )
+
+    await user.click(screen.getByRole('checkbox', { name: 'LONG' }))
+
+    const emitted = onChange.mock.calls[0][0] as { directions?: string[] }
+    expect(emitted.directions).toEqual(['SHORT'])
+  })
+
+  it('drops the key entirely when the last selected item in an array is unchecked', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <AnalyticsFilterBar
+        value={{ directions: ['LONG'] }}
+        onChange={onChange}
+      />,
+    )
+
+    await user.click(screen.getByRole('checkbox', { name: 'LONG' }))
+
+    const emitted = onChange.mock.calls[0][0]
+    expect(emitted).not.toHaveProperty('directions')
+  })
+
+  it('removes exactly one setup from setup_names when partially unchecked', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <AnalyticsFilterBar
+        value={{ setup_names: ['Breakout', 'VWAP Reversion'] }}
+        onChange={onChange}
+      />,
+    )
+
+    await user.click(screen.getByRole('checkbox', { name: 'Breakout' }))
+
+    const emitted = onChange.mock.calls[0][0] as { setup_names?: string[] }
+    expect(emitted.setup_names).toEqual(['VWAP Reversion'])
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Error degradation state
 // ---------------------------------------------------------------------------
 

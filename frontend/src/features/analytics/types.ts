@@ -2,9 +2,14 @@ import type { z } from 'zod'
 import type {
   AccountDimensionSchema,
   AnalyticsSummarySchema,
+  ExitTypeRowSchema,
+  ExitTypesSchema,
+  HoldDurationBucketSchema,
+  HoldDurationSchema,
   RiskAdjustedSchema,
   SharpeResultSchema,
   SortinoResultSchema,
+  StreaksSchema,
 } from './schemas'
 
 export type AccountDimension = z.infer<typeof AccountDimensionSchema>
@@ -12,6 +17,13 @@ export type AnalyticsSummary = z.infer<typeof AnalyticsSummarySchema>
 export type RiskAdjusted = z.infer<typeof RiskAdjustedSchema>
 export type SharpeResult = z.infer<typeof SharpeResultSchema>
 export type SortinoResult = z.infer<typeof SortinoResultSchema>
+
+// Step 12.5 behavioral analytics types
+export type Streaks = z.infer<typeof StreaksSchema>
+export type HoldDurationBucket = z.infer<typeof HoldDurationBucketSchema>
+export type HoldDuration = z.infer<typeof HoldDurationSchema>
+export type ExitTypeRow = z.infer<typeof ExitTypeRowSchema>
+export type ExitTypes = z.infer<typeof ExitTypesSchema>
 
 // Sub-types derived from the top-level summary — used as component prop types.
 export type PnlSummary = AnalyticsSummary['pnl']

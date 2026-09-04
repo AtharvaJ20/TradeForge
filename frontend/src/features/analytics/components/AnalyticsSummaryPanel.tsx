@@ -9,6 +9,9 @@ import { DrawdownCard } from './DrawdownCard'
 import { RiskAdjustedCard } from './RiskAdjustedCard'
 import { DirectionBreakdownTable } from './DirectionBreakdownTable'
 import { ChargesCard } from './ChargesCard'
+import { StreaksCard } from './StreaksCard'
+import { HoldDurationCard } from './HoldDurationCard'
+import { ExitTypeCard } from './ExitTypeCard'
 
 function SkeletonPanel() {
   return (
@@ -80,6 +83,13 @@ export function AnalyticsSummaryPanel({ params }: { params?: AnalyticsFilterPara
       <DirectionBreakdownTable rows={data.direction} />
 
       <ChargesCard charges={data.charges} />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StreaksCard params={params} />
+        <HoldDurationCard params={params} />
+      </div>
+
+      <ExitTypeCard params={params} />
     </div>
   )
 }
