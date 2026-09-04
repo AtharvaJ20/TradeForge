@@ -28,14 +28,19 @@ Phase 1 is complete when a real user can do all of the following without develop
 
 ## Pre-Conditions (Decisions That Must Be Made First)
 
-These are not code tasks. They are decisions that only Atharva can make. Everything on the critical infrastructure path is blocked until they are resolved.
-
 | Decision | Why it blocks | Owner | Status |
 |----------|--------------|-------|--------|
-| **Cloud provider** (AWS / GCP / Azure) | Blocks: managed PostgreSQL, managed Redis (HA), KMS, email provider selection, S3 provisioning | Atharva | ❌ Not decided |
-| **Production domain** | Blocks: CORS config, transactional email sender domain, passkey rpId (irreversible after first user registers a passkey) | Atharva | ❌ Not decided |
+| **Deployment platform** | Determines how services are provisioned | Atharva | ✅ **RESOLVED — Railway** (no upfront cost, free tiers for PostgreSQL + Redis) |
+| **Production domain** | Blocks: CORS config, transactional email sender domain, passkey rpId (irreversible after first user registers a passkey) | Atharva | ⚠️ **Partially resolved** — Railway provides a free `*.up.railway.app` subdomain usable for Phase 1. Custom domain can be added later. If Atharva wants a custom domain at launch, decide before Step I-1. |
+| **KMS approach for broker credentials** | ADR-002 specifies envelope KMS for broker credential encryption. Railway has no native KMS. | Hanuman | ❌ **Needs Hanuman ruling** — see OI-KMS below |
 
-**These decisions must be made before any infrastructure provisioning work begins. Nakula cannot proceed on Step I-1 without them.**
+**OI-KMS — Broker Credential Encryption on Railway:**  
+ADR-002 calls for an envelope KMS (Key Encryption Key) to protect broker API credentials. Railway has no managed KMS. Three options — Hanuman must rule before Step I-1:
+1. **Env-var symmetric encryption (simplest):** Use a `BROKER_MASTER_KEY` environment variable set in Railway dashboard. Encrypt credentials with AES-256-GCM using this key. No external dependency. Acceptable for Phase 1 if Hanuman approves. Risk: key rotation requires re-encrypting all records.
+2. **HashiCorp HCP Vault (free tier):** External KMS-as-a-service, free tier available. Adds external dependency but proper key management. More operational overhead for a solo developer.
+3. **Defer broker credential storage:** Phase 1 users import via CSV only — broker credentials not needed until broker API integrations (Phase 2). Deferring the KMS requirement to Phase 2 is architecturally sound and eliminates the blocker entirely for Phase 1.
+
+**Krishna's recommendation:** Option 3 — defer. Phase 1 uses CSV import only. Broker API credentials are a Phase 2 feature (Sanjaya). Implementing KMS complexity now for a feature that doesn't exist yet is premature. Hanuman confirms this is acceptable for Phase 1.
 
 ---
 
@@ -328,45 +333,63 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 
 ### Track I — Infrastructure (Parallel, Owner: Nakula)
 
-This track runs in parallel with feature steps once Atharva makes the cloud/domain decisions. It does not block most feature development but is the final gate before production deployment.
+**Platform: Railway** (railway.app) — chosen for zero upfront cost and free tiers. No traditional cloud provider (AWS/GCP/Azure) is used in Phase 1.
 
-#### Step I-1 — Cloud Infrastructure Provisioning
+This track runs in parallel with feature steps. It does not block most feature development but is the final gate before production deployment.
+
+#### Step I-1 — Railway Service Provisioning
 
 **Owner:** Nakula  
-**Dependency:** Cloud provider decision + domain decision (Atharva) ← **CRITICAL PATH**  
-**Estimate:** 1–2 sessions  
+**Dependency:** OI-KMS decision (Hanuman) — recommend deferring broker credential KMS to Phase 2 (see Pre-Conditions)  
+**Estimate:** 1 session  
 
-- Provision managed PostgreSQL (production + staging)
-- Provision managed Redis (HA, production + staging)
-- Provision KMS for broker credential KEK
-- Provision S3 bucket for attachments (with lifecycle policy)
-- Provision transactional email provider (SES / SendGrid / Postmark — Nakula decides)
-- Create staging environment (separate DB, separate Redis)
-- Document infrastructure topology in `docs/infrastructure/INFRA-TOPOLOGY.md`
-- All credentials to environment variables; never in code
+**Railway services to provision:**
+- **PostgreSQL:** Railway managed PostgreSQL plugin. Production environment + staging environment (separate Railway projects or environments).
+- **Redis:** Railway managed Redis plugin. Needed for session management (`SessionRepo`).
+- **FastAPI backend:** Deployed as a Railway service from the GitHub repo. `Dockerfile` or Nixpacks. Port from `uvicorn`.
+- **Vite frontend:** Deployed as a Railway static service or separate service (or Vercel/Cloudflare Pages for free static hosting — Nakula decides which is simpler).
 
-#### Step I-2 — CI/CD on Hosted Runner
+**External free-tier services (not Railway-native):**
+- **Attachment storage (S3-compatible):** Cloudflare R2 (free: 10 GB storage, zero egress fees) — recommended. Alternatively Backblaze B2 (free 10 GB). Both are S3-compatible; `S3Storage` implementation only needs endpoint + bucket + key env vars. **Nakula provisions, Bhima wires `S3Storage`.**
+- **Transactional email:** Resend (free: 3,000 emails/month, 100/day) — recommended for simplicity. Alternatively Mailgun free tier. Nakula selects and provisions. Bhima updates `EmailService` to use the chosen provider's SMTP or API.
+
+**Environment variables (all secrets via Railway dashboard — never in code):**
+- `DATABASE_URL` — Railway injects automatically for the PostgreSQL plugin
+- `REDIS_URL` — Railway injects automatically for the Redis plugin
+- `SESSION_SECRET` — generate with `openssl rand -hex 32`
+- `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` — from Cloudflare R2 / Backblaze
+- `EMAIL_API_KEY` — from Resend / Mailgun
+- `ALLOWED_ORIGINS` — production domain (e.g. `https://tradeforge.up.railway.app` or custom domain)
+
+**Domain:**
+- Phase 1: use Railway's free `*.up.railway.app` subdomain. No custom domain required to deploy.
+- Custom domain: add via Railway dashboard at any time — does not require a redeploy.
+- **Important:** Do not register any users with passkeys until the domain is finalised — passkey rpId is tied to the domain and cannot be changed per registered key.
+
+**Deliverable:** Document service topology + env var list in `docs/infrastructure/RAILWAY-TOPOLOGY.md`.
+
+#### Step I-2 — CI/CD on GitHub Actions (GitHub-hosted runner)
 
 **Owner:** Nakula  
 **Dependency:** Step I-1  
-**Estimate:** 1 session  
+**Estimate:** 0.5 session  
 
-- Move GitHub Actions from local to GitHub-hosted runner
-- Add deployment stage to CI: staging deploy on merge to `main`, production deploy on tagged release
-- Add `pip-audit` security scan to CI pipeline
-- Rollback procedure documented and tested on staging
-- Environment parity check: staging DB migration must pass before production deploy is permitted
+- Move GitHub Actions from local to GitHub-hosted runner (free tier: 2,000 min/month for public repos, 500 min for private)
+- Add Railway deployment step to CI: on merge to `main` → Railway redeploy via `RAILWAY_TOKEN` secret in GitHub
+- Add `pip-audit` security scan step to CI pipeline
+- Alembic migration runs as part of Railway deploy (Railway start command: `alembic upgrade head && uvicorn ...`)
+- Staging environment: separate Railway project. CI deploys to staging first; production deploy is a manual trigger or tagged release.
 
 #### Step I-3 — Production Deployment
 
 **Owner:** Nakula  
 **Dependency:** Step I-2 + Step 20 (security hardening, Hanuman sign-off) + Sahadeva E2E gate (Step QA-1)  
 
-- Deploy to production environment
-- Run Alembic migrations on production DB
-- Smoke test: health check, login, CSV import, journal entry, analytics summary
-- Monitor error rate for 24 hours post-deploy
-- Rollback plan on standby
+- Trigger production Railway deploy
+- Confirm Alembic migrations applied cleanly (check Railway logs)
+- Smoke test against production URL: health check, login, CSV import, journal entry, analytics summary
+- Monitor Railway metrics (memory, CPU, error rate) for 24 hours
+- Rollback: Railway supports one-click redeploy of any prior deployment
 
 ---
 
@@ -477,7 +500,8 @@ Phase 1 is DONE when all of the following are true simultaneously:
 
 | # | Risk | Likelihood | Impact | Owner | Mitigation |
 |---|------|-----------|--------|-------|-----------|
-| R-1 | Cloud/domain decisions remain deferred | High | High | Atharva | Escalate: every session delayed is a session lost on infra. Set a decision deadline. |
+| R-1 | ~~Cloud provider deferred~~ | — | — | — | ✅ RETIRED — Railway decision made 2026-09-04 |
+| R-1b | Railway free tier limits hit before production is stable | Low | Medium | Nakula | Monitor Railway usage. Free PostgreSQL has storage limits; free Redis has memory limits. Upgrade to paid tier (~$5/mo) if needed — cost is low. |
 | R-2 | Rate limiting not shipped before any users onboarded | Medium | High | Hanuman | Step 20 is a hard deployment gate. Hanuman sign-off required before I-3. |
 | R-3 | S3Storage not wired → attachments fail silently in production | Medium | Medium | Nakula | Step 20 scope. StubStorage clearly flagged in staging smoke test. |
 | R-4 | Production domain rpId wrong → passkeys permanently broken for early users | Low | High | Atharva | Domain decision before any production registration. No workaround once users register. |
@@ -489,14 +513,16 @@ Phase 1 is DONE when all of the following are true simultaneously:
 
 ## Open Items That Must Be Resolved During Phase 1
 
-| # | Item | Owner | Required by |
-|---|------|-------|------------|
-| OI-1 | Cloud provider decision | Atharva | Before Step I-1 |
-| OI-2 | Production domain decision | Atharva | Before Step I-1 |
-| OI-3 | Ganesha: confirm FIFO multi-lot treatment for CNC delivery — is single-lot assumption acceptable for Phase 1? | Ganesha | Before Step 13 or Step 16 |
-| OI-4 | Yudhishthira: confirm Phase 1 scope of Strategy/Setup — hardcoded enum acceptable, or must users define their own before MVP? | Yudhishthira | Before Step 18 (dashboard design) |
-| OI-5 | Dhanvantari: produce Phase 1 risk metrics spec (scope of Step 13) | Dhanvantari | Before Step 13 implementation |
-| OI-6 | Nakula: select transactional email provider | Nakula | Before Step I-1 |
+| # | Item | Owner | Status | Required by |
+|---|------|-------|--------|------------|
+| OI-1 | Cloud provider decision | Atharva | ✅ **RESOLVED — Railway** (2026-09-04) | — |
+| OI-2 | Production domain decision | Atharva | ⚠️ **Partially resolved** — `*.up.railway.app` free subdomain usable for Phase 1. Custom domain optional. | Before Step I-1 (decide if custom domain needed at launch) |
+| OI-KMS | Broker credential KMS approach on Railway | Hanuman | ❌ **Pending ruling** — Krishna recommends deferring to Phase 2 (CSV-only Phase 1 doesn't need broker API credentials) | Before Step I-1 |
+| OI-3 | Ganesha: confirm FIFO multi-lot treatment for CNC delivery — single-lot assumption acceptable for Phase 1? | Ganesha | ❌ Open | Before Step 13 or Step 16 |
+| OI-4 | Yudhishthira: confirm Phase 1 scope of Strategy/Setup — hardcoded enum acceptable, or must users define their own before MVP? | Yudhishthira | ❌ Open | Before Step 18 (dashboard design) |
+| OI-5 | Dhanvantari: produce Phase 1 risk metrics spec (scope of Step 13) | Dhanvantari | ❌ Open | Before Step 13 implementation |
+| OI-6 | Nakula: select transactional email provider (Resend recommended — free 3,000/month) | Nakula | ❌ Open | Before Step I-1 |
+| OI-7 | Nakula: select attachment storage provider (Cloudflare R2 recommended — free 10 GB, zero egress) | Nakula | ❌ Open | Before Step 20 (S3Storage wiring) |
 
 ---
 
