@@ -196,6 +196,53 @@ export const DimensionBreakdownSchema = z.object({
   groups: z.array(DimensionGroupSchema),
 })
 
+// ---------------------------------------------------------------------------
+// N-4 Kelly Fraction schemas (Step 12.7)
+// ---------------------------------------------------------------------------
+
+export const KellySchema = z.object({
+  kelly_pct: decimalString,
+  half_kelly_pct: decimalString,
+  trades_with_r: z.number().int(),
+  insufficient_sample: z.boolean(),
+  min_n: z.number().int(),
+})
+
+// ---------------------------------------------------------------------------
+// N-2 Time-of-Day schemas (Step 12.7)
+// ---------------------------------------------------------------------------
+
+export const TimeOfDayBucketSchema = z.object({
+  bucket: z.string(),
+  label: z.string(),
+  trade_count: z.number().int(),
+  win_count: z.number().int(),
+  win_rate: z.string(),        // 0–100 scale (percentage)
+  expectancy_inr: decimalString,
+  total_net_pnl: z.string(),
+})
+
+export const TimeOfDaySchema = z.object({
+  buckets: z.array(TimeOfDayBucketSchema),
+})
+
+// ---------------------------------------------------------------------------
+// N-1 Rolling Expectancy schemas (Step 12.7)
+// ---------------------------------------------------------------------------
+
+export const RollingExpectancyPointSchema = z.object({
+  trade_index: z.number().int(),
+  trade_date: z.string(),
+  rolling_exp_r: decimalString,
+  rolling_exp_inr: z.string(),
+})
+
+export const RollingExpectancySchema = z.object({
+  window: z.number().int(),
+  insufficient_sample: z.boolean(),
+  data: z.array(RollingExpectancyPointSchema),
+})
+
 export const AnalyticsSummarySchema = z.object({
   pnl: PnlSummarySchema,
   outcome: OutcomeDistributionSchema,
