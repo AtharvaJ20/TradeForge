@@ -84,7 +84,10 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Rolling Expectancy (N-1), Time-of-Day (N-2), Kelly (N-4) → Step 12.7
 - Monte Carlo (N-3) → Phase 2 (blocked on background job infrastructure)
 
-**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-04** (Sahadeva GO WITH RISKS → Nakula CI GREEN → Yudhishthira ACCEPT)  
+**Test totals:** 474 backend tests (84.79% coverage), 165 frontend tests (85.01% coverage)  
+**Branch:** `feat/step-12-6-analytics-completion` (merge to `main` via PR)
 
 ---
 
