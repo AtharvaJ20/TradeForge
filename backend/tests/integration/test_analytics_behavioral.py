@@ -623,3 +623,199 @@ async def test_tc_beh_007_exit_type_empty(user_empty: uuid.UUID) -> None:
 
     assert response.status_code == 200, response.text
     assert response.json() == []
+
+
+# ---------------------------------------------------------------------------
+# COV-12.5-01: /hold-duration — all 6 buckets covered
+# ---------------------------------------------------------------------------
+# TC-BEH-003 covers buckets 1-3 (< 15 min, 15 min–1 hr, 1–4 hr).
+# This fixture covers buckets 4-6 (4–24 hr, 1–7 days, > 7 days).
+# "1–7 days" is the multi_day bucket (2–6 days inclusive) absent from prior tests.
+
+
+@pytest.fixture
+async def user_hold_duration_extended(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[uuid.UUID, None]:
+    """3 trades spanning hold-duration buckets 4, 5, and 6.
+
+    Trade 1: 720 min (12 hr)  → bucket 4  "4 – 24 hr"
+    Trade 2: 2880 min (2 days) → bucket 5  "1 – 7 days"  (multi_day coverage)
+    Trade 3: 15000 min (~10 d) → bucket 6  "> 7 days"
+    """
+    base_ts = datetime(2025, 4, 1, 9, 30, tzinfo=UTC)
+    holds_minutes = [720, 2880, 15000]
+
+    async with session_factory() as session:
+        async with session.begin():
+            uid = await _insert_user(session)
+            account_id = await _insert_trading_account(session, uid)
+            iid = await _insert_instrument(session)
+
+            for i, hold_min in enumerate(holds_minutes):
+                first_fill = base_ts + timedelta(days=i * 20)
+                last_fill = first_fill + timedelta(minutes=hold_min)
+                tid = await _insert_trade(
+                    session,
+                    user_id=uid,
+                    account_id=account_id,
+                    instrument_id=iid,
+                    trade_date=(base_ts + timedelta(days=i * 20)).date(),
+                    first_fill_at=first_fill,
+                    last_fill_at=last_fill,
+                )
+                await _insert_pnl(
+                    session,
+                    trade_id=tid,
+                    user_id=uid,
+                    account_id=account_id,
+                    net_pnl=Decimal("300"),
+                )
+
+    yield uid
+    await _cleanup(session_factory, uid)
+
+
+async def test_tc_beh_cov01_hold_duration_extended_buckets(
+    user_hold_duration_extended: uuid.UUID,
+) -> None:
+    """COV-12.5-01: trades land in buckets 4 (4–24 hr), 5 (1–7 days), 6 (>7 days).
+
+    Closes the multi_day coverage gap identified by Sahadeva in Step 12.5.
+    """
+    uid = user_hold_duration_extended
+    app.dependency_overrides[get_current_user_id] = lambda: uid
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/v1/analytics/hold-duration")
+    finally:
+        app.dependency_overrides.pop(get_current_user_id, None)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    bucket_names = {b["bucket"] for b in body["buckets"]}
+    assert "4 – 24 hr" in bucket_names, f"Bucket '4 – 24 hr' missing from {bucket_names}"
+    assert "1 – 7 days" in bucket_names, f"Bucket '1 – 7 days' (multi_day) missing from {bucket_names}"
+    assert "> 7 days" in bucket_names, f"Bucket '> 7 days' missing from {bucket_names}"
+
+    total_count = sum(b["count"] for b in body["buckets"])
+    assert total_count == 3, f"Expected 3 trades total across buckets, got {total_count}"
+
+    # Verify ordering
+    orders = [b["bucket_order"] for b in body["buckets"]]
+    assert orders == sorted(orders), "Buckets must be in ascending bucket_order"
+
+
+# ---------------------------------------------------------------------------
+# COV-12.5-02: filter pass-through tests for behavioral analytics endpoints
+# ---------------------------------------------------------------------------
+# One test per endpoint confirming that date_from, date_to, account_ids, and
+# directions filters correctly reduce the result set.
+
+
+async def test_tc_beh_cov02a_streaks_filter_passthrough(
+    user_streaks_wwbll: uuid.UUID,
+) -> None:
+    """COV-12.5-02a: /streaks — from_date after all trade dates returns zero streaks."""
+    uid = user_streaks_wwbll
+    app.dependency_overrides[get_current_user_id] = lambda: uid
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # All trades are in Jan 2025; filtering from 2099-01-01 yields zero trades
+            response = await client.get(
+                "/v1/analytics/streaks", params={"date_from": "2099-01-01"}
+            )
+    finally:
+        app.dependency_overrides.pop(get_current_user_id, None)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["max_win_streak"] == 0, "date_from filter must exclude all trades → zero streaks"
+    assert body["max_loss_streak"] == 0
+    assert body["current_win_streak"] == 0
+    assert body["current_loss_streak"] == 0
+
+    # Also verify direction filter: trades are LONG; SHORT filter → zero streaks
+    app.dependency_overrides[get_current_user_id] = lambda: uid
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response2 = await client.get(
+                "/v1/analytics/streaks", params={"directions": "SHORT"}
+            )
+    finally:
+        app.dependency_overrides.pop(get_current_user_id, None)
+
+    assert response2.status_code == 200, response2.text
+    body2 = response2.json()
+    assert body2["max_win_streak"] == 0, "direction=SHORT filter must exclude LONG trades"
+
+
+async def test_tc_beh_cov02b_hold_duration_filter_passthrough(
+    user_hold_duration: uuid.UUID,
+) -> None:
+    """COV-12.5-02b: /hold-duration — date_to before all trade dates returns empty buckets."""
+    uid = user_hold_duration
+    app.dependency_overrides[get_current_user_id] = lambda: uid
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Trades are Feb 2025; filter date_to=2025-01-01 excludes all
+            response = await client.get(
+                "/v1/analytics/hold-duration", params={"date_to": "2025-01-01"}
+            )
+    finally:
+        app.dependency_overrides.pop(get_current_user_id, None)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["buckets"] == [], "date_to filter before trade dates must yield empty buckets"
+    assert body["avg_duration_minutes"] is None
+    assert body["median_duration_minutes"] is None
+
+    # Also verify account_ids filter with a random unknown account → empty
+    unknown_account = uuid.uuid4()
+    app.dependency_overrides[get_current_user_id] = lambda: uid
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response2 = await client.get(
+                "/v1/analytics/hold-duration",
+                params={"account_ids": str(unknown_account)},
+            )
+    finally:
+        app.dependency_overrides.pop(get_current_user_id, None)
+
+    assert response2.status_code == 200, response2.text
+    body2 = response2.json()
+    assert body2["buckets"] == [], "account_ids filter for unknown account must yield empty buckets"
+
+
+async def test_tc_beh_cov02c_exit_type_filter_passthrough(
+    user_exit_types: dict,
+) -> None:
+    """COV-12.5-02c: /by-exit-type — from_date after all trade dates returns empty list."""
+    uid = user_exit_types["user_id"]
+    app.dependency_overrides[get_current_user_id] = lambda: uid
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Trades are March 2025; filter date_from=2099-01-01 excludes all
+            response = await client.get(
+                "/v1/analytics/by-exit-type", params={"date_from": "2099-01-01"}
+            )
+    finally:
+        app.dependency_overrides.pop(get_current_user_id, None)
+
+    assert response.status_code == 200, response.text
+    assert response.json() == [], "date_from filter must exclude all trades → empty exit-type list"
+
+    # Also verify directions filter
+    app.dependency_overrides[get_current_user_id] = lambda: uid
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response2 = await client.get(
+                "/v1/analytics/by-exit-type", params={"directions": "SHORT"}
+            )
+    finally:
+        app.dependency_overrides.pop(get_current_user_id, None)
+
+    assert response2.status_code == 200, response2.text
+    assert response2.json() == [], "directions=SHORT filter must exclude all LONG trades"
