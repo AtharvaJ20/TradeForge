@@ -58,7 +58,7 @@ Steps 1–12.5 are done. Do not re-do or revisit these. They are foundation — 
 | 11 | Trading accounts + broker CSV import (Zerodha, Upstox, Angel One) | ✅ |
 | 12.1–12.5 | Analytics: 9 metric cards, full filter UI (9 dimensions), dynamic filter options, streaks/hold duration/exit type | ✅ Yudhishthira 2026-09-03/04 |
 
-**Test totals as of Step 12.5:** 457 backend tests (84.31% coverage), 141 frontend tests (84.17% coverage).
+**Test totals as of Step 12.7:** 488 backend tests (84.27% coverage), 190 frontend tests (85.6% statements / 87.88% branches).
 
 ---
 
@@ -96,17 +96,26 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Goal:** Deliver the remaining Karna spec analytics that complete the §13 Phase 1 analytics requirement.  
 **Owners:** Bhima (backend), Arjun (frontend)  
 **Estimate:** 1–2 sessions  
-**Dependency:** Step 12.6 accepted  
+**Dependency:** Step 12.6 accepted ✅  
+**Execution plan:** `docs/project-status/STEP-12-7-EXECUTION-PLAN.md`
 
 **Scope:**
-- **N-1 — Rolling Expectancy:** 20-trade rolling window expectancy. Backend: sliding window query. Frontend: sparkline or tabular rolling values.
-- **N-2 — Time-of-Day Performance:** Performance breakdown by hour-of-day band (pre-market, morning, midday, afternoon, post-market for NSE session). Backend: EXTRACT(HOUR FROM first_fill_at) bucketed. Frontend: heatmap or bar table.
-- **N-4 — Kelly Fraction:** Full Kelly and Half-Kelly from win rate + avg win/loss R. Frontend: single stat with a plain-language risk-of-ruin note.
+- **N-1 — Rolling Expectancy:** 20-trade sliding-window expectancy. Backend: pure Python over ordered equity curve. Frontend: scrollable table (last 20 points visible).
+- **N-2 — Time-of-Day Performance:** Performance by NSE session band (Pre-Open, Open Volatility, Mid-Morning, Lunch, Afternoon, Close) bucketed from `first_fill_at AT TIME ZONE 'Asia/Kolkata'`. Frontend: 6-row table.
+- **N-4 — Kelly Fraction:** Full Kelly and Half-Kelly from Expectancy_R / AVG(positive R). Frontend: two stat numbers + plain-language note. Min N: 30 trades with valid R.
+
+**Order of work:** N-4 → N-2 → N-1 (increasing complexity).
 
 **Explicitly NOT in 12.7:**
 - N-3 Monte Carlo → Phase 2
+- N-5 MAE/MFE → Phase 2
+- Sparkline chart for rolling expectancy → Phase 2 (table is MVP)
 
-**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-04** (Sahadeva GO WITH RISKS → Nakula LOCAL CI GREEN → Yudhishthira ACCEPT)  
+**Test totals:** 488 backend tests (84.27% coverage), 190 frontend tests (85.6% statements / 87.88% branches)  
+**Branch:** `feat/step-12-7-rolling-metrics` (merge to `main` via PR — GitHub Actions CI confirmation required before merge)  
+**Note:** §13 Phase 1 analytics requirement is now fully closed (Steps 12.1–12.7 complete).
 
 ---
 
@@ -427,7 +436,9 @@ This track runs in parallel with feature steps. It does not block most feature d
 
 Phase 1 is DONE when all of the following are true simultaneously:
 
-- [ ] Steps 12.6, 12.7, 13, 14, 15, 16, 17, 18, 19 accepted by Yudhishthira
+- [x] Step 12.6 accepted by Yudhishthira ✅ 2026-09-04
+- [x] Step 12.7 accepted by Yudhishthira ✅ 2026-09-04
+- [ ] Steps 13, 14, 15, 16, 17, 18, 19 accepted by Yudhishthira
 - [ ] Step 20 security hardening accepted by Hanuman
 - [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
 - [ ] Track QA E2E suite (J-1 through J-9) passing on staging

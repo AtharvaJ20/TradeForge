@@ -16,9 +16,12 @@ from tradeforge.domain.analytics.types import (
     EquityCurvePoint,
     ExpectancyResult,
     MonteCarloResult,
+    RollingExpectancyPoint,
+    RollingExpectancyResult,
     SharpeResult,
     SortinoResult,
     StreakStats,
+    TradeSeriesPoint,
 )
 
 _T = TypeVar("_T")
@@ -372,6 +375,64 @@ def compute_sortino_ratio(
         insufficient_sample=False,
         no_downside_trades=False,
     )
+
+
+# ---------------------------------------------------------------------------
+# N-1: Rolling Expectancy (20-trade window)
+# ---------------------------------------------------------------------------
+
+_MIN_N_ROLLING = 20  # G-CONF: minimum window for rolling expectancy series
+
+
+def _rolling_exp_r(window: Sequence[TradeSeriesPoint]) -> Decimal | None:
+    """Compute expectancy in R over a single window of TradeSeriesPoints.
+
+    Splits the window into wins/losses by net_pnl sign (G-CORR-01) and
+    delegates to compute_expectancy. Returns None when no trade in the
+    window has a valid r_multiple.
+    """
+    win_r = [p.r_multiple for p in window if p.r_multiple is not None and p.net_pnl > _ZERO]
+    loss_r = [p.r_multiple for p in window if p.r_multiple is not None and p.net_pnl < _ZERO]
+    if not win_r and not loss_r:
+        return None
+    result = compute_expectancy(
+        win_r_multiples=win_r,
+        loss_r_multiples=loss_r,
+        total_count=len(window),
+    )
+    return result.expectancy_r
+
+
+def compute_rolling_expectancy(
+    points: Sequence[TradeSeriesPoint],
+    window: int = _MIN_N_ROLLING,
+) -> RollingExpectancyResult:
+    """Compute rolling N-trade expectancy series (N-1).
+
+    Points must be ordered by (trade_date ASC, last_fill_at ASC, id ASC) — G-CONF-03.
+    Returns insufficient_sample=True (empty data) when len(points) < window.
+
+    rolling_exp_r: expectancy in R over the window (None if no r_multiple data).
+    rolling_exp_inr: AVG(net_pnl) over the window (always defined).
+    trade_index: 1-based, equals the index of the LAST trade in the window.
+    """
+    if len(points) < window:
+        return RollingExpectancyResult(window=window, insufficient_sample=True, data=[])
+
+    data: list[RollingExpectancyPoint] = []
+    w = Decimal(window)
+    for i in range(window, len(points) + 1):
+        slice_ = points[i - window : i]
+        exp_inr = sum((p.net_pnl for p in slice_), _ZERO) / w
+        data.append(
+            RollingExpectancyPoint(
+                trade_index=i,
+                trade_date=slice_[-1].trade_date,
+                rolling_exp_r=_rolling_exp_r(slice_),
+                rolling_exp_inr=exp_inr,
+            )
+        )
+    return RollingExpectancyResult(window=window, insufficient_sample=False, data=data)
 
 
 # ---------------------------------------------------------------------------

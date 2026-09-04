@@ -12,11 +12,12 @@ Base query pattern:
 
 from __future__ import annotations
 
+from datetime import time as py_time
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Integer, case, func, literal, select
+from sqlalchemy import Integer, Time, case, cast, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.domain.analytics.types import (
@@ -34,6 +35,7 @@ from tradeforge.domain.analytics.types import (
     ProfitFactorResult,
     RBucket,
     SetupPerformanceRow,
+    TradeSeriesPoint,
 )
 from tradeforge.infrastructure.models.trade_domain import ExecutionFill, Instrument, Trade
 from tradeforge.infrastructure.models.trade_pnl import TradePnl
@@ -789,6 +791,140 @@ class AnalyticsRepository:
                 )
             )
         return result
+
+    # ------------------------------------------------------------------
+    # N-4: Kelly Fraction inputs (single aggregate query)
+    # ------------------------------------------------------------------
+
+    async def get_kelly_inputs(self, f: AnalyticsFilter) -> dict[str, Any]:
+        """Return aggregate data needed to compute the Kelly Fraction (N-4).
+
+        Uses one aggregate query instead of fetching the full r_multiple series.
+        Includes ALL CLOSED trades for the user matching the filter — win/loss
+        counting and avg_positive_r filtering are done inside aggregate functions.
+        """
+        stmt = (
+            select(
+                # trades_with_r = COUNT of non-null r_multiple (guard for min_n)
+                func.count(TradePnl.r_multiple).label("trades_with_r"),
+                # win / loss R counts for expectancy formula
+                func.count()
+                .filter(TradePnl.r_multiple.is_not(None), TradePnl.net_pnl > _ZERO)
+                .label("win_r_count"),
+                func.count()
+                .filter(TradePnl.r_multiple.is_not(None), TradePnl.net_pnl < _ZERO)
+                .label("loss_r_count"),
+                # avg win / avg loss R for expectancy (avg_loss_r is a negative number)
+                func.avg(TradePnl.r_multiple)
+                .filter(TradePnl.r_multiple.is_not(None), TradePnl.net_pnl > _ZERO)
+                .label("avg_win_r"),
+                func.avg(TradePnl.r_multiple)
+                .filter(TradePnl.r_multiple.is_not(None), TradePnl.net_pnl < _ZERO)
+                .label("avg_loss_r"),
+                # Kelly denominator: AVG(r_multiple) WHERE r_multiple > 0
+                func.avg(TradePnl.r_multiple)
+                .filter(TradePnl.r_multiple > _ZERO)
+                .label("avg_positive_r"),
+            )
+            .select_from(Trade)
+            .join(TradePnl, TradePnl.trade_id == Trade.id)
+            .where(*self._base_where(f))
+        )
+        if self._needs_instrument_join(f):
+            stmt = stmt.join(Instrument, Trade.instrument_id == Instrument.id)
+            stmt = self._apply_instrument_clauses(stmt, f)
+
+        row = (await self._db.execute(stmt)).one()
+        return dict(row._mapping)
+
+    # ------------------------------------------------------------------
+    # N-2: Time-of-Day bucketing (IST session bands)
+    # ------------------------------------------------------------------
+
+    #: NSE session boundaries used for CASE bucketing (IST)
+    _TOD_BOUNDS = (
+        (py_time(9, 15), py_time(9, 30)),  # pre_open
+        (py_time(9, 30), py_time(10, 0)),  # open_volatility
+        (py_time(10, 0), py_time(11, 30)),  # mid_morning
+        (py_time(11, 30), py_time(13, 30)),  # lunch
+        (py_time(13, 30), py_time(15, 0)),  # afternoon
+        # else → close
+    )
+    _TOD_KEYS = ("pre_open", "open_volatility", "mid_morning", "lunch", "afternoon")
+
+    async def get_time_of_day(self, f: AnalyticsFilter) -> list[dict[str, Any]]:
+        """Return per-NSE-session-band aggregate rows for time-of-day analysis (N-2).
+
+        Converts first_fill_at (TIMESTAMPTZ) to IST via timezone() and casts to TIME.
+        BETWEEN boundaries match Karna spec — top-to-bottom CASE means 09:30 → pre_open.
+        Trades with NULL first_fill_at are excluded.
+        """
+        ist_time = cast(func.timezone("Asia/Kolkata", Trade.first_fill_at), Time)
+
+        bucket_cases = list(zip(self._TOD_BOUNDS, self._TOD_KEYS, strict=True))
+        bucket_expr = case(
+            *[(ist_time.between(lo, hi), literal(key)) for (lo, hi), key in bucket_cases],
+            else_=literal("close"),
+        )
+
+        stmt = (
+            select(
+                bucket_expr.label("bucket"),
+                func.count(Trade.id).label("trade_count"),
+                func.count().filter(TradePnl.net_pnl > _ZERO).label("win_count"),
+                func.avg(TradePnl.net_pnl).label("expectancy_inr"),
+                func.coalesce(func.sum(TradePnl.net_pnl), _ZERO).label("total_net_pnl"),
+            )
+            .select_from(Trade)
+            .join(TradePnl, TradePnl.trade_id == Trade.id)
+            .where(*self._base_where(f), Trade.first_fill_at.is_not(None))
+            .group_by(bucket_expr)
+        )
+        if self._needs_instrument_join(f):
+            stmt = stmt.join(Instrument, Trade.instrument_id == Instrument.id)
+            stmt = self._apply_instrument_clauses(stmt, f)
+
+        rows = (await self._db.execute(stmt)).all()
+        return [dict(r._mapping) for r in rows]
+
+    # ------------------------------------------------------------------
+    # N-1: Trade series for rolling expectancy
+    # ------------------------------------------------------------------
+
+    async def get_trade_series(self, f: AnalyticsFilter) -> list[TradeSeriesPoint]:
+        """Return ordered trade series with net_pnl and r_multiple (N-1).
+
+        G-CONF-03 ordering: trade_date ASC, last_fill_at ASC, id ASC.
+        r_multiple is None when planned_risk_amount was not populated.
+        All CLOSED trades are included (including breakevens and trades with NULL r_multiple)
+        so that rolling_exp_inr is computed over the full window.
+        """
+        stmt = (
+            select(
+                Trade.id.label("trade_id"),
+                Trade.trade_date,
+                TradePnl.net_pnl,
+                TradePnl.r_multiple,
+            )
+            .select_from(Trade)
+            .join(TradePnl, TradePnl.trade_id == Trade.id)
+            .where(*self._base_where(f))
+            .order_by(Trade.trade_date, Trade.last_fill_at, Trade.id)
+        )
+        if self._needs_instrument_join(f):
+            stmt = stmt.join(Instrument, Trade.instrument_id == Instrument.id)
+            stmt = self._apply_instrument_clauses(stmt, f)
+
+        rows = (await self._db.execute(stmt)).all()
+        return [
+            TradeSeriesPoint(
+                trade_date=r.trade_date,
+                trade_id=r.trade_id,
+                net_pnl=r.net_pnl,
+                r_multiple=r.r_multiple,
+            )
+            for r in rows
+        ]
 
     # ------------------------------------------------------------------
     # Filter dimension endpoints (B-4) — unfiltered, user-scoped

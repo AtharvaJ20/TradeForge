@@ -8,12 +8,17 @@ import type {
   ExitTypesSchema,
   HoldDurationBucketSchema,
   HoldDurationSchema,
+  KellySchema,
   RBucketSchema,
   RDistributionSchema,
   RiskAdjustedSchema,
+  RollingExpectancyPointSchema,
+  RollingExpectancySchema,
   SharpeResultSchema,
   SortinoResultSchema,
   StreaksSchema,
+  TimeOfDayBucketSchema,
+  TimeOfDaySchema,
 } from './schemas'
 
 export type AccountDimension = z.infer<typeof AccountDimensionSchema>
@@ -34,6 +39,13 @@ export type RBucket = z.infer<typeof RBucketSchema>
 export type RDistribution = z.infer<typeof RDistributionSchema>
 export type DimensionGroup = z.infer<typeof DimensionGroupSchema>
 export type DimensionBreakdown = z.infer<typeof DimensionBreakdownSchema>
+
+// Step 12.7 N-4 + N-2 + N-1 types
+export type Kelly = z.infer<typeof KellySchema>
+export type TimeOfDayBucket = z.infer<typeof TimeOfDayBucketSchema>
+export type TimeOfDay = z.infer<typeof TimeOfDaySchema>
+export type RollingExpectancyPoint = z.infer<typeof RollingExpectancyPointSchema>
+export type RollingExpectancy = z.infer<typeof RollingExpectancySchema>
 
 // Sub-types derived from the top-level summary — used as component prop types.
 export type PnlSummary = AnalyticsSummary['pnl']

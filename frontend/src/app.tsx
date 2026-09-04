@@ -2,6 +2,11 @@ import { useState } from 'react'
 import { JournalPanel } from './features/journal'
 import { AnalyticsSummaryPanel, AnalyticsFilterBar } from './features/analytics'
 import { countActiveFilterDimensions } from './features/analytics/utils'
+import { RDistributionCard } from './features/analytics/components/RDistributionCard'
+import { DimensionBreakdownCard } from './features/analytics/components/DimensionBreakdownCard'
+import { KellyCard } from './features/analytics/components/KellyCard'
+import { TimeOfDayCard } from './features/analytics/components/TimeOfDayCard'
+import { RollingExpectancyCard } from './features/analytics/components/RollingExpectancyCard'
 import type { AnalyticsFilterParams } from './features/analytics'
 
 const DEMO_TRADE = {
@@ -64,6 +69,21 @@ export function App() {
 
       <div className="w-full max-w-xl">
         <AnalyticsSummaryPanel params={filterParams} />
+      </div>
+      <div className="w-full max-w-xl">
+        <RDistributionCard params={filterParams} />
+      </div>
+      <div className="w-full max-w-xl">
+        <DimensionBreakdownCard params={filterParams} />
+      </div>
+      <div className="w-full max-w-xl">
+        <KellyCard params={filterParams} />
+      </div>
+      <div className="w-full max-w-xl">
+        <TimeOfDayCard params={filterParams} />
+      </div>
+      <div className="w-full max-w-xl">
+        <RollingExpectancyCard params={filterParams} />
       </div>
       <div className="w-full max-w-xl h-[700px] rounded-xl border border-border bg-surface-raised shadow-lg overflow-hidden">
         <JournalPanel trade={DEMO_TRADE} />

@@ -241,6 +241,111 @@ export const DIMENSION_BREAKDOWN_EMPTY_FIXTURE = {
 }
 
 // ---------------------------------------------------------------------------
+// N-4 Kelly Fraction fixtures (Step 12.7)
+// ---------------------------------------------------------------------------
+
+export const KELLY_FIXTURE = {
+  kelly_pct: '0.3142',
+  half_kelly_pct: '0.1571',
+  trades_with_r: 45,
+  insufficient_sample: false,
+  min_n: 30,
+}
+
+export const KELLY_INSUFFICIENT_FIXTURE = {
+  kelly_pct: null,
+  half_kelly_pct: null,
+  trades_with_r: 12,
+  insufficient_sample: true,
+  min_n: 30,
+}
+
+// ---------------------------------------------------------------------------
+// N-2 Time-of-Day fixtures (Step 12.7)
+// ---------------------------------------------------------------------------
+
+export const TIME_OF_DAY_FIXTURE = {
+  buckets: [
+    {
+      bucket: 'pre_open',
+      label: 'Pre-Open',
+      trade_count: 5,
+      win_count: 3,
+      win_rate: '60.00',
+      expectancy_inr: '320.00',
+      total_net_pnl: '1600.00',
+    },
+    {
+      bucket: 'open_volatility',
+      label: 'Open Volatility',
+      trade_count: 12,
+      win_count: 8,
+      win_rate: '66.67',
+      expectancy_inr: '450.00',
+      total_net_pnl: '5400.00',
+    },
+    {
+      bucket: 'mid_morning',
+      label: 'Mid-Morning',
+      trade_count: 0,
+      win_count: 0,
+      win_rate: '0.00',
+      expectancy_inr: null,
+      total_net_pnl: '0.00',
+    },
+    {
+      bucket: 'lunch',
+      label: 'Lunch',
+      trade_count: 7,
+      win_count: 4,
+      win_rate: '57.14',
+      expectancy_inr: '200.00',
+      total_net_pnl: '1400.00',
+    },
+    {
+      bucket: 'afternoon',
+      label: 'Afternoon',
+      trade_count: 3,
+      win_count: 1,
+      win_rate: '33.33',
+      expectancy_inr: '-150.00',
+      total_net_pnl: '-450.00',
+    },
+    {
+      bucket: 'close',
+      label: 'Close',
+      trade_count: 2,
+      win_count: 2,
+      win_rate: '100.00',
+      expectancy_inr: '750.00',
+      total_net_pnl: '1500.00',
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// N-1 Rolling Expectancy fixtures (Step 12.7)
+// ---------------------------------------------------------------------------
+
+// 22 data points so we can verify last-20 slicing
+export const ROLLING_EXPECTANCY_FIXTURE = {
+  window: 20,
+  insufficient_sample: false,
+  data: Array.from({ length: 22 }, (_, i) => ({
+    trade_index: i + 20,
+    trade_date: `2025-01-${String(i + 1).padStart(2, '0')}`,
+    rolling_exp_r: i % 3 === 0 ? null : i % 2 === 0 ? '0.42' : '-0.18',
+    rolling_exp_inr: i % 2 === 0 ? '850.00' : '-200.00',
+  })),
+}
+
+export const ROLLING_EXPECTANCY_INSUFFICIENT_FIXTURE = {
+  window: 20,
+  insufficient_sample: true,
+  data: [],
+}
+
+// ---------------------------------------------------------------------------
 // Behavioral analytics fixtures (Step 12.5)
 // ---------------------------------------------------------------------------
 
@@ -326,6 +431,21 @@ export const handlers = [
   // GET R-Multiple Distribution
   http.get(`${BASE}/v1/analytics/r-distribution`, () => {
     return HttpResponse.json(R_DISTRIBUTION_FIXTURE)
+  }),
+
+  // GET Kelly Fraction (N-4)
+  http.get(`${BASE}/v1/analytics/kelly`, () => {
+    return HttpResponse.json(KELLY_FIXTURE)
+  }),
+
+  // GET Time-of-Day (N-2)
+  http.get(`${BASE}/v1/analytics/time-of-day`, () => {
+    return HttpResponse.json(TIME_OF_DAY_FIXTURE)
+  }),
+
+  // GET Rolling Expectancy (N-1)
+  http.get(`${BASE}/v1/analytics/rolling-expectancy`, () => {
+    return HttpResponse.json(ROLLING_EXPECTANCY_FIXTURE)
   }),
 
   // GET Dimension Breakdown

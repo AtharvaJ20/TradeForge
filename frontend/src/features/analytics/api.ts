@@ -7,8 +7,11 @@ import {
   FilterBrokersSchema,
   FilterSetupsSchema,
   HoldDurationSchema,
+  KellySchema,
   RDistributionSchema,
+  RollingExpectancySchema,
   StreaksSchema,
+  TimeOfDaySchema,
 } from './schemas'
 import type {
   AccountDimension,
@@ -17,8 +20,11 @@ import type {
   DimensionBreakdown,
   ExitTypes,
   HoldDuration,
+  Kelly,
   RDistribution,
+  RollingExpectancy,
   Streaks,
+  TimeOfDay,
 } from './types'
 
 function buildQueryString(params: AnalyticsFilterParams): string {
@@ -85,6 +91,26 @@ export async function fetchRDistribution(
   const qs = buildQueryString(params)
   const raw = await apiClient.get(`/v1/analytics/r-distribution${qs}`)
   return RDistributionSchema.parse(raw)
+}
+
+export async function fetchKelly(params: AnalyticsFilterParams = {}): Promise<Kelly> {
+  const qs = buildQueryString(params)
+  const raw = await apiClient.get(`/v1/analytics/kelly${qs}`)
+  return KellySchema.parse(raw)
+}
+
+export async function fetchTimeOfDay(params: AnalyticsFilterParams = {}): Promise<TimeOfDay> {
+  const qs = buildQueryString(params)
+  const raw = await apiClient.get(`/v1/analytics/time-of-day${qs}`)
+  return TimeOfDaySchema.parse(raw)
+}
+
+export async function fetchRollingExpectancy(
+  params: AnalyticsFilterParams = {},
+): Promise<RollingExpectancy> {
+  const qs = buildQueryString(params)
+  const raw = await apiClient.get(`/v1/analytics/rolling-expectancy${qs}`)
+  return RollingExpectancySchema.parse(raw)
 }
 
 export async function fetchDimensionBreakdown(

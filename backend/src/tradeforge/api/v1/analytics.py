@@ -332,6 +332,54 @@ class DimensionBreakdownResponse(BaseModel):
     groups: list[DimensionGroupResponse]
 
 
+# N-4: Kelly Fraction
+class KellyResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    kelly_pct: Decimal | None
+    half_kelly_pct: Decimal | None
+    trades_with_r: int
+    insufficient_sample: bool
+    min_n: int
+
+
+# N-2: Time-of-Day
+class TimeOfDayBucketResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    bucket: str
+    label: str
+    trade_count: int
+    win_count: int
+    win_rate: Decimal
+    expectancy_inr: Decimal | None
+    total_net_pnl: Decimal
+
+
+class TimeOfDayResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    buckets: list[TimeOfDayBucketResponse]
+
+
+# N-1: Rolling Expectancy
+class RollingExpectancyPointResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    trade_index: int
+    trade_date: date
+    rolling_exp_r: Decimal | None
+    rolling_exp_inr: Decimal
+
+
+class RollingExpectancyResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    window: int
+    insufficient_sample: bool
+    data: list[RollingExpectancyPointResponse]
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -469,6 +517,57 @@ async def get_breakdown(
     return DimensionBreakdownResponse(
         dimension=result.dimension,
         groups=[DimensionGroupResponse.model_validate(g) for g in result.groups],
+    )
+
+
+# ---------------------------------------------------------------------------
+# N-4 / N-2 / N-1: Step 12.7 rolling metrics
+# ---------------------------------------------------------------------------
+
+
+@router.get("/kelly", response_model=KellyResponse)
+async def get_kelly_fraction(
+    f: AnalyticsFilter = Depends(get_analytics_filter),
+    svc: AnalyticsService = Depends(get_analytics_service),
+) -> KellyResponse:
+    """Return Full Kelly and Half-Kelly position-sizing fractions (N-4).
+
+    insufficient_sample=True when trades_with_r < 30 or no positive-R trades.
+    """
+    result = await svc.get_kelly_fraction(f)
+    return KellyResponse.model_validate(result)
+
+
+@router.get("/time-of-day", response_model=TimeOfDayResponse)
+async def get_time_of_day(
+    f: AnalyticsFilter = Depends(get_analytics_filter),
+    svc: AnalyticsService = Depends(get_analytics_service),
+) -> TimeOfDayResponse:
+    """Return performance aggregated by NSE session band (N-2).
+
+    Always returns all 6 buckets in session order: pre_open, open_volatility,
+    mid_morning, lunch, afternoon, close.
+    """
+    result = await svc.get_time_of_day(f)
+    return TimeOfDayResponse(
+        buckets=[TimeOfDayBucketResponse.model_validate(b) for b in result.buckets]
+    )
+
+
+@router.get("/rolling-expectancy", response_model=RollingExpectancyResponse)
+async def get_rolling_expectancy(
+    f: AnalyticsFilter = Depends(get_analytics_filter),
+    svc: AnalyticsService = Depends(get_analytics_service),
+) -> RollingExpectancyResponse:
+    """Return 20-trade rolling expectancy series (N-1).
+
+    insufficient_sample=True when total closed trades < 20.
+    """
+    result = await svc.get_rolling_expectancy(f)
+    return RollingExpectancyResponse(
+        window=result.window,
+        insufficient_sample=result.insufficient_sample,
+        data=[RollingExpectancyPointResponse.model_validate(p) for p in result.data],
     )
 
 
