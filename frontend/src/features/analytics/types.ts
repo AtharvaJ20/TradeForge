@@ -12,6 +12,7 @@ import type {
   RBucketSchema,
   RDistributionSchema,
   RiskAdjustedSchema,
+  RiskSummarySchema,
   RollingExpectancyPointSchema,
   RollingExpectancySchema,
   SharpeResultSchema,
@@ -42,6 +43,7 @@ export type DimensionBreakdown = z.infer<typeof DimensionBreakdownSchema>
 
 // Step 12.7 N-4 + N-2 + N-1 types
 export type Kelly = z.infer<typeof KellySchema>
+export type RiskSummary = z.infer<typeof RiskSummarySchema>
 export type TimeOfDayBucket = z.infer<typeof TimeOfDayBucketSchema>
 export type TimeOfDay = z.infer<typeof TimeOfDaySchema>
 export type RollingExpectancyPoint = z.infer<typeof RollingExpectancyPointSchema>

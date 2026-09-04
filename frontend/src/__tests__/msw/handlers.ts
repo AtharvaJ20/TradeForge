@@ -411,6 +411,44 @@ export const FILTER_SETUPS_FIXTURE = ['Breakout', 'VWAP Reversion', '(no setup)'
 
 export const FILTER_BROKERS_FIXTURE = ['UPSTOX', 'ZERODHA']
 
+// ---------------------------------------------------------------------------
+// Step 13 Risk Summary fixtures
+// ---------------------------------------------------------------------------
+
+export const RISK_SUMMARY_FIXTURE = {
+  max_drawdown_inr: '42500.0000',
+  max_drawdown_pct: '8.50',
+  current_drawdown_inr: '14000.0000',
+  current_drawdown_pct: '2.80',
+  max_loss_streak: 4,
+  current_loss_streak: 2,
+  daily_loss_inr: '-2500.0000',
+  daily_loss_trade_count: 2,
+  total_at_risk_inr: '5000.0000',
+  open_trade_count: 2,
+  as_of_date: '2026-09-04',
+}
+
+export const RISK_SUMMARY_NO_DRAWDOWN_FIXTURE = {
+  max_drawdown_inr: null,
+  max_drawdown_pct: null,
+  current_drawdown_inr: null,
+  current_drawdown_pct: null,
+  max_loss_streak: 0,
+  current_loss_streak: 0,
+  daily_loss_inr: '0.0000',
+  daily_loss_trade_count: 0,
+  total_at_risk_inr: null,
+  open_trade_count: 0,
+  as_of_date: '2026-09-04',
+}
+
+export const RISK_SUMMARY_NO_AT_RISK_FIXTURE = {
+  ...RISK_SUMMARY_FIXTURE,
+  total_at_risk_inr: null,
+  open_trade_count: 1,
+}
+
 export const handlers = [
   // GET analytics summary
   http.get(`${BASE}/v1/analytics/summary`, () => {
@@ -446,6 +484,11 @@ export const handlers = [
   // GET Rolling Expectancy (N-1)
   http.get(`${BASE}/v1/analytics/rolling-expectancy`, () => {
     return HttpResponse.json(ROLLING_EXPECTANCY_FIXTURE)
+  }),
+
+  // GET Risk Summary (Step 13)
+  http.get(`${BASE}/v1/risk/summary`, () => {
+    return HttpResponse.json(RISK_SUMMARY_FIXTURE)
   }),
 
   // GET Dimension Breakdown

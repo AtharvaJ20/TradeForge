@@ -243,6 +243,24 @@ export const RollingExpectancySchema = z.object({
   data: z.array(RollingExpectancyPointSchema),
 })
 
+// ---------------------------------------------------------------------------
+// Step 13 Risk Summary schema
+// ---------------------------------------------------------------------------
+
+export const RiskSummarySchema = z.object({
+  max_drawdown_inr: decimalString,
+  max_drawdown_pct: decimalString,
+  current_drawdown_inr: decimalString,
+  current_drawdown_pct: decimalString,
+  max_loss_streak: z.number().int(),
+  current_loss_streak: z.number().int(),
+  daily_loss_inr: z.string(),
+  daily_loss_trade_count: z.number().int(),
+  total_at_risk_inr: decimalString,
+  open_trade_count: z.number().int(),
+  as_of_date: z.string(),
+})
+
 export const AnalyticsSummarySchema = z.object({
   pnl: PnlSummarySchema,
   outcome: OutcomeDistributionSchema,

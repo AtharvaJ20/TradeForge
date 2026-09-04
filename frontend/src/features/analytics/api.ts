@@ -9,6 +9,7 @@ import {
   HoldDurationSchema,
   KellySchema,
   RDistributionSchema,
+  RiskSummarySchema,
   RollingExpectancySchema,
   StreaksSchema,
   TimeOfDaySchema,
@@ -22,6 +23,7 @@ import type {
   HoldDuration,
   Kelly,
   RDistribution,
+  RiskSummary,
   RollingExpectancy,
   Streaks,
   TimeOfDay,
@@ -111,6 +113,12 @@ export async function fetchRollingExpectancy(
   const qs = buildQueryString(params)
   const raw = await apiClient.get(`/v1/analytics/rolling-expectancy${qs}`)
   return RollingExpectancySchema.parse(raw)
+}
+
+export async function fetchRiskSummary(params: AnalyticsFilterParams = {}): Promise<RiskSummary> {
+  const qs = buildQueryString(params)
+  const raw = await apiClient.get(`/v1/risk/summary${qs}`)
+  return RiskSummarySchema.parse(raw)
 }
 
 export async function fetchDimensionBreakdown(
