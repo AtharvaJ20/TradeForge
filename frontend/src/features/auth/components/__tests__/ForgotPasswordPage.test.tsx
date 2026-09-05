@@ -99,3 +99,17 @@ describe('ForgotPasswordPage — F-14-21: success view replaces form', () => {
     expect(screen.queryByRole('button', { name: /send reset link/i })).not.toBeInTheDocument()
   })
 })
+
+// ---------------------------------------------------------------------------
+// plan F-14-20: RATE_LIMITED (429) error
+// ---------------------------------------------------------------------------
+
+describe('ForgotPasswordPage — RATE_LIMITED error', () => {
+  it('renders "Too many requests" when RATE_LIMITED (429)', () => {
+    mockUseRequestPasswordReset.mockReturnValue(
+      makeReset({ error: new ApiError(429, 'RATE_LIMITED'), isError: true }),
+    )
+    renderForgot()
+    expect(screen.getByRole('alert')).toHaveTextContent(/too many requests/i)
+  })
+})

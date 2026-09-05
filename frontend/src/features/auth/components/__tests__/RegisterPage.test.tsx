@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { RegisterPage } from '../RegisterPage'
 import { ApiError } from '@/lib/api-client'
 import type { useRegister } from '../../hooks/useRegister'
@@ -146,5 +146,56 @@ describe('RegisterPage — F-14-14: API error renders alert', () => {
     )
     renderRegister()
     expect(screen.getByRole('alert')).toHaveTextContent(/too many registration attempts/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// plan F-14-13: 422 policy message rendered verbatim
+// ---------------------------------------------------------------------------
+
+describe('RegisterPage — 422 policy message verbatim', () => {
+  it('shows the exact policy detail string for 422 errors', () => {
+    mockUseRegister.mockReturnValue(
+      makeRegister({
+        error: new ApiError(422, 'Password must contain at least one uppercase letter.'),
+        isError: true,
+      }),
+    )
+    renderRegister()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Password must contain at least one uppercase letter.',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// plan F-14-14 (navigation): navigates to /register-success on success
+// ---------------------------------------------------------------------------
+
+describe('RegisterPage — navigation to /register-success', () => {
+  it('navigates to /register-success when registration succeeds', async () => {
+    const user = userEvent.setup()
+    const mutateFn = vi.fn().mockImplementation(
+      (_vars: unknown, options?: { onSuccess?: (data: unknown) => void }) => {
+        options?.onSuccess?.({ message: 'ok' })
+      },
+    )
+    mockUseRegister.mockReturnValue(makeRegister({ mutate: mutateFn }))
+
+    render(
+      <MemoryRouter initialEntries={['/register']}>
+        <Routes>
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register-success" element={<div>Registration successful</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText(/email/i), 'user@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'Password1!')
+    await user.type(screen.getByLabelText(/confirm password/i), 'Password1!')
+    await user.click(screen.getByRole('button', { name: /sign up/i }))
+
+    expect(screen.getByText('Registration successful')).toBeInTheDocument()
   })
 })

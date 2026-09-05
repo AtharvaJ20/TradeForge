@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { render, screen, waitFor, act } from '@testing-library/react'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { VerifyEmailPage } from '../VerifyEmailPage'
 import { ApiError } from '@/lib/api-client'
 
@@ -92,5 +92,35 @@ describe('VerifyEmailPage — F-14-18: generic error fallback', () => {
     })
 
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// plan F-14-16 (timer): redirects to /login?verified=1 after 2 seconds
+// ---------------------------------------------------------------------------
+
+describe('VerifyEmailPage — F-14-16b: redirect to /login?verified=1 after 2s', () => {
+  it('navigates to /login?verified=1 two seconds after successful verification', async () => {
+    vi.useFakeTimers()
+    mockVerifyEmail.mockResolvedValue({ message: 'ok' })
+
+    render(
+      <MemoryRouter initialEntries={['/verify-email?token=valid-token']}>
+        <Routes>
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/login" element={<div>Login page</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    // flush microtasks so the Promise .then() fires and state updates
+    await act(async () => {})
+
+    expect(screen.getByRole('heading', { name: /email verified/i })).toBeInTheDocument()
+
+    act(() => { vi.advanceTimersByTime(2001) })
+
+    expect(screen.getByText('Login page')).toBeInTheDocument()
+    vi.useRealTimers()
   })
 })

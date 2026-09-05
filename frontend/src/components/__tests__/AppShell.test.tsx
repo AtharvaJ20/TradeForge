@@ -107,3 +107,15 @@ describe('AppShell — F-14-33: logout button calls logout', () => {
     expect(logoutFn).toHaveBeenCalledTimes(1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// F-14-31b: active nav link carries aria-current="page"
+// ---------------------------------------------------------------------------
+
+describe('AppShell — F-14-31b: active link has aria-current="page"', () => {
+  it('applies aria-current="page" to the active link and not to inactive links', () => {
+    renderShell('/analytics')
+    expect(screen.getByRole('link', { name: 'Analytics' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current', 'page')
+  })
+})

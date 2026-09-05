@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { ResetPasswordPage } from '../ResetPasswordPage'
 import { ApiError } from '@/lib/api-client'
 import type { useConfirmPasswordReset } from '../../hooks/usePasswordReset'
@@ -138,5 +138,53 @@ describe('ResetPasswordPage — F-14-26: API error renders alert', () => {
     )
     renderReset()
     expect(screen.getByRole('alert')).toHaveTextContent(/reset link is invalid or has expired/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// plan F-14-25: 422 policy message rendered verbatim
+// ---------------------------------------------------------------------------
+
+describe('ResetPasswordPage — 422 policy message verbatim', () => {
+  it('shows the exact policy detail string for 422 errors', () => {
+    mockUseConfirmPasswordReset.mockReturnValue(
+      makeConfirm({
+        error: new ApiError(422, 'Password must be at least 8 characters.'),
+        isError: true,
+      }),
+    )
+    renderReset()
+    expect(screen.getByRole('alert')).toHaveTextContent('Password must be at least 8 characters.')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// plan F-14-24 (navigation): navigates to /login?reset=1 on success
+// ---------------------------------------------------------------------------
+
+describe('ResetPasswordPage — navigation to /login?reset=1', () => {
+  it('navigates to /login?reset=1 when password reset succeeds', async () => {
+    const user = userEvent.setup()
+    const mutateFn = vi.fn().mockImplementation(
+      (_vars: unknown, options?: { onSuccess?: (data: unknown) => void }) => {
+        options?.onSuccess?.({ message: 'ok' })
+      },
+    )
+    mockUseConfirmPasswordReset.mockReturnValue(makeConfirm({ mutate: mutateFn }))
+
+    render(
+      <MemoryRouter initialEntries={['/reset-password?token=valid-token']}>
+        <Routes>
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/login" element={<div>Login page</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText('New password'), 'Password1!')
+    await user.type(screen.getByLabelText('Confirm new password'), 'Password1!')
+    await user.click(screen.getByRole('button', { name: /set new password/i }))
+
+    expect(screen.getByText('Login page')).toBeInTheDocument()
   })
 })

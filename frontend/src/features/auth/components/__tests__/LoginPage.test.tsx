@@ -186,3 +186,55 @@ describe('LoginPage — F-14-08: ACCOUNT_LOCKED error', () => {
     })
   })
 })
+
+// ---------------------------------------------------------------------------
+// plan F-14-04: EMAIL_NOT_VERIFIED (403) error
+// ---------------------------------------------------------------------------
+
+describe('LoginPage — EMAIL_NOT_VERIFIED error', () => {
+  it('shows "Please verify your email" for EMAIL_NOT_VERIFIED (403) detail', async () => {
+    const user = userEvent.setup()
+    const loginFn = vi.fn().mockRejectedValue(new ApiError(403, 'EMAIL_NOT_VERIFIED'))
+    mockUseAuth.mockReturnValue(makeAuth({ login: loginFn }))
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <LoginPage />
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText(/email/i), 'a@b.com')
+    await user.type(screen.getByLabelText(/password/i), 'pw')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/please verify your email/i)
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// plan F-14-05: RATE_LIMITED (429) error
+// ---------------------------------------------------------------------------
+
+describe('LoginPage — RATE_LIMITED error', () => {
+  it('shows "Too many attempts" for RATE_LIMITED (429) detail', async () => {
+    const user = userEvent.setup()
+    const loginFn = vi.fn().mockRejectedValue(new ApiError(429, 'RATE_LIMITED'))
+    mockUseAuth.mockReturnValue(makeAuth({ login: loginFn }))
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <LoginPage />
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText(/email/i), 'a@b.com')
+    await user.type(screen.getByLabelText(/password/i), 'pw')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/too many attempts/i)
+    })
+  })
+})
