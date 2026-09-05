@@ -2,8 +2,8 @@
 
 **Document:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Author:** Krishna (Project Manager)  
-**Date:** 2026-09-04  
-**Base state:** Steps 1–13 complete, CI GREEN, branch `main` (after `feat/step-13-basic-risk-metrics` merged)  
+**Date:** 2026-09-05  
+**Base state:** Steps 1–14 complete, CI GREEN, branch `main` (after `feat/step-14-execution-plan` merged)  
 **Source of truth for scope:** `docs/requirements/REQUIREMENTS.md` v1.1 §38  
 **Status:** ACTIVE — update as steps close
 
@@ -57,8 +57,11 @@ Steps 1–12.5 are done. Do not re-do or revisit these. They are foundation — 
 | 10 | P&L engine (21-column schema, 7 charge components, R-multiple, 49 tests) | ✅ Yudhishthira 2026-09-01 |
 | 11 | Trading accounts + broker CSV import (Zerodha, Upstox, Angel One) | ✅ |
 | 12.1–12.5 | Analytics: 9 metric cards, full filter UI (9 dimensions), dynamic filter options, streaks/hold duration/exit type | ✅ Yudhishthira 2026-09-03/04 |
+| 12.6–12.7 | Analytics completion: R-distribution, dimension breakdown, rolling expectancy, time-of-day, Kelly fraction | ✅ Yudhishthira 2026-09-04 |
+| 13 | Basic risk metrics (RiskSummaryCard, `/v1/risk/summary`) | ✅ Yudhishthira 2026-09-05 |
+| 14 | Frontend Navigation Shell + Auth Screens (React Router, AuthContext, 6 auth screen components, AppShell, RequireAuth, session-expired redirect, skip-link a11y) | ✅ Yudhishthira 2026-09-05 |
 
-**Test totals as of Step 13:** 506 backend tests, 141 frontend tests.
+**Test totals as of Step 14:** 501 backend tests (84.91% coverage), 245 frontend tests (87.43% coverage).
 
 ---
 
@@ -171,7 +174,11 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - OAuth / social login (Phase 3)
 
 **Execution plan:** `docs/project-status/STEP-14-EXECUTION-PLAN.md`  
-**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-05** (Sahadeva GO · Nakula CI GREEN · Yudhishthira ACCEPT)  
+**Test totals:** 245 frontend tests (87.43% coverage), 501 backend tests (84.91% coverage)  
+**Branch:** `feat/step-14-execution-plan` (merged to `main`)  
+**Note:** VerifyEmailPage auto-redirect (2s) replaced with explicit "Continue to sign in" button — accepted product improvement per Yudhishthira + Usha (WCAG, user control). WCAG 2.1 SC 2.4.1 skip-link added to AppShell.
 
 ---
 
@@ -444,7 +451,8 @@ Phase 1 is DONE when all of the following are true simultaneously:
 - [x] Step 12.6 accepted by Yudhishthira ✅ 2026-09-04
 - [x] Step 12.7 accepted by Yudhishthira ✅ 2026-09-04
 - [x] Step 13 accepted by Yudhishthira ✅ 2026-09-05
-- [ ] Steps 14, 15, 16, 17, 18, 19 accepted by Yudhishthira
+- [x] Step 14 accepted by Yudhishthira ✅ 2026-09-05
+- [ ] Steps 15, 16, 17, 18, 19 accepted by Yudhishthira
 - [ ] Step 20 security hardening accepted by Hanuman
 - [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
 - [ ] Track QA E2E suite (J-1 through J-9) passing on staging
@@ -483,9 +491,7 @@ Phase 1 is DONE when all of the following are true simultaneously:
 ```
 
 **Steps that can start immediately (no pending decision):**
-- Step 12.6 (Bhima + Arjun)
-- Step 13 spec (Dhanvantari)
-- Step 14 (Arjun)
+- Step 15 (Bhima + Arjun) — Step 14 is now complete
 - Step 20 design (Hanuman)
 
 **Steps blocked on Atharva's cloud/domain decisions:**

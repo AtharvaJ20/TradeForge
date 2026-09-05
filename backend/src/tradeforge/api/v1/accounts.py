@@ -75,6 +75,13 @@ class AccountOut(BaseModel):
     updated_at: datetime
 
 
+class UpdateAccountRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    display_name: str | None = Field(default=None, min_length=1, max_length=100)
+    account_type: str | None = Field(default=None)
+
+
 class ImportSummaryOut(BaseModel):
     import_record_id: uuid.UUID
     fills_ingested: int
@@ -164,6 +171,43 @@ async def get_account(
     except AccountNotFoundError:
         raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
     return AccountOut.model_validate(account)
+
+
+@router.patch("/{account_id}", response_model=AccountOut)
+async def update_account(
+    account_id: uuid.UUID,
+    body: UpdateAccountRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+    svc: TradingAccountService = Depends(get_account_service),
+) -> AccountOut:
+    try:
+        account = await svc.update(
+            db,
+            user_id=user_id,
+            account_id=account_id,
+            display_name=body.display_name,
+            account_type=body.account_type,
+        )
+        await db.commit()
+    except AccountNotFoundError:
+        raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return AccountOut.model_validate(account)
+
+
+@router.delete("/{account_id}", status_code=204)
+async def deactivate_account(
+    account_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+    svc: TradingAccountService = Depends(get_account_service),
+) -> None:
+    found = await svc.deactivate(db, user_id=user_id, account_id=account_id)
+    await db.commit()
+    if not found:
+        raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
 
 
 @router.post("/{account_id}/import", response_model=ImportSummaryOut)

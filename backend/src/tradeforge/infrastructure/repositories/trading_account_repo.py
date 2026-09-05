@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.domain.import_domain.types import TradingAccount as TradingAccountDomain
@@ -64,6 +65,44 @@ class TradingAccountRepository:
         )
         result = await session.execute(stmt)
         return [self._to_domain(r) for r in result.scalars().all()]
+
+    async def update(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        display_name: str | None = None,
+        account_type: str | None = None,
+    ) -> TradingAccountDomain | None:
+        """Update mutable account fields.  Returns None if not found / not owned."""
+        values: dict[str, object] = {"updated_at": datetime.now(UTC)}
+        if display_name is not None:
+            values["display_name"] = display_name
+        if account_type is not None:
+            values["account_type"] = account_type
+
+        await session.execute(
+            update(TradingAccount)
+            .where(TradingAccount.id == account_id, TradingAccount.user_id == user_id)
+            .values(**values)
+        )
+        return await self.get_for_user(session, user_id, account_id)
+
+    async def deactivate(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+    ) -> bool:
+        """Soft-delete: set status to INACTIVE.  Idempotent — returns True if found."""
+        result = await session.execute(
+            update(TradingAccount)
+            .where(TradingAccount.id == account_id, TradingAccount.user_id == user_id)
+            .values(status="INACTIVE", updated_at=datetime.now(UTC))
+        )
+        return result.rowcount > 0  # type: ignore[return-value]
 
     @staticmethod
     def _to_domain(row: TradingAccount) -> TradingAccountDomain:

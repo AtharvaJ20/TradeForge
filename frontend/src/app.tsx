@@ -6,6 +6,8 @@ import { VerifyEmailPage } from './features/auth/components/VerifyEmailPage'
 import { ForgotPasswordPage } from './features/auth/components/ForgotPasswordPage'
 import { ResetPasswordPage } from './features/auth/components/ResetPasswordPage'
 import { AnalyticsPage } from './features/analytics/AnalyticsPage'
+import { SettingsPage } from './features/settings/SettingsPage'
+import { AccountProvider } from './features/accounts/context/AccountContext'
 import { AppShell } from './layout/AppShell'
 import { RequireAuth } from './components/RequireAuth'
 import { PlaceholderPage } from './components/PlaceholderPage'
@@ -23,13 +25,19 @@ export function App() {
 
       {/* Protected routes — gated by auth, wrapped in AppShell */}
       <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
+        <Route
+          element={
+            <AccountProvider>
+              <AppShell />
+            </AccountProvider>
+          }
+        >
           <Route path="/" element={<Navigate to="/analytics" replace />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/risk" element={<PlaceholderPage title="Risk" />} />
           <Route path="/trades" element={<PlaceholderPage title="Trades" />} />
           <Route path="/import" element={<PlaceholderPage title="Import" />} />
-          <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Route>
     </Routes>

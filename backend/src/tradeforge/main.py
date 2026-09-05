@@ -105,6 +105,11 @@ def create_app() -> FastAPI:
 
     app.include_router(risk.router, prefix="/v1")
 
+    # Users router (Step 15 — profile management)
+    from tradeforge.api.v1 import users
+
+    app.include_router(users.router, prefix="/v1")
+
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
