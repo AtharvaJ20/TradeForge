@@ -422,6 +422,74 @@ export const AUTH_ME_FIXTURE = {
   is_admin: false,
 }
 
+// ---------------------------------------------------------------------------
+// Step 15 — User Profile fixtures
+// ---------------------------------------------------------------------------
+
+export const USER_PROFILE_FIXTURE = {
+  id: '00000000-0000-0000-0000-000000000099',
+  email: 'trader@example.com',
+  display_name: 'Arjun Sharma',
+  time_zone: 'Asia/Kolkata',
+  base_currency: 'INR',
+  is_email_verified: true,
+  is_admin: false,
+  created_at: '2026-06-01T10:00:00Z',
+}
+
+export const UPDATE_PROFILE_SUCCESS_FIXTURE = {
+  ...USER_PROFILE_FIXTURE,
+  display_name: 'Updated Name',
+}
+
+// ---------------------------------------------------------------------------
+// Step 15 — Accounts fixtures
+// ---------------------------------------------------------------------------
+
+export const ACCOUNTS_LIST_FIXTURE = [
+  {
+    id: '00000000-0000-0000-0000-000000000001',
+    user_id: '00000000-0000-0000-0000-000000000099',
+    broker: 'ZERODHA',
+    display_name: 'Zerodha Main',
+    account_type: 'INDIVIDUAL',
+    base_currency: 'INR',
+    status: 'ACTIVE',
+    created_at: '2026-08-01T10:00:00Z',
+    updated_at: '2026-08-01T10:00:00Z',
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000002',
+    user_id: '00000000-0000-0000-0000-000000000099',
+    broker: 'UPSTOX',
+    display_name: 'Upstox Old',
+    account_type: 'INDIVIDUAL',
+    base_currency: 'INR',
+    status: 'INACTIVE',
+    created_at: '2026-07-01T10:00:00Z',
+    updated_at: '2026-07-15T10:00:00Z',
+  },
+] as const
+
+export const ACCOUNTS_EMPTY_FIXTURE: typeof ACCOUNTS_LIST_FIXTURE = [] as unknown as typeof ACCOUNTS_LIST_FIXTURE
+
+export const CREATE_ACCOUNT_SUCCESS_FIXTURE = {
+  id: '00000000-0000-0000-0000-000000000003',
+  user_id: '00000000-0000-0000-0000-000000000099',
+  broker: 'ZERODHA',
+  display_name: 'New Account',
+  account_type: 'INDIVIDUAL',
+  base_currency: 'INR',
+  status: 'ACTIVE',
+  created_at: '2026-09-05T10:00:00Z',
+  updated_at: '2026-09-05T10:00:00Z',
+}
+
+export const UPDATE_ACCOUNT_SUCCESS_FIXTURE = {
+  ...ACCOUNTS_LIST_FIXTURE[0],
+  display_name: 'Renamed Account',
+}
+
 export const LOGIN_SUCCESS_FIXTURE = AUTH_ME_FIXTURE
 
 export const REGISTER_SUCCESS_FIXTURE = {
@@ -483,6 +551,26 @@ export const handlers = [
   // Auth handlers (Step 14) — default: authenticated user
   // ---------------------------------------------------------------------------
   http.get(`${BASE}/v1/auth/me`, () => HttpResponse.json(AUTH_ME_FIXTURE)),
+
+  // ---------------------------------------------------------------------------
+  // Step 15 — User profile handlers
+  // ---------------------------------------------------------------------------
+  http.get(`${BASE}/v1/users/me`, () => HttpResponse.json(USER_PROFILE_FIXTURE)),
+  http.patch(`${BASE}/v1/users/me`, () => HttpResponse.json(UPDATE_PROFILE_SUCCESS_FIXTURE)),
+
+  // ---------------------------------------------------------------------------
+  // Step 15 — Accounts handlers
+  // ---------------------------------------------------------------------------
+  http.get(`${BASE}/v1/accounts`, () => HttpResponse.json(ACCOUNTS_LIST_FIXTURE)),
+  http.post(`${BASE}/v1/accounts`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ ...CREATE_ACCOUNT_SUCCESS_FIXTURE, ...body })
+  }),
+  http.patch(`${BASE}/v1/accounts/:id`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({ ...UPDATE_ACCOUNT_SUCCESS_FIXTURE, ...body })
+  }),
+  http.delete(`${BASE}/v1/accounts/:id`, () => new HttpResponse(null, { status: 204 })),
   http.post(`${BASE}/v1/auth/login`, () => HttpResponse.json(LOGIN_SUCCESS_FIXTURE)),
   http.post(`${BASE}/v1/auth/logout`, () => HttpResponse.json(LOGOUT_SUCCESS_FIXTURE)),
   http.post(`${BASE}/v1/auth/register`, () => HttpResponse.json(REGISTER_SUCCESS_FIXTURE)),
@@ -681,3 +769,32 @@ export const resetConfirmPolicyViolationHandler = (detail: string) =>
       headers: { 'Content-Type': 'application/json' },
     })
   })
+
+// ---------------------------------------------------------------------------
+// Step 15 override handlers
+// ---------------------------------------------------------------------------
+
+export const updateProfileInvalidTzHandler = http.patch(`${BASE}/v1/users/me`, () =>
+  new HttpResponse(JSON.stringify({ detail: 'INVALID_TIMEZONE' }), {
+    status: 422,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)
+
+export const updateProfileBlankNameHandler = http.patch(`${BASE}/v1/users/me`, () =>
+  new HttpResponse(JSON.stringify({ detail: 'DISPLAY_NAME_BLANK' }), {
+    status: 422,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)
+
+export const accountsEmptyHandler = http.get(`${BASE}/v1/accounts`, () =>
+  HttpResponse.json([]),
+)
+
+export const createAccountInvalidHandler = http.post(`${BASE}/v1/accounts`, () =>
+  new HttpResponse(JSON.stringify({ detail: 'VALIDATION_ERROR' }), {
+    status: 422,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)

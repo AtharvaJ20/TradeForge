@@ -1,8 +1,10 @@
 import { apiClient } from '@/lib/api-client'
-import type { User } from './types'
+import type { User, UpdateProfileBody } from './types'
 
 export const authApi = {
   me: () => apiClient.get<User>('/v1/auth/me'),
+  getProfile: () => apiClient.get<User>('/v1/users/me'),
+  updateProfile: (body: UpdateProfileBody) => apiClient.patch<User>('/v1/users/me', body),
   login: (email: string, password: string) =>
     apiClient.post<User>('/v1/auth/login', { email, password }),
   logout: () => apiClient.post<{ message: string }>('/v1/auth/logout'),
