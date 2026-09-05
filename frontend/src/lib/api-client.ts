@@ -28,6 +28,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // non-JSON error body; keep default
     }
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent('auth:session-expired'))
+    }
     throw new ApiError(res.status, detail)
   }
 
