@@ -124,6 +124,7 @@ class DrawdownStatsResponse(BaseModel):
     max_drawdown_inr: Decimal | None
     avg_drawdown_pct: Decimal | None
     current_drawdown_pct: Decimal | None
+    current_drawdown_inr: Decimal | None = None
 
 
 class DirectionPerformanceResponse(BaseModel):

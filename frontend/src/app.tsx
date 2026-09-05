@@ -4,6 +4,7 @@ import { AnalyticsSummaryPanel, AnalyticsFilterBar } from './features/analytics'
 import { countActiveFilterDimensions } from './features/analytics/utils'
 import { RDistributionCard } from './features/analytics/components/RDistributionCard'
 import { DimensionBreakdownCard } from './features/analytics/components/DimensionBreakdownCard'
+import { RiskSummaryCard } from './features/analytics/components/RiskSummaryCard'
 import { KellyCard } from './features/analytics/components/KellyCard'
 import { TimeOfDayCard } from './features/analytics/components/TimeOfDayCard'
 import { RollingExpectancyCard } from './features/analytics/components/RollingExpectancyCard'
@@ -75,6 +76,9 @@ export function App() {
       </div>
       <div className="w-full max-w-xl">
         <DimensionBreakdownCard params={filterParams} />
+      </div>
+      <div className="w-full max-w-xl">
+        <RiskSummaryCard params={filterParams} />
       </div>
       <div className="w-full max-w-xl">
         <KellyCard params={filterParams} />
