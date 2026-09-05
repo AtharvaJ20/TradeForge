@@ -412,6 +412,35 @@ export const FILTER_SETUPS_FIXTURE = ['Breakout', 'VWAP Reversion', '(no setup)'
 export const FILTER_BROKERS_FIXTURE = ['UPSTOX', 'ZERODHA']
 
 // ---------------------------------------------------------------------------
+// Auth fixtures (Step 14)
+// ---------------------------------------------------------------------------
+
+export const AUTH_ME_FIXTURE = {
+  id: '00000000-0000-0000-0000-000000000099',
+  email: 'trader@example.com',
+  is_email_verified: true,
+  is_admin: false,
+}
+
+export const LOGIN_SUCCESS_FIXTURE = AUTH_ME_FIXTURE
+
+export const REGISTER_SUCCESS_FIXTURE = {
+  message: 'If this email address is new, a verification link has been sent.',
+}
+
+export const LOGOUT_SUCCESS_FIXTURE = { message: 'Logged out successfully.' }
+
+export const VERIFY_EMAIL_SUCCESS_FIXTURE = { message: 'Email verified successfully.' }
+
+export const PASSWORD_RESET_REQUEST_SUCCESS_FIXTURE = {
+  message: 'If this email address is registered, a password reset link has been sent.',
+}
+
+export const PASSWORD_RESET_CONFIRM_SUCCESS_FIXTURE = {
+  message: 'Password reset successfully. Please log in with your new password.',
+}
+
+// ---------------------------------------------------------------------------
 // Step 13 Risk Summary fixtures
 // ---------------------------------------------------------------------------
 
@@ -450,6 +479,23 @@ export const RISK_SUMMARY_NO_AT_RISK_FIXTURE = {
 }
 
 export const handlers = [
+  // ---------------------------------------------------------------------------
+  // Auth handlers (Step 14) — default: authenticated user
+  // ---------------------------------------------------------------------------
+  http.get(`${BASE}/v1/auth/me`, () => HttpResponse.json(AUTH_ME_FIXTURE)),
+  http.post(`${BASE}/v1/auth/login`, () => HttpResponse.json(LOGIN_SUCCESS_FIXTURE)),
+  http.post(`${BASE}/v1/auth/logout`, () => HttpResponse.json(LOGOUT_SUCCESS_FIXTURE)),
+  http.post(`${BASE}/v1/auth/register`, () => HttpResponse.json(REGISTER_SUCCESS_FIXTURE)),
+  http.post(`${BASE}/v1/auth/verify-email`, () =>
+    HttpResponse.json(VERIFY_EMAIL_SUCCESS_FIXTURE),
+  ),
+  http.post(`${BASE}/v1/auth/password-reset/request`, () =>
+    HttpResponse.json(PASSWORD_RESET_REQUEST_SUCCESS_FIXTURE),
+  ),
+  http.post(`${BASE}/v1/auth/password-reset/confirm`, () =>
+    HttpResponse.json(PASSWORD_RESET_CONFIRM_SUCCESS_FIXTURE),
+  ),
+
   // GET analytics summary
   http.get(`${BASE}/v1/analytics/summary`, () => {
     return HttpResponse.json(ANALYTICS_SUMMARY_FIXTURE)
@@ -546,3 +592,92 @@ export const handlers = [
 export const noEntryHandler = http.get(`${BASE}/v1/journal/trades/:tradeId`, () => {
   return new HttpResponse(null, { status: 404 })
 })
+
+// ---------------------------------------------------------------------------
+// Auth override handlers (Step 14) — use with server.use(...) in tests
+// ---------------------------------------------------------------------------
+
+export const authMeUnauthorizedHandler = http.get(`${BASE}/v1/auth/me`, () => {
+  return new HttpResponse(JSON.stringify({ detail: 'Not authenticated' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  })
+})
+
+export const loginInvalidCredentialsHandler = http.post(`${BASE}/v1/auth/login`, () => {
+  return new HttpResponse(JSON.stringify({ detail: 'INVALID_CREDENTIALS' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  })
+})
+
+export const loginAccountLockedHandler = http.post(`${BASE}/v1/auth/login`, () => {
+  return new HttpResponse(JSON.stringify({ detail: 'ACCOUNT_LOCKED' }), {
+    status: 423,
+    headers: { 'Content-Type': 'application/json' },
+  })
+})
+
+export const loginEmailNotVerifiedHandler = http.post(`${BASE}/v1/auth/login`, () => {
+  return new HttpResponse(JSON.stringify({ detail: 'EMAIL_NOT_VERIFIED' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  })
+})
+
+export const loginRateLimitedHandler = http.post(`${BASE}/v1/auth/login`, () => {
+  return new HttpResponse(JSON.stringify({ detail: 'RATE_LIMITED' }), {
+    status: 429,
+    headers: { 'Content-Type': 'application/json' },
+  })
+})
+
+export const registerRateLimitedHandler = http.post(`${BASE}/v1/auth/register`, () => {
+  return new HttpResponse(JSON.stringify({ detail: 'RATE_LIMITED' }), {
+    status: 429,
+    headers: { 'Content-Type': 'application/json' },
+  })
+})
+
+export const registerPolicyViolationHandler = (detail: string) =>
+  http.post(`${BASE}/v1/auth/register`, () => {
+    return new HttpResponse(JSON.stringify({ detail }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  })
+
+export const verifyEmailInvalidTokenHandler = http.post(`${BASE}/v1/auth/verify-email`, () => {
+  return new HttpResponse(JSON.stringify({ detail: 'INVALID_OR_EXPIRED_TOKEN' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  })
+})
+
+export const passwordResetRateLimitedHandler = http.post(
+  `${BASE}/v1/auth/password-reset/request`,
+  () => {
+    return new HttpResponse(JSON.stringify({ detail: 'RATE_LIMITED' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  },
+)
+
+export const resetConfirmInvalidTokenHandler = http.post(
+  `${BASE}/v1/auth/password-reset/confirm`,
+  () => {
+    return new HttpResponse(JSON.stringify({ detail: 'INVALID_OR_EXPIRED_TOKEN' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  },
+)
+
+export const resetConfirmPolicyViolationHandler = (detail: string) =>
+  http.post(`${BASE}/v1/auth/password-reset/confirm`, () => {
+    return new HttpResponse(JSON.stringify({ detail }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  })
