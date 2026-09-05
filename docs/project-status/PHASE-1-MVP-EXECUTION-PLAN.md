@@ -3,7 +3,7 @@
 **Document:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Author:** Krishna (Project Manager)  
 **Date:** 2026-09-04  
-**Base state:** Steps 1–12.5 complete, CI GREEN, branch `feat/step-12-5-behavioral-analytics`  
+**Base state:** Steps 1–13 complete, CI GREEN, branch `main` (after `feat/step-13-basic-risk-metrics` merged)  
 **Source of truth for scope:** `docs/requirements/REQUIREMENTS.md` v1.1 §38  
 **Status:** ACTIVE — update as steps close
 
@@ -58,7 +58,7 @@ Steps 1–12.5 are done. Do not re-do or revisit these. They are foundation — 
 | 11 | Trading accounts + broker CSV import (Zerodha, Upstox, Angel One) | ✅ |
 | 12.1–12.5 | Analytics: 9 metric cards, full filter UI (9 dimensions), dynamic filter options, streaks/hold duration/exit type | ✅ Yudhishthira 2026-09-03/04 |
 
-**Test totals as of Step 12.7:** 488 backend tests (84.27% coverage), 190 frontend tests (85.6% statements / 87.88% branches).
+**Test totals as of Step 13:** 506 backend tests, 141 frontend tests.
 
 ---
 
@@ -125,6 +125,7 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Owners:** Dhanvantari (spec), Bhima (backend), Arjun (frontend)  
 **Estimate:** 2 sessions  
 **Dependency:** Step 12 analytics foundation (for data queries). Can run in parallel with Step 12.7.  
+**Execution plan:** `docs/project-status/STEP-13-EXECUTION-PLAN.md`
 
 **Scope — Phase 1 only:**
 - Risk per trade (from `planned_risk_amount` already in journal)
@@ -142,7 +143,10 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Risk of ruin (Phase 2)
 - Real-time open position risk (requires live price feed — Phase 2)
 
-**Gate:** Dhanvantari spec sign-off → Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Dhanvantari spec sign-off → Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-05** (Dhanvantari signed off 2026-09-04 · Sahadeva GO · Nakula CI GREEN · Yudhishthira ACCEPT)  
+**Test totals:** 506 backend tests, 141 frontend tests  
+**Branch:** `feat/step-13-basic-risk-metrics` (merged to `main` via PR)
 
 ---
 
@@ -166,6 +170,7 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - All other screens (built in subsequent steps)
 - OAuth / social login (Phase 3)
 
+**Execution plan:** `docs/project-status/STEP-14-EXECUTION-PLAN.md`  
 **Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
 
 ---
@@ -438,7 +443,8 @@ Phase 1 is DONE when all of the following are true simultaneously:
 
 - [x] Step 12.6 accepted by Yudhishthira ✅ 2026-09-04
 - [x] Step 12.7 accepted by Yudhishthira ✅ 2026-09-04
-- [ ] Steps 13, 14, 15, 16, 17, 18, 19 accepted by Yudhishthira
+- [x] Step 13 accepted by Yudhishthira ✅ 2026-09-05
+- [ ] Steps 14, 15, 16, 17, 18, 19 accepted by Yudhishthira
 - [ ] Step 20 security hardening accepted by Hanuman
 - [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
 - [ ] Track QA E2E suite (J-1 through J-9) passing on staging
@@ -532,9 +538,9 @@ Phase 1 is DONE when all of the following are true simultaneously:
 | OI-1 | Cloud provider decision | Atharva | ✅ **RESOLVED — Railway** (2026-09-04) | — |
 | OI-2 | Production domain decision | Atharva | ⚠️ **Partially resolved** — `*.up.railway.app` free subdomain usable for Phase 1. Custom domain optional. | Before Step I-1 (decide if custom domain needed at launch) |
 | OI-KMS | Broker credential KMS approach on Railway | Hanuman | ❌ **Pending ruling** — Krishna recommends deferring to Phase 2 (CSV-only Phase 1 doesn't need broker API credentials) | Before Step I-1 |
-| OI-3 | Ganesha: confirm FIFO multi-lot treatment for CNC delivery — single-lot assumption acceptable for Phase 1? | Ganesha | ❌ Open | Before Step 13 or Step 16 |
+| OI-3 | Ganesha: confirm FIFO multi-lot treatment for CNC delivery — single-lot assumption acceptable for Phase 1? | Ganesha | ✅ **RESOLVED 2026-09-04** — ruling G-RISK-01: use `status IN ('OPEN', 'PARTIAL')`, full `planned_risk_amount` no pro-ration, label "Planned At-Risk" | — |
 | OI-4 | Yudhishthira: confirm Phase 1 scope of Strategy/Setup — hardcoded enum acceptable, or must users define their own before MVP? | Yudhishthira | ❌ Open | Before Step 18 (dashboard design) |
-| OI-5 | Dhanvantari: produce Phase 1 risk metrics spec (scope of Step 13) | Dhanvantari | ❌ Open | Before Step 13 implementation |
+| OI-5 | Dhanvantari: produce Phase 1 risk metrics spec (scope of Step 13) | Dhanvantari | ✅ **RESOLVED 2026-09-04** — spec signed off, two corrections applied (open trade date scoping removed; `current_loss_streak` added) | — |
 | OI-6 | Nakula: select transactional email provider (Resend recommended — free 3,000/month) | Nakula | ❌ Open | Before Step I-1 |
 | OI-7 | Nakula: select attachment storage provider (Cloudflare R2 recommended — free 10 GB, zero egress) | Nakula | ❌ Open | Before Step 20 (S3Storage wiring) |
 
