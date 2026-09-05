@@ -23,6 +23,12 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-surface-base">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-text-primary focus:shadow focus:outline-none focus:ring-2 focus:ring-primary"
+      >
+        Skip to content
+      </a>
       <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface-base">
         <div className="border-b border-border px-4 py-5">
           <span className="text-lg font-bold text-text-primary">TradeForge</span>
@@ -51,7 +57,7 @@ export function AppShell() {
         </div>
       </aside>
 
-      <main className="flex flex-1 flex-col overflow-auto">
+      <main id="main" className="flex flex-1 flex-col overflow-auto">
         <Outlet />
       </main>
     </div>

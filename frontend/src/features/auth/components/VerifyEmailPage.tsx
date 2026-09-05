@@ -19,10 +19,6 @@ export function VerifyEmailPage() {
       .verifyEmail(token)
       .then(() => {
         setState('success')
-        const timer = setTimeout(() => {
-          navigate('/login?verified=1', { replace: true })
-        }, 2000)
-        return () => clearTimeout(timer)
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.detail === 'INVALID_OR_EXPIRED_TOKEN') {
@@ -32,7 +28,7 @@ export function VerifyEmailPage() {
         }
         setState('error')
       })
-  }, [token, navigate])
+  }, [token])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-base px-4">
@@ -43,7 +39,14 @@ export function VerifyEmailPage() {
         {state === 'success' && (
           <>
             <h1 className="mb-3 text-xl font-bold text-text-primary">Email verified!</h1>
-            <p className="text-sm text-text-secondary">Redirecting you to sign in…</p>
+            <p className="mb-4 text-sm text-text-secondary">Your account is ready. Sign in to get started.</p>
+            <button
+              type="button"
+              onClick={() => navigate('/login?verified=1', { replace: true })}
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              Continue to sign in
+            </button>
           </>
         )}
         {state === 'error' && (

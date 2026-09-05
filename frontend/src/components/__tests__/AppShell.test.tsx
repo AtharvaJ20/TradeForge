@@ -119,3 +119,21 @@ describe('AppShell — F-14-31b: active link has aria-current="page"', () => {
     expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current', 'page')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Task B: skip-link present with href="#main" (WCAG 2.1 SC 2.4.1)
+// ---------------------------------------------------------------------------
+
+describe('AppShell — skip-link for keyboard navigation', () => {
+  it('renders a skip-link with href="#main" before the sidebar', () => {
+    renderShell()
+    const skipLink = screen.getByRole('link', { name: /skip to content/i })
+    expect(skipLink).toBeInTheDocument()
+    expect(skipLink).toHaveAttribute('href', '#main')
+  })
+
+  it('main landmark has id="main" so the skip-link target exists', () => {
+    renderShell()
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main')
+  })
+})

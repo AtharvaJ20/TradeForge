@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { VerifyEmailPage } from '../VerifyEmailPage'
 import { ApiError } from '@/lib/api-client'
@@ -96,12 +97,12 @@ describe('VerifyEmailPage — F-14-18: generic error fallback', () => {
 })
 
 // ---------------------------------------------------------------------------
-// plan F-14-16 (timer): redirects to /login?verified=1 after 2 seconds
+// plan F-14-16b: "Continue to sign in" button navigates to /login?verified=1
 // ---------------------------------------------------------------------------
 
-describe('VerifyEmailPage — F-14-16b: redirect to /login?verified=1 after 2s', () => {
-  it('navigates to /login?verified=1 two seconds after successful verification', async () => {
-    vi.useFakeTimers()
+describe('VerifyEmailPage — F-14-16b: button navigates to /login?verified=1', () => {
+  it('navigates to /login?verified=1 when "Continue to sign in" is clicked', async () => {
+    const user = userEvent.setup()
     mockVerifyEmail.mockResolvedValue({ message: 'ok' })
 
     render(
@@ -113,14 +114,12 @@ describe('VerifyEmailPage — F-14-16b: redirect to /login?verified=1 after 2s',
       </MemoryRouter>,
     )
 
-    // flush microtasks so the Promise .then() fires and state updates
-    await act(async () => {})
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /email verified/i })).toBeInTheDocument()
+    })
 
-    expect(screen.getByRole('heading', { name: /email verified/i })).toBeInTheDocument()
-
-    act(() => { vi.advanceTimersByTime(2001) })
+    await user.click(screen.getByRole('button', { name: /continue to sign in/i }))
 
     expect(screen.getByText('Login page')).toBeInTheDocument()
-    vi.useRealTimers()
   })
 })
