@@ -1,9 +1,61 @@
 import { useState } from 'react'
 import { useAccount } from '@/features/accounts/context/AccountContext'
 import { accountsApi } from '@/features/accounts/api'
+import { useFocusTrap } from '@/shared/hooks/useFocusTrap'
 import { CreateAccountModal } from './CreateAccountModal'
 import { EditAccountModal } from './EditAccountModal'
 import type { Account } from '@/features/accounts/types'
+
+interface DeactivateConfirmDialogProps {
+  account: Account
+  isDeactivating: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}
+
+function DeactivateConfirmDialog({
+  account,
+  isDeactivating,
+  onCancel,
+  onConfirm,
+}: DeactivateConfirmDialogProps) {
+  const dialogRef = useFocusTrap(onCancel)
+
+  return (
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirm deactivation"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    >
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-6 shadow-lg">
+        <p className="text-sm text-text-primary mb-4">
+          Are you sure you want to deactivate{' '}
+          <strong>{account.display_name}</strong>? It will no longer appear in
+          analytics or trade imports.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={isDeactivating}
+            onClick={onConfirm}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50 disabled:opacity-50"
+          >
+            {isDeactivating ? 'Deactivating…' : 'Deactivate'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function AccountsSection() {
   const { accounts, selectedAccount, selectAccount, refetchAccounts, isLoading } = useAccount()
@@ -113,37 +165,12 @@ export function AccountsSection() {
       )}
 
       {deactivateAccount && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm deactivation"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-        >
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-6 shadow-lg">
-            <p className="text-sm text-text-primary mb-4">
-              Are you sure you want to deactivate{' '}
-              <strong>{deactivateAccount.display_name}</strong>? It will no longer appear in
-              analytics or trade imports.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeactivateAccount(null)}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={deactivating}
-                onClick={() => void handleDeactivate(deactivateAccount)}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50 disabled:opacity-50"
-              >
-                {deactivating ? 'Deactivating…' : 'Deactivate'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeactivateConfirmDialog
+          account={deactivateAccount}
+          isDeactivating={deactivating}
+          onCancel={() => setDeactivateAccount(null)}
+          onConfirm={() => void handleDeactivate(deactivateAccount)}
+        />
       )}
 
       {showCreate && (

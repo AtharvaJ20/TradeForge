@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { accountsApi } from '@/features/accounts/api'
 import { ApiError } from '@/lib/api-client'
+import { useFocusTrap } from '@/shared/hooks/useFocusTrap'
 
 const BROKERS = ['ZERODHA', 'UPSTOX', 'ANGEL_ONE', 'MANUAL'] as const
 const ACCOUNT_TYPES = ['INDIVIDUAL', 'HUF'] as const
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function CreateAccountModal({ onClose, onCreated }: Props) {
+  const dialogRef = useFocusTrap(onClose)
   const [displayName, setDisplayName] = useState('')
   const [broker, setBroker] = useState<string>(BROKERS[0])
   const [accountType, setAccountType] = useState<string>(ACCOUNT_TYPES[0])
@@ -51,6 +53,7 @@ export function CreateAccountModal({ onClose, onCreated }: Props) {
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Create account"

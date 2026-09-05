@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AccountProvider } from '@/features/accounts/context/AccountContext'
 import { AccountsSection } from '../AccountsSection'
@@ -188,6 +188,80 @@ describe('AccountsSection — F-15-18: Deactivate calls DELETE /v1/accounts/{id}
     await user.click(within(confirmDialog).getByRole('button', { name: /^deactivate$/i }))
 
     // Dialog should close after deactivation
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /confirm deactivation/i })).toBeNull()
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// BUG-QA-15-01 regression: Escape closes CreateAccountModal
+// ---------------------------------------------------------------------------
+
+describe('AccountsSection — BUG-QA-15-01-a: Escape closes CreateAccountModal', () => {
+  it('closes CreateAccountModal when Escape is pressed', async () => {
+    const user = userEvent.setup()
+    renderSection()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /add account/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /add account/i }))
+    expect(screen.getByRole('dialog', { name: /create account/i })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /create account/i })).toBeNull()
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// BUG-QA-15-01 regression: Escape closes EditAccountModal
+// ---------------------------------------------------------------------------
+
+describe('AccountsSection — BUG-QA-15-01-b: Escape closes EditAccountModal', () => {
+  it('closes EditAccountModal when Escape is pressed', async () => {
+    const user = userEvent.setup()
+    renderSection()
+
+    await waitFor(() => {
+      expect(screen.getByText(ACCOUNTS_LIST_FIXTURE[0].display_name)).toBeInTheDocument()
+    })
+
+    const editButtons = screen.getAllByRole('button', { name: /edit/i })
+    await user.click(editButtons[0])
+    expect(screen.getByRole('dialog', { name: /edit account/i })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /edit account/i })).toBeNull()
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// BUG-QA-15-01 regression: Escape closes deactivate confirmation dialog
+// ---------------------------------------------------------------------------
+
+describe('AccountsSection — BUG-QA-15-01-c: Escape closes deactivate confirm dialog', () => {
+  it('closes deactivate confirmation dialog when Escape is pressed', async () => {
+    const user = userEvent.setup()
+    renderSection()
+
+    await waitFor(() => {
+      expect(screen.getByText(ACCOUNTS_LIST_FIXTURE[0].display_name)).toBeInTheDocument()
+    })
+
+    const deactivateButtons = screen.getAllByRole('button', { name: /deactivate/i })
+    await user.click(deactivateButtons[0])
+    expect(screen.getByRole('dialog', { name: /confirm deactivation/i })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: /confirm deactivation/i })).toBeNull()
     })

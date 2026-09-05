@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { accountsApi } from '@/features/accounts/api'
 import { ApiError } from '@/lib/api-client'
 import type { Account } from '@/features/accounts/types'
+import { useFocusTrap } from '@/shared/hooks/useFocusTrap'
 
 const ACCOUNT_TYPES = ['INDIVIDUAL', 'HUF'] as const
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function EditAccountModal({ account, onClose, onUpdated }: Props) {
+  const dialogRef = useFocusTrap(onClose)
   const [displayName, setDisplayName] = useState(account.display_name)
   const [accountType, setAccountType] = useState(account.account_type)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -49,6 +51,7 @@ export function EditAccountModal({ account, onClose, onUpdated }: Props) {
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Edit account"

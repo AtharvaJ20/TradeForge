@@ -94,3 +94,50 @@ class TradingAccountService:
         if account.status != "ACTIVE":
             raise AccountInactiveError(account_id)
         return account
+
+    async def update(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        display_name: str | None = None,
+        account_type: str | None = None,
+    ) -> TradingAccount:
+        """Update mutable account fields.
+
+        Raises:
+            AccountNotFoundError: account does not exist or is not owned by user.
+            ValueError: account_type is not a supported value.
+        """
+        if account_type is not None and account_type not in _VALID_ACCOUNT_TYPES:
+            raise ValueError(
+                f"Unsupported account_type {account_type!r}. "
+                f"Must be one of {sorted(_VALID_ACCOUNT_TYPES)}"
+            )
+        if display_name is not None and not display_name.strip():
+            raise ValueError("display_name must not be blank")
+
+        result = await self._repo.update(
+            session,
+            user_id=user_id,
+            account_id=account_id,
+            display_name=display_name.strip() if display_name else None,
+            account_type=account_type,
+        )
+        if result is None:
+            raise AccountNotFoundError(account_id)
+        return result
+
+    async def deactivate(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+    ) -> bool:
+        """Soft-delete the account (status → INACTIVE). Idempotent.
+
+        Returns True if the account was found (and deactivated), False if not found.
+        """
+        return await self._repo.deactivate(session, user_id=user_id, account_id=account_id)

@@ -2,11 +2,14 @@
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.infrastructure.models.user import User
+
+_UNSET: Any = object()  # sentinel: distinguish "not provided" from explicit None
 
 
 class UserRepository:
@@ -51,3 +54,27 @@ class UserRepository:
             .where(User.id == user_id)
             .values(is_locked=locked, updated_at=datetime.utcnow())
         )
+
+    async def update_profile(
+        self,
+        user_id: uuid.UUID,
+        *,
+        display_name: Any = _UNSET,
+        time_zone: Any = _UNSET,
+        base_currency: Any = _UNSET,
+    ) -> User | None:
+        """Update profile fields. Only provided (non-UNSET) fields are changed.
+
+        Passing display_name=None explicitly clears the field.
+        Returns the refreshed User row, or None if the user does not exist.
+        """
+        values: dict[str, Any] = {"updated_at": datetime.now(UTC)}
+        if display_name is not _UNSET:
+            values["display_name"] = display_name
+        if time_zone is not _UNSET:
+            values["time_zone"] = time_zone
+        if base_currency is not _UNSET:
+            values["base_currency"] = base_currency
+
+        await self._db.execute(update(User).where(User.id == user_id).values(**values))
+        return await self.find_by_id(user_id)
