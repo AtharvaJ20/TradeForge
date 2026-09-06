@@ -73,10 +73,14 @@ Two changes:
 ALTER TABLE trades
   ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT false;
 
-CREATE INDEX idx_trades_user_not_deleted ON trades (user_id, is_deleted);
+-- Partial index: covers only the common case (non-deleted rows).
+-- A standard composite index on (user_id, boolean) has poor selectivity
+-- because is_deleted = false represents ~100% of rows; the planner
+-- would ignore it. A partial index is smaller and always used.
+CREATE INDEX idx_trades_user_active ON trades (user_id) WHERE is_deleted = false;
 ```
 
-- `is_deleted = true` is the soft-delete flag. All existing queries that surface trades to users must add `trades.is_deleted = false` to their WHERE clauses (analytics queries, risk queries, journal lookups). Bhima must audit `analytics_repo.py`, `risk_service.py`, and `journal_repo.py` for any raw trades selects and add this predicate.
+- `is_deleted = true` is the soft-delete flag. **The trade's `status` column is NOT changed by the delete operation** — a soft-deleted OPEN trade remains `status = 'OPEN'` in the database. The `is_deleted` flag is the sole deletion signal. All queries that surface trades to users must add `trades.is_deleted = false` to their WHERE clauses. See B-16-C for the mandatory audit list.
 - `DEFAULT false` ensures existing rows are unaffected.
 
 **2. Extend `import_source` check constraint on `execution_fills` to include `'MANUAL'`:**
@@ -92,6 +96,8 @@ ALTER TABLE execution_fills ADD CONSTRAINT ck_fills_import_source
 ```
 
 If the constraint does not exist (column is unconstrained), skip this step and add a note.
+
+> **Note on `broker = 'MANUAL'`:** The existing `ck_fills_broker` constraint on `execution_fills` already includes `'MANUAL'` — `"broker IN ('ZERODHA', 'UPSTOX', 'ANGEL_ONE', 'MANUAL')"`. No migration change is needed for the broker column.
 
 **Downgrade:** reverse the `is_deleted` column addition and restore the prior check constraint.
 
@@ -206,14 +212,19 @@ Creates a new trade from manual fills.
 2. Resolve `account_id` — verify the account exists, is ACTIVE, and belongs to the authenticated user (use `TradingAccountService.get()`). Return 404 `ACCOUNT_NOT_FOUND` if not.
 3. Resolve `instrument_id` via `InstrumentRepository.find_for_fill()`. Return 422 `INSTRUMENT_NOT_FOUND` with `{symbol, exchange_segment, instrument_type}` detail if not found.
 4. For each fill in `request.fills`: call `FillRepository.insert_normalized_fill()` with `import_source="MANUAL"`, `broker="MANUAL"`, `fill_id=None`, `order_id=None`, `is_expiry_squareoff=False`, `is_auction=False`.
-   - Derive `session` from `fill_timestamp` converted to `Asia/Kolkata` local time per the session bands used in Step 12.7 (N-2): Pre-Open 09:00–09:14, Open Volatility 09:15–09:29, Mid-Morning 09:30–11:29, Lunch 11:30–12:59, Afternoon 13:00–14:29, Close 14:30–15:30 → map to the existing session enum values. Any timestamp outside these bands → use `"REGULAR"` as fallback.
+   - Derive `session` from `fill_timestamp` converted to `Asia/Kolkata` local time. The `execution_fills.session` column has a DB check constraint permitting only three values: `'PRE_OPEN'`, `'REGULAR'`, `'POST_CLOSE'`. Map as follows:
+     - `'PRE_OPEN'` — IST time before 09:15
+     - `'REGULAR'` — IST time 09:15 to 15:30 (inclusive)
+     - `'POST_CLOSE'` — IST time after 15:30
+   - **Do not use the six N-2 analytics bands** (Open Volatility, Mid-Morning, etc.) here. Those are computed at query time from `fill_timestamp AT TIME ZONE 'Asia/Kolkata'` by the analytics layer and are never stored in the `session` column.
    - Derive `trade_date` as `.date()` of `fill_timestamp` localised to `Asia/Kolkata`.
 5. Flush (not commit) after all fills are inserted, so they are visible to the reconstruction query within the same transaction.
-6. Run `ReconstructionEngine.run()` for `(user_id, account_id, instrument_id, product_type)`. On `ReconstructionError` — rollback and return 422 `RECONSTRUCTION_FAILED` with the error detail.
-7. If any trades were closed by the reconstruction, run `PnlService.backfill_all_closed()`.
-8. If `planned_stop` or `planned_target` was provided, update the `trades` row with those values (the reconstruction engine does not set them).
-9. Commit.
-10. Query and return the `Trade` ORM row for the instrument/account that was just created or updated. Return `TradeOut`.
+6. Run `ReconstructionEngine.run(session, user_id, account_id, instrument_id, product_type, instrument_type)`. Pass `instrument_type` from `request.instrument.instrument_type` — the engine requires it to disambiguate `NRML_FUT` from `NRML_OPT` at trade-open time. On `ReconstructionError` — rollback and return 422 `RECONSTRUCTION_FAILED` with the error detail.
+7. The `run()` call returns a `ReconstructionResult`. Obtain the trade ID from `result.affected_trade_id` (see B-16-D — `ReconstructionResult` must be extended with this field). This is the trade that was created or last modified by the run.
+8. If any trades were closed by the reconstruction (`result.trades_closed > 0`), run `PnlService.backfill_all_closed()`.
+9. If `planned_stop` or `planned_target` was provided, update the `trades` row identified by `result.affected_trade_id` with those values via `TradeRepository.update_trade()`. The reconstruction engine does not set these fields.
+10. Commit.
+11. Query the `Trade` ORM row by `result.affected_trade_id` and return `TradeOut`.
 
 **Response:** `201 Created` with `TradeOut`.
 
@@ -229,10 +240,11 @@ Adds a fill to an existing trade in OPEN or PARTIAL status.
 2. Verify the trade's `account_id` belongs to the authenticated user (join with `trading_accounts` or re-use `TradingAccountService`). Return 403 `TRADE_NOT_OWNED` if mismatch.
 3. If the trade status is `CLOSED`, return 422 `TRADE_ALREADY_CLOSED` — exits on a closed trade are not supported via this endpoint in Phase 1.
 4. Validate the `fill.fill_timestamp` is timezone-aware and is after the trade's `first_fill_at`. Return 422 if not.
-5. Insert the fill using `FillRepository.insert_normalized_fill()` as above.
-6. Flush, then run `ReconstructionEngine.run()` for the trade's `(account_id, instrument_id, product_type)` unit.
-7. Run `PnlService.backfill_all_closed()` if the reconstruction closed the trade.
-8. Commit. Return the updated `TradeOut`.
+5. Look up `instrument_type` from the `instruments` table using the trade's `instrument_id` via `InstrumentRepository`. This field is required by `ReconstructionEngine.run()` but is not carried on the `Trade` ORM model. `AddFillRequest` does not carry `instrument_type` — the server derives it from the stored instrument.
+6. Insert the fill using `FillRepository.insert_normalized_fill()` as above (apply the same `session` derivation: PRE_OPEN / REGULAR / POST_CLOSE against `fill_timestamp` IST).
+7. Flush, then run `ReconstructionEngine.run(session, user_id, account_id, instrument_id, product_type, instrument_type)` with the `instrument_type` obtained in step 5.
+8. Run `PnlService.backfill_all_closed()` if the reconstruction closed the trade (`result.trades_closed > 0`).
+9. Commit. Query and return the updated `Trade` ORM row by `trade_id` as `TradeOut`.
 
 **Response:** `200 OK` with `TradeOut`.
 
@@ -247,31 +259,43 @@ Soft-deletes a manually entered trade.
 1. Look up the trade by `trade_id`. Return 404 `TRADE_NOT_FOUND` if not found or already `is_deleted = true`.
 2. Verify ownership (same as above). Return 403 `TRADE_NOT_OWNED` if mismatch.
 3. Fetch all `execution_fills` where `trade_id = trade_id` (both ENTRY and EXIT fills).
-4. Insert each fill's `id` into `fill_exclusions` (idempotent — if already excluded, skip).
-5. Set `trades.is_deleted = true` for this trade.
+4. For each fill: call `FillExclusionRepository.exists_by_fill_id(fill.id)`. If not already excluded, call `FillExclusionRepository.create_exclusion()` with:
+   - `fill_id = fill.id`
+   - `reason = "USER_DELETED_TRADE"`
+   - `replacement_fill_ids = []` (no replacement fills for user-initiated deletion)
+   - `excluded_by = user_id` (authenticated user)
+   If `exists_by_fill_id()` returns True, skip that fill — the exclusion is already permanent.
+5. Set `trades.is_deleted = true` for this trade via `TradeRepository.update_trade()`. **Do not change `trades.status`** — the status (OPEN, PARTIAL, or CLOSED) is left as-is. The `is_deleted` flag is the authoritative deletion signal; `status` remains accurate for audit purposes.
 6. Commit.
 7. Return `204 No Content`.
 
-**Note:** This does NOT re-run reconstruction. Excluding fills via `fill_exclusions` prevents them from being picked up in future reconstruction runs. The trade is flagged `is_deleted` so it is filtered from all user-facing queries immediately.
+**Critical invariant:** Because `is_deleted = true` trades retain their original `status`, `TradeRepository.get_open_trade_with_lock()` — which queries `status IN ('OPEN', 'PARTIAL')` — **must** also filter `is_deleted = false`. Without this, a soft-deleted OPEN trade would be picked up as the "existing open trade" by a future reconstruction run for the same instrument/account/product_type, causing silent data corruption. This filter is mandatory and is listed in B-16-C.
+
+**Note on `fill_exclusions` as an audit log:** `fill_exclusions` is a permanent append-only table — `UPDATE` and `DELETE` are blocked by DB triggers. Using it here is deliberate: the fills are genuinely excluded from future reconstruction, and the exclusion record serves as a permanent audit trail of the user's deletion action. `replacement_fill_ids = []` is valid — the array column has a server default of `ARRAY[]::uuid[]`.
 
 ---
 
 ### Task B-16-C — Audit Existing Queries for `is_deleted`
 
-After migration 0015 lands, Bhima must search `analytics_repo.py`, `risk_service.py`, and any other file that queries `trades` directly, and add `.where(Trade.is_deleted.is_(False))` (or `NOT is_deleted` in raw SQL) to every query that surfaces trade rows to users.
+After migration 0015 lands, Bhima must add `is_deleted = false` predicates to every query that surfaces trade rows to users. This is not optional — a soft-deleted trade appearing in analytics or risk metrics is a data correctness bug, not a cosmetic one.
 
-Files to audit:
-- `backend/src/tradeforge/infrastructure/repositories/analytics_repo.py`
-- `backend/src/tradeforge/application/risk_service.py`
-- `backend/src/tradeforge/infrastructure/repositories/trade_repo.py`
-- `backend/src/tradeforge/infrastructure/repositories/pnl_repo.py`
-- `backend/src/tradeforge/infrastructure/repositories/journal_repo.py` (if it selects trades)
+**Specific callsites that must be updated (verified by Mayasura against the source):**
 
-This is not optional — a soft-deleted trade that still appears in analytics would be a data correctness bug.
+| File | Callsite | Fix |
+|------|----------|-----|
+| `analytics_repo.py` | `AnalyticsRepository._base_where()` — shared predicate builder used by all 9 analytics metrics | Add `Trade.is_deleted.is_(False)` to the `clauses` list. **One line fixes all 9 metrics.** |
+| `risk_service.py` | `_AT_RISK_BY_ACCOUNT` raw SQL template — queries `FROM trades WHERE status IN ('OPEN', 'PARTIAL')` | Add `AND is_deleted = false` to the WHERE clause |
+| `risk_service.py` | `_DAILY_LOSS_BY_ACCOUNT` raw SQL template — queries `FROM trades t JOIN trade_pnl` | Add `AND t.is_deleted = false` to the WHERE clause |
+| `risk_service.py` | `_AT_RISK_BY_USER` raw SQL template (and any other raw SQL templates in the file) | Add `AND is_deleted = false` / `AND t.is_deleted = false` as appropriate |
+| `trade_repo.py` | `TradeRepository.get_open_trade_with_lock()` — queries `status IN ('OPEN', 'PARTIAL')` without `is_deleted` filter | Add `Trade.is_deleted.is_(False)` to the WHERE clause. **This is the highest-priority fix**: without it, a soft-deleted OPEN trade is found as the "existing open trade" by a future reconstruction run, corrupting the next import or manual entry for the same processing unit. |
+| `pnl_repo.py` | Any query joining or selecting from `trades` | Add `Trade.is_deleted.is_(False)` or `AND is_deleted = false` |
+| `journal_repo.py` | Any query joining or selecting from `trades` | Add `Trade.is_deleted.is_(False)` if trades are queried directly |
+
+**Priority order:** Fix `trade_repo.py → get_open_trade_with_lock()` first (prevents reconstruction corruption), then `analytics_repo.py → _base_where()` (one-line fix for all analytics), then `risk_service.py` raw SQL templates.
 
 ---
 
-### Task B-16-D — New Service: `TradeService`
+### Task B-16-D — New Service: `TradeService` + `ReconstructionResult` Extension
 
 **File (new):** `backend/src/tradeforge/application/trade_service.py`
 
@@ -283,6 +307,32 @@ Methods:
 - `async create_trade(session, user_id, request) -> Trade`
 - `async add_fill(session, user_id, trade_id, fill_input) -> Trade`
 - `async soft_delete_trade(session, user_id, trade_id) -> None`
+
+**Required change to `ReconstructionResult`:**
+
+**File:** `backend/src/tradeforge/domain/trade/types.py`
+
+Add `affected_trade_id: uuid.UUID | None = None` to the `ReconstructionResult` dataclass:
+
+```python
+@dataclass
+class ReconstructionResult:
+    fills_processed: int = 0
+    fills_skipped_no_unprocessed: int = 0
+    trades_opened: int = 0
+    trades_closed: int = 0
+    tax_lots_created: int = 0
+    tax_lots_updated: int = 0
+    halted_at_fill_id: uuid.UUID | None = None
+    error_detail: str | None = None
+    affected_trade_id: uuid.UUID | None = None  # ← NEW: trade created or operated on
+```
+
+The reconstruction engine must set `result.affected_trade_id` to the trade it opened or continued processing fills against. Specifically:
+- When the engine opens a new trade: set `result.affected_trade_id = trade_id` at the point where `result.trades_opened += 1`.
+- When the engine resumes an existing OPEN/PARTIAL trade (i.e., `open_trade is not None` at step 4 of `run()`): set `result.affected_trade_id = open_trade.id` before the fill loop begins.
+
+This field is used by `TradeService.create_trade()` to identify which `Trade` ORM row to query and return as `TradeOut`. Without it, the service has no reference to the affected trade ID after `run()` returns.
 
 ---
 
