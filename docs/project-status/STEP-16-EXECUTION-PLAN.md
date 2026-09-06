@@ -59,6 +59,34 @@ Step 15 is merged to `main`. Branch `feat/step-16-manual-trade-entry` is based o
 
 ---
 
+## Domain Rulings (Ganesha — Trading Domain Analyst, 2026-09-06)
+
+Formal rulings resolving domain ambiguities identified during the pre-implementation review. These decisions govern implementation choices and must not be altered without a new Ganesha review.
+
+---
+
+### Ruling D2 — DELETE Endpoint: Restricted to Manually Entered Trades Only
+
+**Decision:** `DELETE /v1/trades/{id}` is restricted to trades whose fills are entirely manually entered. A trade is manually entered when **all** of its fills carry `import_source = 'MANUAL'`. If any fill has `import_source = 'CSV'` (or any other non-MANUAL source), the endpoint returns 422 `TRADE_NOT_MANUAL`.
+
+**Rationale:** The CSV import pipeline represents broker-verified, exchange-confirmed execution data. A trade created from a CSV import is the broker's record of what happened; it is not the user's assertion. Allowing users to soft-delete CSV-imported trades would permanently remove auditable broker records from analytics with no reconciliation trail — the fill exclusion entries would record the user's intent but not any broker dispute. If a user needs to dispute a specific broker-imported fill (wrong price, wrong quantity, data error), the correct path is the fill exclusion mechanism, which preserves the original fill in the database and records the dispute as an audit event. Manual trades, by contrast, are entirely user-asserted; the user is both the source and the authority, and they should be able to correct or remove their own entries freely.
+
+**Implementation effect:** Step 0 added to the DELETE sequence — see B-16-B.
+
+---
+
+### Ruling D3 — `POST /v1/trades/{id}/fills`: Mixed-Provenance Trades Are Permitted
+
+**Decision:** A user may add a manual fill to any non-CLOSED trade regardless of that trade's origin. No `import_source` restriction is placed on the receiving trade. A trade that contains both broker-CSV fills and user-MANUAL fills is a valid, permitted state.
+
+**Rationale:** The primary legitimate use case is trade gap repair: a broker CSV export was incomplete (connectivity failure, end-of-day export missed a fill, late trade report), and the user needs to add the missing fill to a trade that is already open in the system. Blocking this forces the user to either accept a permanently PARTIAL trade (incorrect P&L, broken analytics) or delete and re-enter everything — both worse outcomes. The reconstruction engine is provenance-agnostic; it processes all non-excluded fills for the processing unit by FIFO order regardless of `import_source`. The per-fill `import_source` column provides a permanent audit trail of which fills came from the broker and which the user asserted.
+
+**Boundary condition:** If the user adds a manual fill to a CSV-imported trade and a subsequent CSV import includes the broker's version of that fill, `fill_exists()` (checking `broker_trade_id + account_id`) will not match the user's manual fill (whose `broker_trade_id` is a generated UUID). Both fills would be present. Bhima must document this in the service code: if a user adds a manual fill as a gap-repair and then a corrected CSV import arrives, the manual fill must be excluded via fill_exclusions before re-importing, or the position will be double-counted. This is a user-workflow concern, not a data model defect.
+
+**Phase 2 note:** Mixed-provenance trades should be visually distinguished in the trade list and detail view (Step 19). A `has_manual_fills` derived field is a query-time computation; no schema change is required now.
+
+---
+
 ## Backend Scope (Owner: Bhima)
 
 ### Task B-16-A — Migration 0015: Soft-Delete and Import Source
@@ -163,6 +191,10 @@ Validation rules (applied in the endpoint before calling any service):
 - Fills must be in strictly ascending timestamp order — return 422 `FILLS_NOT_CHRONOLOGICAL` if any fill is ≤ the prior fill's timestamp.
 - For `instrument_type` of `FUT`, `CE`, `PE`: `expiry_date` must be provided — return 422 `EXPIRY_DATE_REQUIRED`.
 - For `instrument_type` of `CE`, `PE`: `strike_price` must be provided — return 422 `STRIKE_PRICE_REQUIRED`.
+- `product_type` must be valid for `instrument.instrument_type` per Indian exchange domain rules (D1 — Ganesha). Equities use MIS/CNC only; F&O uses MIS/NRML only. CNC is not a valid product type on derivative instruments; NRML is not a valid product type for equity:
+  - `instrument_type = EQ` → `product_type` must be `MIS` or `CNC` — return 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` if `NRML`
+  - `instrument_type = FUT` → `product_type` must be `MIS` or `NRML` — return 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` if `CNC`
+  - `instrument_type = CE` or `PE` → `product_type` must be `MIS` or `NRML` — return 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` if `CNC`
 
 **`AddFillRequest`** — request body for `POST /v1/trades/{id}/fills`:
 
@@ -211,7 +243,14 @@ Creates a new trade from manual fills.
 1. Validate the request body (timestamp ordering, expiry/strike presence for F&O).
 2. Resolve `account_id` — verify the account exists, is ACTIVE, and belongs to the authenticated user (use `TradingAccountService.get()`). Return 404 `ACCOUNT_NOT_FOUND` if not.
 3. Resolve `instrument_id` via `InstrumentRepository.find_for_fill()`. Return 422 `INSTRUMENT_NOT_FOUND` with `{symbol, exchange_segment, instrument_type}` detail if not found.
-4. For each fill in `request.fills`: call `FillRepository.insert_normalized_fill()` with `import_source="MANUAL"`, `broker="MANUAL"`, `fill_id=None`, `order_id=None`, `is_expiry_squareoff=False`, `is_auction=False`.
+4. For each fill in `request.fills`: construct a `NormalizedFill` and call `FillRepository.insert_normalized_fill()`. For manual fills, set fields as follows (D5 — Ganesha):
+   - `broker_trade_id = str(uuid.uuid4())` — a freshly generated UUID string per fill. Manual fills have no broker fill ID; a UUID satisfies the `NormalizedFill.broker_trade_id: str` type contract (non-optional) and guarantees uniqueness without conflicting with the partial unique index `uq_fills_broker_trade_account`. The `broker='MANUAL'` + `import_source='MANUAL'` markers on each fill row permanently identify it as a manual entry.
+   - `broker_order_id = str(uuid.uuid4())` — same rationale; one UUID per fill, independent of `broker_trade_id`.
+   - `import_source = "MANUAL"`
+   - `broker = "MANUAL"`
+   - `is_expiry_squareoff = False`
+   - `is_auction = False`
+   - Do **not** call `fill_exists()` before inserting manual fills. That method deduplicates on `broker_trade_id + account_id`, which is meaningful only for broker-sourced fills where the broker assigns a stable fill ID. For manual fills the UUID is generated at call time — it is always unique. Every `POST /v1/trades` call always creates new fills; deduplication at the manual entry level is the user's responsibility.
    - Derive `session` from `fill_timestamp` converted to `Asia/Kolkata` local time. The `execution_fills.session` column has a DB check constraint permitting only three values: `'PRE_OPEN'`, `'REGULAR'`, `'POST_CLOSE'`. Map as follows:
      - `'PRE_OPEN'` — IST time before 09:15
      - `'REGULAR'` — IST time 09:15 to 15:30 (inclusive)
@@ -228,11 +267,15 @@ Creates a new trade from manual fills.
 
 **Response:** `201 Created` with `TradeOut`.
 
+> **Multi-cycle behavior (D4 — Ganesha):** If the submitted fills span a complete position cycle and then reopen — e.g., BUY 100 → SELL 100 → BUY 50 for the same instrument + product_type — the reconstruction engine creates more than one trade via FIFO boundary detection. The `201 Created` response returns only the trade identified by `result.affected_trade_id`, which is the trade affected by the final fill. Earlier trades created within the same call (e.g., a fully closed trade from the first BUY→SELL cycle) are persisted and will appear in the trade list (Step 19), but are not returned in this response. This is expected and correct behavior: trade boundaries are determined by the reconstruction engine at position-zero crossings, not by the API caller. Test B-16-27 covers this case.
+
 ---
 
 #### `POST /v1/trades/{trade_id}/fills`
 
 Adds a fill to an existing trade in OPEN or PARTIAL status.
+
+> **Domain ruling (D3 — Ganesha):** This endpoint permits adding manual fills to trades of any origin — including CSV-imported trades. Mixed-provenance trades (some fills from broker CSV, some from manual entry) are a valid state and support the gap-repair use case. If a user adds a manual fill as gap-repair and a corrected CSV import later arrives containing the broker's version of that fill, the manual fill must be excluded via fill_exclusions before re-importing to prevent double-counting. Document this in the `TradeService.add_fill()` code.
 
 **Implementation sequence:**
 
@@ -256,9 +299,10 @@ Soft-deletes a manually entered trade.
 
 **Implementation sequence:**
 
+0. Fetch all `execution_fills` where `trade_id = trade_id`. If any fill has `import_source ≠ 'MANUAL'`, return 422 `TRADE_NOT_MANUAL` — "This trade contains broker-imported fills and cannot be deleted via this endpoint. Use the fill exclusion mechanism to dispute specific fills." See Domain Ruling D2.
 1. Look up the trade by `trade_id`. Return 404 `TRADE_NOT_FOUND` if not found or already `is_deleted = true`.
 2. Verify ownership (same as above). Return 403 `TRADE_NOT_OWNED` if mismatch.
-3. Fetch all `execution_fills` where `trade_id = trade_id` (both ENTRY and EXIT fills).
+3. The fills are already fetched from step 0. Filter to those not yet excluded.
 4. For each fill: call `FillExclusionRepository.exists_by_fill_id(fill.id)`. If not already excluded, call `FillExclusionRepository.create_exclusion()` with:
    - `fill_id = fill.id`
    - `reason = "USER_DELETED_TRADE"`
@@ -365,6 +409,10 @@ All tests follow the existing `AsyncClient` + pytest-asyncio + conftest pattern.
 | B-16-19 | `DELETE /v1/trades/{id}` on another user's trade returns 403 `TRADE_NOT_OWNED` |
 | B-16-20 | Soft-deleted trade fills are present in `fill_exclusions` after `DELETE` |
 | B-16-21 | `is_deleted` trades do not appear in `GET /v1/analytics/summary` — integration guard |
+| B-16-24 | `POST /v1/trades` with `instrument_type=EQ` and `product_type=NRML` returns 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` (D1) |
+| B-16-25 | `POST /v1/trades` with `instrument_type=FUT` and `product_type=CNC` returns 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` (D1) |
+| B-16-26 | `DELETE /v1/trades/{id}` on a CSV-imported trade returns 422 `TRADE_NOT_MANUAL` (D2) |
+| B-16-27 | `POST /v1/trades` with fills spanning a close-and-reopen cycle (BUY→SELL→BUY) returns 201 with the second (OPEN) trade; first (CLOSED) trade is persisted in the database with correct P&L (D4) |
 
 **New file:** `backend/tests/unit/application/test_trade_service.py`
 
@@ -617,7 +665,7 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| Sahadeva QA | Sahadeva | All 35 new tests pass (B-16-01 through B-16-23, F-16-01 through F-16-12); no regressions in Steps 12–15 tests; `is_deleted` predicate verified in analytics integration guard (B-16-21) |
+| Sahadeva QA | Sahadeva | All 39 new tests pass (B-16-01 through B-16-27, F-16-01 through F-16-12); no regressions in Steps 12–15 tests; `is_deleted` predicate verified in analytics integration guard (B-16-21); D1/D2 validation confirmed by B-16-24 through B-16-26; D4 multi-cycle behavior confirmed by B-16-27 |
 | Nakula CI | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes thresholds; `tsc --noEmit` clean; ESLint 0 warnings; `alembic upgrade head` applies cleanly from 0014 head |
 | Yudhishthira accept | Yudhishthira | Add Trade screen accessible from nav; OPEN trade created from entry fill; CLOSED trade with P&L created from entry+exit fills; soft-delete removes trade from analytics view |
 
