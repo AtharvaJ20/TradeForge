@@ -5,7 +5,7 @@
 **Date:** 2026-09-06  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-16-manual-trade-entry` (base: `main` after Step 15 merged as PR #9)  
-**Status:** READY TO IMPLEMENT — no external sign-off required before work begins
+**Status:** READY TO IMPLEMENT — Ganesha (2026-09-06) + Dhanvantari (2026-09-06) reviews complete; all blocking corrections applied
 
 ---
 
@@ -71,7 +71,7 @@ Formal rulings resolving domain ambiguities identified during the pre-implementa
 
 **Rationale:** The CSV import pipeline represents broker-verified, exchange-confirmed execution data. A trade created from a CSV import is the broker's record of what happened; it is not the user's assertion. Allowing users to soft-delete CSV-imported trades would permanently remove auditable broker records from analytics with no reconciliation trail — the fill exclusion entries would record the user's intent but not any broker dispute. If a user needs to dispute a specific broker-imported fill (wrong price, wrong quantity, data error), the correct path is the fill exclusion mechanism, which preserves the original fill in the database and records the dispute as an audit event. Manual trades, by contrast, are entirely user-asserted; the user is both the source and the authority, and they should be able to correct or remove their own entries freely.
 
-**Implementation effect:** Step 0 added to the DELETE sequence — see B-16-B.
+**Implementation effect:** Step 2 added to the DELETE sequence, after ownership verification — see B-16-B. (Corrected by Dhanvantari: fill provenance must not be disclosed before the caller is verified as the trade owner.)
 
 ---
 
@@ -260,8 +260,9 @@ Creates a new trade from manual fills.
 5. Flush (not commit) after all fills are inserted, so they are visible to the reconstruction query within the same transaction.
 6. Run `ReconstructionEngine.run(session, user_id, account_id, instrument_id, product_type, instrument_type)`. Pass `instrument_type` from `request.instrument.instrument_type` — the engine requires it to disambiguate `NRML_FUT` from `NRML_OPT` at trade-open time. On `ReconstructionError` — rollback and return 422 `RECONSTRUCTION_FAILED` with the error detail.
 7. The `run()` call returns a `ReconstructionResult`. Obtain the trade ID from `result.affected_trade_id` (see B-16-D — `ReconstructionResult` must be extended with this field). This is the trade that was created or last modified by the run.
-8. If any trades were closed by the reconstruction (`result.trades_closed > 0`), run `PnlService.backfill_all_closed()`.
-9. If `planned_stop` or `planned_target` was provided, update the `trades` row identified by `result.affected_trade_id` with those values via `TradeRepository.update_trade()`. The reconstruction engine does not set these fields.
+8. If `planned_stop` or `planned_target` was provided, update the `trades` row identified by `result.affected_trade_id` with those values via `TradeRepository.update_trade()`. Flush immediately (not commit) so `planned_stop` is visible within the transaction before the P&L backfill reads it. The reconstruction engine does not set these fields.
+   > **Ordering constraint (Dhanvantari BLK-1):** This step must execute BEFORE step 9. `PnlService.backfill_all_closed()` reads `trades.planned_stop` from the database to compute `r_multiple`. If `planned_stop` is written after the backfill runs, the backfill reads NULL and persists a NULL R-multiple permanently — there is no subsequent recalculation. Flush after `update_trade()`, then proceed to step 9.
+9. If any trades were closed by the reconstruction (`result.trades_closed > 0`), run `PnlService.backfill_all_closed()`. `planned_stop` is now present in the database within this transaction, so R-multiple is computed correctly for any manually entered closed trade that provided a planned stop.
 10. Commit.
 11. Query the `Trade` ORM row by `result.affected_trade_id` and return `TradeOut`.
 
@@ -299,10 +300,11 @@ Soft-deletes a manually entered trade.
 
 **Implementation sequence:**
 
-0. Fetch all `execution_fills` where `trade_id = trade_id`. If any fill has `import_source ≠ 'MANUAL'`, return 422 `TRADE_NOT_MANUAL` — "This trade contains broker-imported fills and cannot be deleted via this endpoint. Use the fill exclusion mechanism to dispute specific fills." See Domain Ruling D2.
-1. Look up the trade by `trade_id`. Return 404 `TRADE_NOT_FOUND` if not found or already `is_deleted = true`.
-2. Verify ownership (same as above). Return 403 `TRADE_NOT_OWNED` if mismatch.
-3. The fills are already fetched from step 0. Filter to those not yet excluded.
+0. Look up the trade by `trade_id`. Return 404 `TRADE_NOT_FOUND` if not found or already `is_deleted = true`.
+1. Verify the trade's `account_id` belongs to the authenticated user (join with `trading_accounts` or re-use `TradingAccountService`). Return 403 `TRADE_NOT_OWNED` if mismatch.
+   > **Auth boundary (Dhanvantari BLK-2):** Steps 0–1 establish identity before any fill data is accessed. Without this ordering, an unauthenticated caller can probe fill provenance (CSV vs. MANUAL) on any trade UUID in the system by observing whether the response is 422 `TRADE_NOT_MANUAL` vs. 403/404 — an information-disclosure vulnerability. No fill data is fetched until ownership is confirmed.
+2. Fetch all `execution_fills` where `trade_id = trade_id`. If any fill has `import_source ≠ 'MANUAL'`, return 422 `TRADE_NOT_MANUAL` — "This trade contains broker-imported fills and cannot be deleted via this endpoint. Use the fill exclusion mechanism to dispute specific fills." See Domain Ruling D2.
+3. Filter fills to those not yet excluded.
 4. For each fill: call `FillExclusionRepository.exists_by_fill_id(fill.id)`. If not already excluded, call `FillExclusionRepository.create_exclusion()` with:
    - `fill_id = fill.id`
    - `reason = "USER_DELETED_TRADE"`
@@ -413,6 +415,7 @@ All tests follow the existing `AsyncClient` + pytest-asyncio + conftest pattern.
 | B-16-25 | `POST /v1/trades` with `instrument_type=FUT` and `product_type=CNC` returns 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` (D1) |
 | B-16-26 | `DELETE /v1/trades/{id}` on a CSV-imported trade returns 422 `TRADE_NOT_MANUAL` (D2) |
 | B-16-27 | `POST /v1/trades` with fills spanning a close-and-reopen cycle (BUY→SELL→BUY) returns 201 with the second (OPEN) trade; first (CLOSED) trade is persisted in the database with correct P&L (D4) |
+| B-16-28 | `POST /v1/trades` with entry + exit fills and `planned_stop` returns 201 where the corresponding `trade_pnl` record has a non-NULL `r_multiple` computed from `planned_stop` — verifies that `planned_stop` is written before `PnlService.backfill_all_closed()` runs (Dhanvantari BLK-1) |
 
 **New file:** `backend/tests/unit/application/test_trade_service.py`
 
@@ -554,6 +557,10 @@ Fill rows are ordered by (date, time). The frontend enforces no duplicate timest
 - At least 1 fill.
 - Each fill: side, quantity (> 0), price (> 0), date, and time are all required.
 - Fills must be in chronological order (date+time ascending) — show inline error on the offending row.
+- `product_type` must be valid for the selected `instrument_type` (enforced inline on `instrument_type` change, not after submission — D1 — Ganesha):
+  - `instrument_type = EQ` → disable the `NRML` option in the Product Type select. Show helper text below the select: "NRML is not valid for equity instruments — use MIS (intraday) or CNC (delivery)."
+  - `instrument_type = FUT`, `CE`, or `PE` → disable the `CNC` option in the Product Type select. Show helper text: "CNC is not valid for F&O instruments — use MIS (intraday) or NRML (overnight)."
+  - Preferred implementation: disable the invalid option (not hide it) so the user can see it exists but is unavailable for the selected instrument type. If the user's current `product_type` selection becomes invalid when `instrument_type` changes, reset the `product_type` field to force an explicit new selection rather than silently submitting an invalid combination.
 
 **On success:** Navigate to `/trades` (the Trade List page — implemented in Step 19). For Step 16, since that page is still a placeholder, show a success toast and navigate to `/trades`. The toast should read "Trade added successfully."
 
@@ -606,6 +613,7 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 | F-16-10 | Submit button is disabled while request is in flight |
 | F-16-11 | On `INSTRUMENT_NOT_FOUND` response, shows inline error message |
 | F-16-12 | On success, shows success toast |
+| F-16-13 | When instrument type changes to FUT, the CNC option in the Product Type select is disabled and cannot be selected; when instrument type changes to EQ, the NRML option is disabled (D1 — Dhanvantari REQ-1) |
 
 ---
 
@@ -630,6 +638,9 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 1. Check the `execution_fills.import_source` check constraint in `0002_trade_domain_tables.py` — note whether it exists and what it accepts.
 2. Write migration `0015_manual_trade_soft_delete.py` — run `alembic upgrade head` locally, verify clean.
 3. Audit `analytics_repo.py`, `risk_service.py`, `trade_repo.py`, `pnl_repo.py`, `journal_repo.py` for trade queries — add `is_deleted = false` predicate to each.
+
+   > **Gate — B-16-C must be verified before proceeding to step 4 (Dhanvantari REQ-4):** Before implementing `TradeService`, manually verify that `TradeRepository.get_open_trade_with_lock()` correctly excludes soft-deleted trades: (a) create a trade, (b) set `is_deleted = true` directly in the DB, (c) assert that `get_open_trade_with_lock()` returns `None` for that instrument/account/product_type unit. Do not proceed to `TradeService` or the router until this assertion passes. The DELETE endpoint creates soft-deleted OPEN trades — if this filter is missing, the next reconstruction run for the same processing unit silently treats the deleted trade as an active open position and corrupts the trade history.
+
 4. Create `backend/src/tradeforge/application/trade_service.py` — `TradeService` with `create_trade`, `add_fill`, `soft_delete_trade`.
 5. Create `backend/src/tradeforge/api/v1/trades.py` — three routes, thin router calling `TradeService`.
 6. Wire `trades` router into `main.py`.
@@ -658,6 +669,8 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 | R-16-3 | `fill_timestamp` timezone handling — user enters local IST time, frontend sends UTC offset incorrectly | Medium | Medium | Frontend must produce ISO 8601 with explicit +05:30 offset (not UTC `Z`). Backend stores as UTC after converting. Test B-16-01 must verify `first_fill_at` timezone round-trips correctly. |
 | R-16-4 | `DELETE /v1/trades/{id}` on a trade that has a journal entry — journal orphaned | Low | Low | Journal entries reference `trade_id` via FK. After soft-delete, `is_deleted = true` but the trade row still exists (soft-delete, not hard delete), so the FK remains valid. The journal entry becomes orphaned in UX terms (no trade to navigate to) but there is no data integrity problem. Step 19 will handle journal visibility filtering. Acceptable for Phase 1 — document in code. |
 | R-16-5 | Phase 1 has no instrument symbol master — user must know exact symbol and segment | Accepted | Low | Accepted for Phase 1. Phase 2 will add symbol search/autocomplete from NSE master. Document on the Add Trade screen with a placeholder-text hint (e.g. "RELIANCE", "NIFTY24OCTFUT"). |
+| R-16-6 | Manual gap-repair fill (D3) inflates at-risk calculation during the window between adding the manual fill and receiving a corrected CSV. If the corrected CSV arrives without first excluding the manual fill, both fills persist — position is double-counted and at-risk is permanently overstated until the user manually excludes the fill. Phase 1 has no fill-exclusion UI. | Low | Medium | Document in `TradeService.add_fill()` code. Add a UI tooltip on the "Add Fill" action on an existing trade: "Added fills cannot be undone from this screen. If you entered a fill in error, contact support." Phase 2 must include a fill exclusion UI. (Dhanvantari REQ-2) |
+| R-16-7 | CSV-imported OPEN trades on INACTIVE accounts have no Phase 1 clearing path — `DELETE` is blocked (D2: not MANUAL), CSV import is blocked (`get_active()`), and the at-risk calculation persists indefinitely with no normal user-facing correction flow. | Low | Medium | Document at `TradingAccountService.get_active()` call sites. Phase 2 must include: (a) a fill exclusion UI for individual fills, or (b) a closing-fill workflow that bypasses the account-active check for existing OPEN positions on INACTIVE accounts. Account administrative status does not mean positions were closed — do not filter INACTIVE accounts out of at-risk queries. (Dhanvantari REQ-3) |
 
 ---
 
@@ -665,7 +678,7 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| Sahadeva QA | Sahadeva | All 39 new tests pass (B-16-01 through B-16-27, F-16-01 through F-16-12); no regressions in Steps 12–15 tests; `is_deleted` predicate verified in analytics integration guard (B-16-21); D1/D2 validation confirmed by B-16-24 through B-16-26; D4 multi-cycle behavior confirmed by B-16-27 |
+| Sahadeva QA | Sahadeva | All 41 new tests pass (B-16-01 through B-16-28, F-16-01 through F-16-13); no regressions in Steps 12–15 tests; `is_deleted` predicate verified in analytics integration guard (B-16-21); D1/D2 validation confirmed by B-16-24 through B-16-26; D4 multi-cycle behavior confirmed by B-16-27; R-multiple correctness with `planned_stop` confirmed by B-16-28; D1 frontend select disabling confirmed by F-16-13 |
 | Nakula CI | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes thresholds; `tsc --noEmit` clean; ESLint 0 warnings; `alembic upgrade head` applies cleanly from 0014 head |
 | Yudhishthira accept | Yudhishthira | Add Trade screen accessible from nav; OPEN trade created from entry fill; CLOSED trade with P&L created from entry+exit fills; soft-delete removes trade from analytics view |
 
@@ -691,4 +704,6 @@ This is within the Phase 1 plan estimate of 1–2 sessions, at the high end due 
 ---
 
 *Krishna — Senior Project Manager*  
+*Domain review: Ganesha (Trading Domain Analyst) — 2026-09-06 — D1 through D5 rulings*  
+*Risk review: Dhanvantari (Risk Management Engineer) — 2026-09-06 — BLK-1, BLK-2, REQ-1 through REQ-4 applied*  
 *Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `backend/src/tradeforge/infrastructure/repositories/fill_repo.py`, `backend/src/tradeforge/application/trade/reconstruction.py`, `backend/src/tradeforge/domain/import_domain/types.py`, `frontend/src/app.tsx`, `frontend/src/features/accounts/context/AccountContext.tsx`*
