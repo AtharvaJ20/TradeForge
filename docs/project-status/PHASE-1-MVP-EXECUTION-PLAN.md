@@ -3,7 +3,7 @@
 **Document:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Author:** Krishna (Project Manager)  
 **Date:** 2026-09-05  
-**Base state:** Steps 1–14 complete, CI GREEN, branch `main` (after `feat/step-14-execution-plan` merged)  
+**Base state:** Steps 1–15 complete, CI GREEN, branch `main` (after `feat/step-15-profile-account-management` merged as PR #9); Step 16 in progress on `feat/step-16-manual-trade-entry`  
 **Source of truth for scope:** `docs/requirements/REQUIREMENTS.md` v1.1 §38  
 **Status:** ACTIVE — update as steps close
 
@@ -60,8 +60,9 @@ Steps 1–12.5 are done. Do not re-do or revisit these. They are foundation — 
 | 12.6–12.7 | Analytics completion: R-distribution, dimension breakdown, rolling expectancy, time-of-day, Kelly fraction | ✅ Yudhishthira 2026-09-04 |
 | 13 | Basic risk metrics (RiskSummaryCard, `/v1/risk/summary`) | ✅ Yudhishthira 2026-09-05 |
 | 14 | Frontend Navigation Shell + Auth Screens (React Router, AuthContext, 6 auth screen components, AppShell, RequireAuth, session-expired redirect, skip-link a11y) | ✅ Yudhishthira 2026-09-05 |
+| 15 | User Profile + Account/Broker Management (GET/PATCH /v1/users/me, PATCH/DELETE /v1/accounts/{id}, Settings screen, CreateAccountModal, EditAccountModal, DeactivateConfirmDialog, useFocusTrap hook) | ✅ Yudhishthira 2026-09-05 |
 
-**Test totals as of Step 14:** 501 backend tests (84.91% coverage), 245 frontend tests (87.43% coverage).
+**Test totals as of Step 15:** 405 backend tests, 266 frontend tests (266/266 pass).
 
 ---
 
@@ -207,7 +208,11 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Per-account fee configuration UI (charge schedules exist in backend — UI deferred Phase 2)
 - OAuth account linking (Phase 3)
 
-**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-05** (Sahadeva GO · Nakula CI GREEN)  
+**Test totals:** 405 backend tests, 266 frontend tests (266/266 pass)  
+**Branch:** `feat/step-15-profile-account-management` (merged to `main` via PR #9, commit `6cdbd31`)  
+**Notes:** BUG-QA-15-01 (missing focus trap on all three dialogs) fixed via `useFocusTrap` hook. BUG-QA-15-02 (B-15-13 mislabeled — tested wrong scenario) fixed; idempotency guarantee confirmed at repo layer (UPDATE always sets `updated_at=now()`, rowcount=1 for any owned account).
 
 ---
 
@@ -217,6 +222,7 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Owner:** Bhima (backend endpoint), Arjun (frontend screen)  
 **Estimate:** 1–2 sessions  
 **Dependency:** Step 15 (account selection)  
+**Execution plan:** `docs/project-status/STEP-16-EXECUTION-PLAN.md`  
 
 **Backend scope (Bhima):**
 - `POST /v1/trades` — create a trade from manual fill data
@@ -452,7 +458,8 @@ Phase 1 is DONE when all of the following are true simultaneously:
 - [x] Step 12.7 accepted by Yudhishthira ✅ 2026-09-04
 - [x] Step 13 accepted by Yudhishthira ✅ 2026-09-05
 - [x] Step 14 accepted by Yudhishthira ✅ 2026-09-05
-- [ ] Steps 15, 16, 17, 18, 19 accepted by Yudhishthira
+- [x] Step 15 accepted by Yudhishthira ✅ 2026-09-05
+- [ ] Steps 16, 17, 18, 19 accepted by Yudhishthira
 - [ ] Step 20 security hardening accepted by Hanuman
 - [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
 - [ ] Track QA E2E suite (J-1 through J-9) passing on staging
@@ -491,7 +498,9 @@ Phase 1 is DONE when all of the following are true simultaneously:
 ```
 
 **Steps that can start immediately (no pending decision):**
-- Step 15 (Bhima + Arjun) — Step 14 is now complete
+- Step 16 (Bhima + Arjun) — Step 15 is now complete
+- Step 17 (Arjun + Bhima) — Step 15 is now complete (parallel with Step 16)
+- Step 18 (Arjun + Bhima) — Step 15 is now complete (parallel with Steps 16/17)
 - Step 20 design (Hanuman)
 
 **Steps blocked on Atharva's cloud/domain decisions:**
