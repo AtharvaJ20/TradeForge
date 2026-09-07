@@ -674,6 +674,13 @@ export const handlers = [
   http.delete(`${BASE}/v1/journal/trades/:tradeId/attachments/:attachmentId`, () => {
     return new HttpResponse(null, { status: 204 })
   }),
+
+  // ---------------------------------------------------------------------------
+  // Step 16 — Trades handlers (default: success)
+  // ---------------------------------------------------------------------------
+  http.post(`${BASE}/v1/trades`, () => HttpResponse.json(TRADE_OPEN_FIXTURE, { status: 201 })),
+  http.post(`${BASE}/v1/trades/:id/fills`, () => HttpResponse.json(TRADE_OPEN_FIXTURE)),
+  http.delete(`${BASE}/v1/trades/:id`, () => new HttpResponse(null, { status: 204 })),
 ]
 
 /** Override handler: GET returns 404 (no journal entry). */
@@ -794,6 +801,50 @@ export const accountsEmptyHandler = http.get(`${BASE}/v1/accounts`, () =>
 
 export const createAccountInvalidHandler = http.post(`${BASE}/v1/accounts`, () =>
   new HttpResponse(JSON.stringify({ detail: 'VALIDATION_ERROR' }), {
+    status: 422,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)
+
+// ---------------------------------------------------------------------------
+// Step 16 — Trades fixtures
+// ---------------------------------------------------------------------------
+
+export const TRADE_OPEN_FIXTURE = {
+  id: '00000000-0000-0000-0000-000000000101',
+  account_id: '00000000-0000-0000-0000-000000000001',
+  instrument_id: '00000000-0000-0000-0000-000000000201',
+  trade_type: 'MIS',
+  direction: 'LONG',
+  status: 'OPEN',
+  trade_date: '2026-09-06',
+  first_fill_at: '2026-09-06T04:45:00Z',
+  last_fill_at: null,
+  total_entry_quantity: '10',
+  total_exit_quantity: '0',
+  net_position: '10',
+  average_entry: '500.00',
+  average_exit: null,
+  planned_stop: null,
+  planned_target: null,
+  is_deleted: false,
+  created_at: '2026-09-06T04:45:00Z',
+  updated_at: '2026-09-06T04:45:00Z',
+}
+
+// ---------------------------------------------------------------------------
+// Step 16 — Trades override handlers
+// ---------------------------------------------------------------------------
+
+export const createTradeInstrumentNotFoundHandler = http.post(`${BASE}/v1/trades`, () =>
+  new HttpResponse(JSON.stringify({ detail: 'INSTRUMENT_NOT_FOUND' }), {
+    status: 422,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)
+
+export const createTradeFillsNotChronologicalHandler = http.post(`${BASE}/v1/trades`, () =>
+  new HttpResponse(JSON.stringify({ detail: 'FILLS_NOT_CHRONOLOGICAL' }), {
     status: 422,
     headers: { 'Content-Type': 'application/json' },
   }),

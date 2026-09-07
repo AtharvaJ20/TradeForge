@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/features/auth/context/AuthContext'
 
 const NAV_ITEMS = [
@@ -38,9 +38,25 @@ export function AppShell() {
           <ul className="flex flex-col gap-1">
             {NAV_ITEMS.map((item) => (
               <li key={item.path}>
-                <NavLink to={item.path} end={item.end} className={navLinkClass}>
-                  {item.label}
-                </NavLink>
+                {item.path === '/trades' ? (
+                  <div className="flex items-center gap-1">
+                    <NavLink to={item.path} end={item.end} className={navLinkClass}>
+                      {item.label}
+                    </NavLink>
+                    <Link
+                      to="/trades/new"
+                      title="Add Trade"
+                      aria-label="Add Trade"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
+                      +
+                    </Link>
+                  </div>
+                ) : (
+                  <NavLink to={item.path} end={item.end} className={navLinkClass}>
+                    {item.label}
+                  </NavLink>
+                )}
               </li>
             ))}
           </ul>
