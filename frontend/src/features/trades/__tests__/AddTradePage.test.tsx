@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { AccountProvider } from '@/features/accounts/context/AccountContext'
 import { AddTradePage } from '../AddTradePage'
@@ -11,6 +11,24 @@ import {
   createTradeInstrumentNotFoundHandler,
 } from '@/__tests__/msw/handlers'
 import { server } from '@/__tests__/msw/server'
+
+// ---------------------------------------------------------------------------
+// /trades stub: reads success message from navigation state so F-16-12 can
+// verify the toast after navigation.
+// ---------------------------------------------------------------------------
+
+function TradesRoute() {
+  const location = useLocation()
+  const state = location.state as { successMessage?: string } | null
+  return (
+    <div>
+      {state?.successMessage && (
+        <div role="status">{state.successMessage}</div>
+      )}
+      Trades list page
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Render helper: wraps AddTradePage with AccountProvider and MemoryRouter.
@@ -23,7 +41,7 @@ function renderPage() {
       <AccountProvider>
         <Routes>
           <Route path="/trades/new" element={<AddTradePage />} />
-          <Route path="/trades" element={<div>Trades list page</div>} />
+          <Route path="/trades" element={<TradesRoute />} />
         </Routes>
       </AccountProvider>
     </MemoryRouter>,

@@ -141,7 +141,6 @@ export function AddTradePage() {
   // UI state
   const [errors, setErrors] = useState<FormErrors>({})
   const [apiError, setApiError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Default account to selected on load
@@ -150,13 +149,6 @@ export function AddTradePage() {
       setAccountId(selectedAccount.id)
     }
   }, [accountsLoading, selectedAccount, accountId])
-
-  // Navigate to /trades after showing success message
-  useEffect(() => {
-    if (successMessage) {
-      navigate('/trades')
-    }
-  }, [successMessage, navigate])
 
   // When instrument type changes, reset invalid product type and clear conditional fields
   function handleInstrumentTypeChange(newType: InstrumentType | '') {
@@ -278,7 +270,7 @@ export function AddTradePage() {
     setIsSubmitting(true)
     try {
       await tradesApi.create(body)
-      setSuccessMessage('Trade added successfully.')
+      navigate('/trades', { state: { successMessage: 'Trade added successfully.' } })
     } catch (err) {
       if (err instanceof ApiError) {
         setApiError(err.detail)
@@ -297,12 +289,6 @@ export function AddTradePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-bold text-text-primary">Add Trade</h1>
-
-      {successMessage && (
-        <div role="status" className="mb-4 rounded-lg bg-surface-success px-4 py-3 text-sm text-success-emphasis">
-          {successMessage}
-        </div>
-      )}
 
       {apiError && (
         <div role="alert" className="mb-4 rounded-lg bg-surface-danger px-4 py-3 text-sm text-danger-emphasis">
