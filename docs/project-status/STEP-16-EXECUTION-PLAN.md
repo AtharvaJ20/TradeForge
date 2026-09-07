@@ -301,16 +301,18 @@ Soft-deletes a manually entered trade.
 **Implementation sequence:**
 
 0. Look up the trade by `trade_id`. Return 404 `TRADE_NOT_FOUND` if not found or already `is_deleted = true`.
-1. Verify the trade's `account_id` belongs to the authenticated user (join with `trading_accounts` or re-use `TradingAccountService`). Return 403 `TRADE_NOT_OWNED` if mismatch.
+1. Verify the trade's `account_id` belongs to the authenticated user using an **ownership-only query**: `SELECT id FROM trading_accounts WHERE id = trade.account_id AND user_id = authenticated_user_id`. Return 403 `TRADE_NOT_OWNED` if no row is returned.
+   > **Implementation constraint (Mayasura A-16-4):** Do NOT use `TradingAccountService.get()` or `TradingAccountService.get_active()` here. Both methods check `ACTIVE` account status, which would incorrectly block deletion of trades that belong to a now-deactivated trading account. A trade's account being deactivated does not revoke the user's right to delete their own manually entered trade. The ownership check must be a direct query against `trading_accounts` filtering only on `id` and `user_id`, with no status condition.
    > **Auth boundary (Dhanvantari BLK-2):** Steps 0–1 establish identity before any fill data is accessed. Without this ordering, an unauthenticated caller can probe fill provenance (CSV vs. MANUAL) on any trade UUID in the system by observing whether the response is 422 `TRADE_NOT_MANUAL` vs. 403/404 — an information-disclosure vulnerability. No fill data is fetched until ownership is confirmed.
 2. Fetch all `execution_fills` where `trade_id = trade_id`. If any fill has `import_source ≠ 'MANUAL'`, return 422 `TRADE_NOT_MANUAL` — "This trade contains broker-imported fills and cannot be deleted via this endpoint. Use the fill exclusion mechanism to dispute specific fills." See Domain Ruling D2.
-3. Filter fills to those not yet excluded. If the filtered list is empty (all fills were already individually excluded), proceed directly to step 5 — the DELETE still succeeds and sets `is_deleted = true`. This is correct and expected: a user who excluded all fills one by one via the fill-exclusion mechanism should still be able to soft-delete the resulting empty trade shell. The two operations (fill exclusion and trade soft-delete) are independent. (AMB-02 — Ganesha)
-4. For each fill: call `FillExclusionRepository.exists_by_fill_id(fill.id)`. If not already excluded, call `FillExclusionRepository.create_exclusion()` with:
+3. Call `FillExclusionRepository.get_excluded_fill_ids_for_trade(trade_id)` — **one batch query** that returns the set of all already-excluded fill UUIDs for this trade. Compute `fills_to_exclude = [f for f in fills if f.id not in excluded_fill_ids]`. If `fills_to_exclude` is empty (all fills were already individually excluded), proceed directly to step 5 — the DELETE still succeeds and sets `is_deleted = true`. This is correct and expected: a user who excluded all fills one by one via the fill-exclusion mechanism should still be able to soft-delete the resulting empty trade shell. The two operations (fill exclusion and trade soft-delete) are independent. (AMB-02 — Ganesha)
+   > **Implementation constraint (Mayasura A-16-5):** `get_excluded_fill_ids_for_trade(trade_id)` must be added to `FillExclusionRepository` as part of B-16-B if it does not already exist. It issues a single `SELECT fill_id FROM fill_exclusions WHERE fill_id IN (SELECT id FROM execution_fills WHERE trade_id = :trade_id)` (or an equivalent join) and returns a `set[uuid.UUID]`. This replaces the per-fill `exists_by_fill_id()` pattern, which would issue N queries for a trade with N fills — an O(N) query amplification that causes unnecessary DB round-trips.
+4. For each fill in `fills_to_exclude`: call `FillExclusionRepository.create_exclusion()` with:
    - `fill_id = fill.id`
    - `reason = "USER_DELETED_TRADE"`
    - `replacement_fill_ids = []` (no replacement fills for user-initiated deletion)
    - `excluded_by = user_id` (authenticated user)
-   If `exists_by_fill_id()` returns True, skip that fill — the exclusion is already permanent.
+   Do NOT call `exists_by_fill_id()` here — the batch query in step 3 already resolved which fills need exclusion records. Calling it again per fill reintroduces the N+1 pattern.
 5. Set `trades.is_deleted = true` for this trade via `TradeRepository.update_trade()`. **Do not change `trades.status`** — the status (OPEN, PARTIAL, or CLOSED) is left as-is. The `is_deleted` flag is the authoritative deletion signal; `status` remains accurate for audit purposes.
 6. Commit.
 7. Return `204 No Content`.
@@ -377,6 +379,7 @@ class ReconstructionResult:
 The reconstruction engine must set `result.affected_trade_id` to the trade it opened or continued processing fills against. Specifically:
 - When the engine opens a new trade: set `result.affected_trade_id = trade_id` at the point where `result.trades_opened += 1`.
 - When the engine resumes an existing OPEN/PARTIAL trade (i.e., `open_trade is not None` at step 4 of `run()`): set `result.affected_trade_id = open_trade.id` before the fill loop begins.
+- **`affected_trade_id` is always overwritten at every `trades_opened += 1` event — not only on the first open.** For the D4 multi-cycle case (BUY→SELL→BUY: first trade closes, second trade opens in the same run), the second `trades_opened += 1` must overwrite the field so the 201 response returns the last OPEN trade, not the closed first trade. After `run()` returns, `result.affected_trade_id` always identifies the trade created or last operated on — the one whose ORM row `TradeService` must query and return as `TradeOut`.
 
 This field is used by `TradeService.create_trade()` to identify which `Trade` ORM row to query and return as `TradeOut`. Without it, the service has no reference to the affected trade ID after `run()` returns.
 
