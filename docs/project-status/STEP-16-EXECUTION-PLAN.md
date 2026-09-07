@@ -5,7 +5,7 @@
 **Date:** 2026-09-06  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-16-manual-trade-entry` (base: `main` after Step 15 merged as PR #9)  
-**Status:** READY TO IMPLEMENT — Ganesha (2026-09-06) + Dhanvantari (2026-09-06) reviews complete; all blocking corrections applied
+**Status:** READY TO IMPLEMENT — Ganesha AMB-01/02/03 rulings applied (2026-09-07); Dhanvantari BLK-1/BLK-2 applied (2026-09-06); PLN-01/02/03 plan corrections applied; all blocking corrections incorporated
 
 ---
 
@@ -212,7 +212,7 @@ class TradeOut(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
-    account_id: uuid.UUID | None
+    account_id: uuid.UUID | None  # nullable: mirrors ORM nullable=True; Step 16 endpoints always return non-None (AMB-03 — Ganesha)
     instrument_id: uuid.UUID
     trade_type: str
     direction: str
@@ -283,7 +283,7 @@ Adds a fill to an existing trade in OPEN or PARTIAL status.
 1. Look up the trade by `trade_id`. Return 404 `TRADE_NOT_FOUND` if not found or `is_deleted = true`.
 2. Verify the trade's `account_id` belongs to the authenticated user (join with `trading_accounts` or re-use `TradingAccountService`). Return 403 `TRADE_NOT_OWNED` if mismatch.
 3. If the trade status is `CLOSED`, return 422 `TRADE_ALREADY_CLOSED` — exits on a closed trade are not supported via this endpoint in Phase 1.
-4. Validate the `fill.fill_timestamp` is timezone-aware and is after the trade's `first_fill_at`. Return 422 if not.
+4. Validate the `fill.fill_timestamp` is timezone-aware and is **at or after** (`>=`) the trade's `first_fill_at`. Return 422 `FILL_TIMESTAMP_BEFORE_TRADE_OPEN` if the fill timestamp precedes the trade's opening fill. A fill with the same timestamp as `first_fill_at` is valid — simultaneous partial fills from the same broker order share a timestamp, and the reconstruction engine resolves ordering deterministically via `fill_id ASC, created_at ASC`. (AMB-01 — Ganesha)
 5. Look up `instrument_type` from the `instruments` table using the trade's `instrument_id` via `InstrumentRepository`. This field is required by `ReconstructionEngine.run()` but is not carried on the `Trade` ORM model. `AddFillRequest` does not carry `instrument_type` — the server derives it from the stored instrument.
 6. Insert the fill using `FillRepository.insert_normalized_fill()` as above (apply the same `session` derivation: PRE_OPEN / REGULAR / POST_CLOSE against `fill_timestamp` IST).
 7. Flush, then run `ReconstructionEngine.run(session, user_id, account_id, instrument_id, product_type, instrument_type)` with the `instrument_type` obtained in step 5.
@@ -304,7 +304,7 @@ Soft-deletes a manually entered trade.
 1. Verify the trade's `account_id` belongs to the authenticated user (join with `trading_accounts` or re-use `TradingAccountService`). Return 403 `TRADE_NOT_OWNED` if mismatch.
    > **Auth boundary (Dhanvantari BLK-2):** Steps 0–1 establish identity before any fill data is accessed. Without this ordering, an unauthenticated caller can probe fill provenance (CSV vs. MANUAL) on any trade UUID in the system by observing whether the response is 422 `TRADE_NOT_MANUAL` vs. 403/404 — an information-disclosure vulnerability. No fill data is fetched until ownership is confirmed.
 2. Fetch all `execution_fills` where `trade_id = trade_id`. If any fill has `import_source ≠ 'MANUAL'`, return 422 `TRADE_NOT_MANUAL` — "This trade contains broker-imported fills and cannot be deleted via this endpoint. Use the fill exclusion mechanism to dispute specific fills." See Domain Ruling D2.
-3. Filter fills to those not yet excluded.
+3. Filter fills to those not yet excluded. If the filtered list is empty (all fills were already individually excluded), proceed directly to step 5 — the DELETE still succeeds and sets `is_deleted = true`. This is correct and expected: a user who excluded all fills one by one via the fill-exclusion mechanism should still be able to soft-delete the resulting empty trade shell. The two operations (fill exclusion and trade soft-delete) are independent. (AMB-02 — Ganesha)
 4. For each fill: call `FillExclusionRepository.exists_by_fill_id(fill.id)`. If not already excluded, call `FillExclusionRepository.create_exclusion()` with:
    - `fill_id = fill.id`
    - `reason = "USER_DELETED_TRADE"`
@@ -390,9 +390,9 @@ All tests follow the existing `AsyncClient` + pytest-asyncio + conftest pattern.
 
 | Test ID | Description |
 |---------|-------------|
-| B-16-01 | `POST /v1/trades` with valid EQ entry fill creates OPEN trade — returns 201 with `TradeOut` |
-| B-16-02 | `POST /v1/trades` with entry + exit fills for same day CNC creates CLOSED trade with P&L |
-| B-16-03 | `POST /v1/trades` with entry + exit fills for MIS creates CLOSED trade with P&L |
+| B-16-01 | `POST /v1/trades` with valid EQ entry fill creates OPEN trade — returns 201 with `TradeOut`; assert `account_id` is non-None and equals the request `account_id` (AMB-03) |
+| B-16-02 | `POST /v1/trades` with entry + exit fills for same day CNC creates CLOSED trade with P&L; assert `account_id` is non-None (AMB-03) |
+| B-16-03 | `POST /v1/trades` with entry + exit fills for MIS creates CLOSED trade with P&L; assert `account_id` is non-None (AMB-03) |
 | B-16-04 | `POST /v1/trades` with unknown instrument returns 422 `INSTRUMENT_NOT_FOUND` |
 | B-16-05 | `POST /v1/trades` with inactive account returns 404 `ACCOUNT_NOT_FOUND` |
 | B-16-06 | `POST /v1/trades` with another user's account returns 404 `ACCOUNT_NOT_FOUND` |
@@ -405,17 +405,24 @@ All tests follow the existing `AsyncClient` + pytest-asyncio + conftest pattern.
 | B-16-13 | `POST /v1/trades/{id}/fills` on OPEN trade adds fill and returns updated `TradeOut` |
 | B-16-14 | `POST /v1/trades/{id}/fills` on CLOSED trade returns 422 `TRADE_ALREADY_CLOSED` |
 | B-16-15 | `POST /v1/trades/{id}/fills` on another user's trade returns 403 `TRADE_NOT_OWNED` |
-| B-16-16 | `POST /v1/trades/{id}/fills` with fill timestamp before `first_fill_at` returns 422 |
-| B-16-17 | `DELETE /v1/trades/{id}` sets `is_deleted = true` — trade no longer returned in a subsequent GET |
+| B-16-16 | `POST /v1/trades/{id}/fills` with fill timestamp **strictly before** `first_fill_at` returns 422 `FILL_TIMESTAMP_BEFORE_TRADE_OPEN` (AMB-01) |
+| B-16-16b | `POST /v1/trades/{id}/fills` with fill timestamp **equal to** `first_fill_at` is accepted — returns 200 with updated `TradeOut` (AMB-01 boundary: simultaneous fills are valid) |
+| B-16-17 | `DELETE /v1/trades/{id}` sets `is_deleted = true` — verify via direct DB assertion that `trades.is_deleted = true` for the deleted row, and that `TradeRepository.get_open_trade_with_lock()` returns `None` for that processing unit (no GET endpoint in Step 16; QA-06) |
 | B-16-18 | `DELETE /v1/trades/{id}` on already-deleted trade returns 404 |
 | B-16-19 | `DELETE /v1/trades/{id}` on another user's trade returns 403 `TRADE_NOT_OWNED` |
 | B-16-20 | Soft-deleted trade fills are present in `fill_exclusions` after `DELETE` |
 | B-16-21 | `is_deleted` trades do not appear in `GET /v1/analytics/summary` — integration guard |
+
+_(B-16-24 through B-16-34 are in the same file — added by Dhanvantari and Sahadeva reviews. B-16-22 and B-16-23 are unit tests in `test_trade_service.py`, shown separately below. — PLN-01)_
+
+| Test ID | Description |
+|---------|-------------|
 | B-16-24 | `POST /v1/trades` with `instrument_type=EQ` and `product_type=NRML` returns 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` (D1) |
 | B-16-25 | `POST /v1/trades` with `instrument_type=FUT` and `product_type=CNC` returns 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` (D1) |
 | B-16-26 | `DELETE /v1/trades/{id}` on a CSV-imported trade returns 422 `TRADE_NOT_MANUAL` (D2) |
 | B-16-27 | `POST /v1/trades` with fills spanning a close-and-reopen cycle (BUY→SELL→BUY) returns 201 with the second (OPEN) trade; first (CLOSED) trade is persisted in the database with correct P&L (D4) |
 | B-16-28 | `POST /v1/trades` with entry + exit fills and `planned_stop` returns 201 where the corresponding `trade_pnl` record has a non-NULL `r_multiple` computed from `planned_stop` — verifies that `planned_stop` is written before `PnlService.backfill_all_closed()` runs (Dhanvantari BLK-1) |
+| B-16-34 | `POST /v1/trades` with `instrument_type=CE` and `product_type=CNC` returns 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` (D1 — Sahadeva QA-08) |
 
 **New file:** `backend/tests/unit/application/test_trade_service.py`
 
@@ -654,7 +661,7 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 4. Implement `src/features/trades/AddTradePage.tsx` with all three sections and validation.
 5. Update `frontend/src/app.tsx` to add the `/trades/new` route.
 6. Update `AppShell.tsx` to add the "Add Trade" navigation action.
-7. Write frontend tests F-16-01 through F-16-12.
+7. Write frontend tests F-16-01 through F-16-13. (PLN-02)
 
 **Arjun dependency on Bhima:** All frontend work can be developed against MSW fixtures. No blocker. Integration against the real backend happens once Bhima's routes are live on the branch.
 
@@ -678,7 +685,7 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| Sahadeva QA | Sahadeva | All 41 new tests pass (B-16-01 through B-16-28, F-16-01 through F-16-13); no regressions in Steps 12–15 tests; `is_deleted` predicate verified in analytics integration guard (B-16-21); D1/D2 validation confirmed by B-16-24 through B-16-26; D4 multi-cycle behavior confirmed by B-16-27; R-multiple correctness with `planned_stop` confirmed by B-16-28; D1 frontend select disabling confirmed by F-16-13 |
+| Sahadeva QA | Sahadeva | All 43 new tests pass (B-16-01 through B-16-28 + B-16-16b + B-16-34, F-16-01 through F-16-13); no regressions in Steps 12–15 tests; `is_deleted` predicate verified in analytics integration guard (B-16-21); D1/D2 validation confirmed by B-16-24 through B-16-26 and B-16-34 (PLN-03); D4 multi-cycle behavior confirmed by B-16-27; R-multiple correctness with `planned_stop` confirmed by B-16-28; AMB-01 boundary behaviour confirmed by B-16-16 and B-16-16b; D1 frontend select disabling confirmed by F-16-13 |
 | Nakula CI | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes thresholds; `tsc --noEmit` clean; ESLint 0 warnings; `alembic upgrade head` applies cleanly from 0014 head |
 | Yudhishthira accept | Yudhishthira | Add Trade screen accessible from nav; OPEN trade created from entry fill; CLOSED trade with P&L created from entry+exit fills; soft-delete removes trade from analytics view |
 
@@ -696,7 +703,7 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 | Arjun | Types + API client + MSW fixtures | ~0.15 session |
 | Arjun | `AddTradePage.tsx` — 3 sections, validation, error states | ~0.5 session |
 | Arjun | Router + AppShell updates | ~0.1 session |
-| Arjun | Frontend tests F-16-01 through F-16-12 | ~0.3 session |
+| Arjun | Frontend tests F-16-01 through F-16-13 | ~0.3 session |
 | **Total** | | **~2.25 sessions** |
 
 This is within the Phase 1 plan estimate of 1–2 sessions, at the high end due to the multi-fill UX complexity and the `is_deleted` audit across existing query code. No scope is at risk.
@@ -704,6 +711,7 @@ This is within the Phase 1 plan estimate of 1–2 sessions, at the high end due 
 ---
 
 *Krishna — Senior Project Manager*  
-*Domain review: Ganesha (Trading Domain Analyst) — 2026-09-06 — D1 through D5 rulings*  
+*Domain review: Ganesha (Trading Domain Analyst) — 2026-09-06 — D1 through D5 rulings; AMB-01/02/03 rulings applied 2026-09-07*  
 *Risk review: Dhanvantari (Risk Management Engineer) — 2026-09-06 — BLK-1, BLK-2, REQ-1 through REQ-4 applied*  
+*QA review: Sahadeva — 2026-09-07 — PLN-01/02/03 corrections and B-16-34 applied; QA-01 through QA-07, QA-09 deferred (separate task)*  
 *Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `backend/src/tradeforge/infrastructure/repositories/fill_repo.py`, `backend/src/tradeforge/application/trade/reconstruction.py`, `backend/src/tradeforge/domain/import_domain/types.py`, `frontend/src/app.tsx`, `frontend/src/features/accounts/context/AccountContext.tsx`*
