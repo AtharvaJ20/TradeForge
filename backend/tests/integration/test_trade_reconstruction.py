@@ -178,7 +178,7 @@ async def _insert_fill(
     fill_timestamp: datetime,
     trade_date: date | None = None,
     fill_id_str: str | None = None,
-    import_source: str = "BROKER",
+    import_source: str = "CSV",
 ) -> uuid.UUID:
     fill_pk = uuid.uuid4()
     td = trade_date or fill_timestamp.date()

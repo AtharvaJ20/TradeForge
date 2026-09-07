@@ -209,7 +209,7 @@ async def _insert_entry_fill(
             "(id, user_id, account_id, instrument_id, trade_id, fill_timestamp, trade_date, "
             " session, side, quantity, price, product_type, broker, import_source, fill_role) "
             "VALUES (:id, :uid, :aid, :iid, :tid, :ts, :td, 'REGULAR', "
-            " 'BUY', 100, 250.00, 'MIS', :broker, 'BROKER', 'ENTRY')"
+            " 'BUY', 100, 250.00, 'MIS', :broker, 'CSV', 'ENTRY')"
         ),
         {
             "id": str(uuid.uuid4()),
