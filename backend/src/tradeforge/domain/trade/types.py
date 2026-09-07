@@ -189,3 +189,40 @@ class ReconstructionResult:
     tax_lots_updated: int = 0
     halted_at_fill_id: uuid.UUID | None = None
     error_detail: str | None = None
+    # B-16-D: trade created or last operated on in this run.
+    # Set to the trade_id at every trades_opened += 1 event (always overwritten
+    # so multi-cycle runs — BUY→SELL→BUY — return the last OPEN trade, not the
+    # first CLOSED one). Also set when resuming an existing OPEN/PARTIAL trade.
+    # TradeService uses this to query and return the affected Trade ORM row.
+    affected_trade_id: uuid.UUID | None = None
+
+
+# ---------------------------------------------------------------------------
+# product_type_from_trade_type — D6 (Ganesha 2026-09-07)
+# ---------------------------------------------------------------------------
+
+
+def product_type_from_trade_type(trade_type: str) -> str:
+    """Reverse-map a stored trade_type to the raw broker product_type.
+
+    Used by TradeService.add_fill() when trade.trade_type must be converted
+    back to the product_type expected by ReconstructionEngine.run().
+
+    The mapping is the exact inverse of provisional_trade_type() and is
+    consistent with TRADE_TYPES_FOR_FAMILY. The Trade ORM has no product_type
+    column; computing it from trade_type avoids any schema change.
+
+    Mapping (D6 — Ganesha):
+        MIS          → MIS
+        CNC          → CNC
+        CNC_SAME_DAY → CNC
+        NRML_FUT     → NRML
+        NRML_OPT     → NRML
+    """
+    if trade_type == "MIS":
+        return "MIS"
+    if trade_type in ("CNC", "CNC_SAME_DAY"):
+        return "CNC"
+    if trade_type in ("NRML_FUT", "NRML_OPT"):
+        return "NRML"
+    raise ReconstructionDataError(f"Unknown trade_type: {trade_type!r}")
