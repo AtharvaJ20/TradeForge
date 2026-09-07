@@ -5,7 +5,7 @@
 **Date:** 2026-09-06  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-16-manual-trade-entry` (base: `main` after Step 15 merged as PR #9)  
-**Status:** READY TO IMPLEMENT — Ganesha AMB-01/02/03 rulings applied (2026-09-07); Dhanvantari BLK-1/BLK-2 applied (2026-09-06); PLN-01/02/03 plan corrections applied; all blocking corrections incorporated
+**Status:** READY TO IMPLEMENT — Ganesha AMB-01/02/03 + D6 rulings applied (2026-09-07); Dhanvantari BLK-1/BLK-2 applied (2026-09-06); PLN-01/02/03 plan corrections applied; Mayasura A-16-1 through A-16-5 applied (2026-09-07); BLK-1 data path corrected (Bhima inspection 2026-09-07); all blocking corrections incorporated
 
 ---
 
@@ -84,6 +84,24 @@ Formal rulings resolving domain ambiguities identified during the pre-implementa
 **Boundary condition:** If the user adds a manual fill to a CSV-imported trade and a subsequent CSV import includes the broker's version of that fill, `fill_exists()` (checking `broker_trade_id + account_id`) will not match the user's manual fill (whose `broker_trade_id` is a generated UUID). Both fills would be present. Bhima must document this in the service code: if a user adds a manual fill as a gap-repair and then a corrected CSV import arrives, the manual fill must be excluded via fill_exclusions before re-importing, or the position will be double-counted. This is a user-workflow concern, not a data model defect.
 
 **Phase 2 note:** Mixed-provenance trades should be visually distinguished in the trade list and detail view (Step 19). A `has_manual_fills` derived field is a query-time computation; no schema change is required now.
+
+---
+
+### Ruling D6 — `product_type` Source for `add_fill()` Reconstruction Path
+
+**Decision:** In `POST /v1/trades/{id}/fills`, `product_type` is not stored on the `trades` table and is not carried in `AddFillRequest`. It must be derived server-side from `trade.trade_type` using a new pure helper `product_type_from_trade_type()` in `domain/trade/types.py`. The mapping is deterministic:
+
+| `trade.trade_type` | Derived `product_type` |
+|--------------------|------------------------|
+| `MIS` | `MIS` |
+| `CNC` | `CNC` |
+| `CNC_SAME_DAY` | `CNC` |
+| `NRML_FUT` | `NRML` |
+| `NRML_OPT` | `NRML` |
+
+**Rationale:** `ExecutionFill.product_type` stores raw broker values (`MIS`, `CNC`, `NRML`); `Trade.trade_type` stores the system's enriched encoding (`MIS`, `CNC`, `CNC_SAME_DAY`, `NRML_FUT`, `NRML_OPT`). `ReconstructionEngine.run()` requires `product_type` as a processing-unit discriminator. For `add_fill()`, the trade already exists — its `trade_type` encodes exactly the information needed to recover the original `product_type`. The mapping is the exact inverse of `provisional_trade_type()` and is consistent with `TRADE_TYPES_FOR_FAMILY`. The `Trade` ORM has no `product_type` column; computing it from `trade_type` avoids any schema change.
+
+**Implementation effect:** Step 5 of `POST /v1/trades/{id}/fills` is extended to derive `product_type` alongside `instrument_type`. `product_type_from_trade_type()` is added to `domain/trade/types.py` — see B-16-D.
 
 ---
 
@@ -260,8 +278,12 @@ Creates a new trade from manual fills.
 5. Flush (not commit) after all fills are inserted, so they are visible to the reconstruction query within the same transaction.
 6. Run `ReconstructionEngine.run(session, user_id, account_id, instrument_id, product_type, instrument_type)`. Pass `instrument_type` from `request.instrument.instrument_type` — the engine requires it to disambiguate `NRML_FUT` from `NRML_OPT` at trade-open time. On `ReconstructionError` — rollback and return 422 `RECONSTRUCTION_FAILED` with the error detail.
 7. The `run()` call returns a `ReconstructionResult`. Obtain the trade ID from `result.affected_trade_id` (see B-16-D — `ReconstructionResult` must be extended with this field). This is the trade that was created or last modified by the run.
-8. If `planned_stop` or `planned_target` was provided, update the `trades` row identified by `result.affected_trade_id` with those values via `TradeRepository.update_trade()`. Flush immediately (not commit) so `planned_stop` is visible within the transaction before the P&L backfill reads it. The reconstruction engine does not set these fields.
-   > **Ordering constraint (Dhanvantari BLK-1):** This step must execute BEFORE step 9. `PnlService.backfill_all_closed()` reads `trades.planned_stop` from the database to compute `r_multiple`. If `planned_stop` is written after the backfill runs, the backfill reads NULL and persists a NULL R-multiple permanently — there is no subsequent recalculation. Flush after `update_trade()`, then proceed to step 9.
+8. If `planned_stop` or `planned_target` was provided:
+   a. Query the `Trade` ORM row by `result.affected_trade_id` for `average_entry` and `total_entry_quantity` — the reconstruction engine (step 6) has written both. This query is within the same transaction (no commit yet); the values are correct.
+   b. If `planned_stop` was provided, compute `planned_risk_amount = abs(trade.average_entry - planned_stop) * trade.total_entry_quantity`.
+   c. Call `TradeRepository.update_trade()` for `result.affected_trade_id` with: `planned_stop` (if provided), `planned_target` (if provided), and `planned_risk_amount` (if computed in step b). Flush immediately (not commit). The reconstruction engine does not set any of these three fields.
+   > **Ordering constraint (Dhanvantari BLK-1 — rationale corrected, Bhima inspection 2026-09-07):** This step must execute BEFORE step 9. `PnlService.backfill_all_closed()` → `PnlRepository.get_planned_risk()` reads **`trades.planned_risk_amount`** (via an extended fallback path — see B-16-D) to compute `r_multiple` for Step 16 trades that have no journal entry. If `trades.planned_risk_amount` is written after the backfill runs, `get_planned_risk()` returns NULL and a NULL R-multiple is persisted permanently with no subsequent recalculation path. Flush after `update_trade()`, then proceed to step 9.
+   > **Correction to prior BLK-1 rationale:** The earlier version stated that `PnlService.backfill_all_closed()` reads `trades.planned_stop`. This is incorrect. Bhima inspection confirmed that `PnlRepository.get_planned_risk()` reads `journal_entries.planned_risk_amount` — which is NULL for all Step 16 trades that have no journal entry — and currently returns NULL unconditionally in that case. Writing `trades.planned_stop` alone has no effect on R-multiple computation. The fix is two-part: (1) populate `trades.planned_risk_amount` here from `planned_stop` as specified above; (2) extend `get_planned_risk()` to fall back to `trades.planned_risk_amount` when no journal entry exists — see B-16-D. Without both parts, B-16-28 will always produce a NULL R-multiple regardless of `planned_stop` being provided.
 9. If any trades were closed by the reconstruction (`result.trades_closed > 0`), run `PnlService.backfill_all_closed()`. `planned_stop` is now present in the database within this transaction, so R-multiple is computed correctly for any manually entered closed trade that provided a planned stop.
 10. Commit.
 11. Query the `Trade` ORM row by `result.affected_trade_id` and return `TradeOut`.
@@ -284,9 +306,11 @@ Adds a fill to an existing trade in OPEN or PARTIAL status.
 2. Verify the trade's `account_id` belongs to the authenticated user (join with `trading_accounts` or re-use `TradingAccountService`). Return 403 `TRADE_NOT_OWNED` if mismatch.
 3. If the trade status is `CLOSED`, return 422 `TRADE_ALREADY_CLOSED` — exits on a closed trade are not supported via this endpoint in Phase 1.
 4. Validate the `fill.fill_timestamp` is timezone-aware and is **at or after** (`>=`) the trade's `first_fill_at`. Return 422 `FILL_TIMESTAMP_BEFORE_TRADE_OPEN` if the fill timestamp precedes the trade's opening fill. A fill with the same timestamp as `first_fill_at` is valid — simultaneous partial fills from the same broker order share a timestamp, and the reconstruction engine resolves ordering deterministically via `fill_id ASC, created_at ASC`. (AMB-01 — Ganesha)
-5. Look up `instrument_type` from the `instruments` table using the trade's `instrument_id` via `InstrumentRepository`. This field is required by `ReconstructionEngine.run()` but is not carried on the `Trade` ORM model. `AddFillRequest` does not carry `instrument_type` — the server derives it from the stored instrument.
+5. Derive both server-side arguments required by `ReconstructionEngine.run()`:
+   - **`instrument_type`:** query the `instruments` table via `InstrumentRepository` using `trade.instrument_id`. Not carried on the `Trade` ORM model; must be fetched.
+   - **`product_type`:** call `product_type_from_trade_type(trade.trade_type)` from `domain/trade/types.py` (D6 — Ganesha, 2026-09-07). Applies the deterministic reverse mapping: `MIS→MIS`, `CNC/CNC_SAME_DAY→CNC`, `NRML_FUT/NRML_OPT→NRML`. The `Trade` ORM has no `product_type` column; `trade.trade_type` encodes all information needed to recover it. `AddFillRequest` carries neither field — both are derived server-side.
 6. Insert the fill using `FillRepository.insert_normalized_fill()` as above (apply the same `session` derivation: PRE_OPEN / REGULAR / POST_CLOSE against `fill_timestamp` IST).
-7. Flush, then run `ReconstructionEngine.run(session, user_id, account_id, instrument_id, product_type, instrument_type)` with the `instrument_type` obtained in step 5.
+7. Flush, then run `ReconstructionEngine.run(session, user_id, account_id, instrument_id, product_type, instrument_type)` using `product_type` and `instrument_type` both derived in step 5.
 8. Run `PnlService.backfill_all_closed()` if the reconstruction closed the trade (`result.trades_closed > 0`).
 9. Commit. Query and return the updated `Trade` ORM row by `trade_id` as `TradeOut`.
 
@@ -382,6 +406,65 @@ The reconstruction engine must set `result.affected_trade_id` to the trade it op
 - **`affected_trade_id` is always overwritten at every `trades_opened += 1` event — not only on the first open.** For the D4 multi-cycle case (BUY→SELL→BUY: first trade closes, second trade opens in the same run), the second `trades_opened += 1` must overwrite the field so the 201 response returns the last OPEN trade, not the closed first trade. After `run()` returns, `result.affected_trade_id` always identifies the trade created or last operated on — the one whose ORM row `TradeService` must query and return as `TradeOut`.
 
 This field is used by `TradeService.create_trade()` to identify which `Trade` ORM row to query and return as `TradeOut`. Without it, the service has no reference to the affected trade ID after `run()` returns.
+
+---
+
+**Required addition to `domain/trade/types.py` — `product_type_from_trade_type()` (D6 — Ganesha, 2026-09-07):**
+
+Add alongside `provisional_trade_type()` and `finalize_trade_type()`. Implements the deterministic reverse mapping from stored `trade_type` back to raw broker `product_type`, used by `TradeService.add_fill()` to supply the `product_type` argument to `ReconstructionEngine.run()`:
+
+```python
+def product_type_from_trade_type(trade_type: str) -> str:
+    """Reverse-map a stored trade_type to the raw broker product_type.
+
+    Used by add_fill() when trade.trade_type must be converted back to the
+    product_type expected by ReconstructionEngine.run().
+    """
+    if trade_type == "MIS":
+        return "MIS"
+    if trade_type in ("CNC", "CNC_SAME_DAY"):
+        return "CNC"
+    if trade_type in ("NRML_FUT", "NRML_OPT"):
+        return "NRML"
+    raise ReconstructionDataError(f"Unknown trade_type: {trade_type!r}")
+```
+
+This function is pure and has zero I/O dependencies — it belongs in the domain layer alongside the other type helpers and is independently unit-testable.
+
+---
+
+**Required extension to `PnlRepository.get_planned_risk()` — `trades.planned_risk_amount` fallback (BLK-1 corrected, Bhima inspection 2026-09-07):**
+
+**File:** `backend/src/tradeforge/infrastructure/repositories/pnl_repo.py`
+
+`get_planned_risk()` currently reads only `journal_entries.planned_risk_amount`. For Step 16 manually entered trades, no journal entry exists at the time `backfill_all_closed()` runs, so the method returns NULL and R-multiple is never computed. The method must fall back to `trades.planned_risk_amount` (column already present at `trade_domain.py:122`):
+
+```python
+async def get_planned_risk(self, trade_id: uuid.UUID) -> Decimal | None:
+    # Primary: journal entry (user's explicit pre-trade risk annotation)
+    stmt = select(JournalEntry.planned_risk_amount).where(
+        JournalEntry.trade_id == trade_id,
+        JournalEntry.deleted_at.is_(None),
+    )
+    result = await self._db.execute(stmt)
+    value = result.scalar_one_or_none()
+    if value is not None:
+        return Decimal(str(value))
+    # Fallback: trades.planned_risk_amount — populated at create_trade time
+    # from planned_stop when no journal entry exists (Step 16 manual trades)
+    stmt2 = select(Trade.planned_risk_amount).where(Trade.id == trade_id)
+    result2 = await self._db.execute(stmt2)
+    value2 = result2.scalar_one_or_none()
+    return Decimal(str(value2)) if value2 is not None else None
+```
+
+This change is additive: existing behavior (journal entry takes priority) is unchanged. Trades with a journal entry continue to use `journal_entries.planned_risk_amount`. Only trades without a journal entry — all Step 16 manually entered trades — fall through to `trades.planned_risk_amount`.
+
+**Session contract — `PnlService` per-request DI (Mayasura A-16-1, confirmed by Bhima inspection 2026-09-07):**
+
+`PnlService.backfill_all_closed()` uses `self._pnl_repo._db` — the `AsyncSession` injected at `PnlRepository` construction time. This means `PnlService` must be constructed with the **same** per-request `AsyncSession` instance as `TradeRepository`, `FillRepository`, and `FillExclusionRepository`. When all services share one session, `trades.planned_risk_amount` flushed in `create_trade()` step 8c is visible to `get_planned_risk()` in step 9 without a separate transaction or commit. Do not construct `PnlService` with a different session or a session from a separate request context.
+
+`TradeService.__init__` must therefore accept a single `AsyncSession` parameter and pass it to all repository constructors, rather than accepting pre-constructed repositories with potentially different sessions.
 
 ---
 
@@ -714,7 +797,9 @@ This is within the Phase 1 plan estimate of 1–2 sessions, at the high end due 
 ---
 
 *Krishna — Senior Project Manager*  
-*Domain review: Ganesha (Trading Domain Analyst) — 2026-09-06 — D1 through D5 rulings; AMB-01/02/03 rulings applied 2026-09-07*  
-*Risk review: Dhanvantari (Risk Management Engineer) — 2026-09-06 — BLK-1, BLK-2, REQ-1 through REQ-4 applied*  
+*Domain review: Ganesha (Trading Domain Analyst) — 2026-09-06 — D1 through D5 rulings; AMB-01/02/03 rulings applied 2026-09-07; D6 (`product_type_from_trade_type()`) ruling applied 2026-09-07*  
+*Risk review: Dhanvantari (Risk Management Engineer) — 2026-09-06 — BLK-1, BLK-2, REQ-1 through REQ-4 applied; BLK-1 data path corrected 2026-09-07 (Bhima inspection)*  
+*Architecture review: Mayasura (Senior Software Architect) — 2026-09-07 — A-16-1 through A-16-5 applied; A-16-1 session contract confirmed by Bhima inspection*  
+*Backend inspection: Bhima (Senior Backend Engineer) — 2026-09-07 — confirmed `PnlRepository.get_planned_risk()` reads `journal_entries.planned_risk_amount`, NOT `trades.planned_stop`; confirmed `backfill_all_closed()` uses per-request DI session; identified `trades.planned_risk_amount` as required fallback path*  
 *QA review: Sahadeva — 2026-09-07 — PLN-01/02/03 corrections and B-16-34 applied; QA-01 through QA-07, QA-09 deferred (separate task)*  
-*Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `backend/src/tradeforge/infrastructure/repositories/fill_repo.py`, `backend/src/tradeforge/application/trade/reconstruction.py`, `backend/src/tradeforge/domain/import_domain/types.py`, `frontend/src/app.tsx`, `frontend/src/features/accounts/context/AccountContext.tsx`*
+*Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `backend/src/tradeforge/infrastructure/repositories/fill_repo.py`, `backend/src/tradeforge/infrastructure/repositories/pnl_repo.py`, `backend/src/tradeforge/application/pnl_service.py`, `backend/src/tradeforge/application/trade/reconstruction.py`, `backend/src/tradeforge/domain/trade/types.py`, `frontend/src/app.tsx`, `frontend/src/features/accounts/context/AccountContext.tsx`*
