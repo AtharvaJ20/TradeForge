@@ -5,7 +5,7 @@
 **Date:** 2026-09-06  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-16-manual-trade-entry` (base: `main` after Step 15 merged as PR #9)  
-**Status:** READY TO IMPLEMENT — Ganesha AMB-01/02/03 + D6 rulings applied (2026-09-07); Dhanvantari BLK-1/BLK-2 applied (2026-09-06); Dhanvantari BLK-3 + REQ-5/6/7 + R-16-6 (elevated) + R-16-7 (clarified) applied (2026-09-07); PLN-01/02/03 plan corrections applied; Mayasura A-16-1 through A-16-5 applied (2026-09-07); BLK-1 data path corrected (Bhima inspection 2026-09-07); all blocking corrections incorporated
+**Status:** READY TO IMPLEMENT — Ganesha AMB-01/02/03 + D6 rulings applied (2026-09-07); Dhanvantari BLK-1/BLK-2 applied (2026-09-06); Dhanvantari BLK-3 + REQ-5/6/7 + R-16-6 (elevated) + R-16-7 (clarified) applied (2026-09-07); PLN-01/02/03 plan corrections applied; Mayasura A-16-1 through A-16-5 applied (2026-09-07); BLK-1 data path corrected (Bhima inspection 2026-09-07); Sahadeva QA-10 (B-16-37) added; QA-11/QA-12 recorded as accepted known risks (2026-09-07); all blocking corrections incorporated
 
 ---
 
@@ -526,6 +526,7 @@ _(B-16-24 through B-16-34 are in the same file — added by Dhanvantari and Saha
 | B-16-34 | `POST /v1/trades` with `instrument_type=CE` and `product_type=CNC` returns 422 `INVALID_PRODUCT_TYPE_FOR_INSTRUMENT` (D1 — Sahadeva QA-08) |
 | B-16-35 | `POST /v1/trades/{id}/fills` on an OPEN trade that has `planned_stop` set — after adding a second entry fill at a different price, assert that `trades.planned_risk_amount` in the database reflects `abs(new_average_entry - planned_stop) × new_total_entry_quantity`, not the original value from create time (Dhanvantari BLK-3) |
 | B-16-36 | `POST /v1/trades` with a LONG entry fill (BUY side) and `planned_stop` greater than or equal to the fill price returns 422 `PLANNED_STOP_WRONG_SIDE`; mirror case: SHORT entry (SELL side) with `planned_stop` less than or equal to the fill price returns 422 `PLANNED_STOP_WRONG_SIDE` (Dhanvantari REQ-5) |
+| B-16-37 | `POST /v1/trades/{id}/fills` on a trade whose account has been set to INACTIVE (direct DB status update in the test fixture after trade creation) — authenticated as the trade owner — returns 200 with updated `TradeOut`, not 403. Verifies that the ownership-only query in `add_fill()` step 2 does not filter on account status, per Dhanvantari REQ-6. (Sahadeva QA-10) |
 
 **New file:** `backend/tests/unit/application/test_trade_service.py`
 
@@ -788,9 +789,20 @@ All tests follow the existing MSW + Vitest + Testing Library pattern.
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| Sahadeva QA | Sahadeva | All 45 new tests pass (B-16-01 through B-16-28 + B-16-16b + B-16-34 through B-16-36, F-16-01 through F-16-13); no regressions in Steps 12–15 tests; `is_deleted` predicate verified in analytics integration guard (B-16-21); D1/D2 validation confirmed by B-16-24 through B-16-26 and B-16-34 (PLN-03); D4 multi-cycle behavior confirmed by B-16-27; R-multiple correctness with `planned_stop` confirmed by B-16-28; AMB-01 boundary behaviour confirmed by B-16-16 and B-16-16b; D1 frontend select disabling confirmed by F-16-13; `planned_risk_amount` recomputation on scale-in confirmed by B-16-35 (BLK-3); stop-side direction validation confirmed by B-16-36 (REQ-5) |
+| Sahadeva QA | Sahadeva | All 46 new tests pass (B-16-01 through B-16-28 + B-16-16b + B-16-34 through B-16-37, F-16-01 through F-16-13); no regressions in Steps 12–15 tests; `is_deleted` predicate verified in analytics integration guard (B-16-21); D1/D2 validation confirmed by B-16-24 through B-16-26 and B-16-34 (PLN-03); D4 multi-cycle behavior confirmed by B-16-27; R-multiple correctness with `planned_stop` confirmed by B-16-28; AMB-01 boundary behaviour confirmed by B-16-16 and B-16-16b; D1 frontend select disabling confirmed by F-16-13; `planned_risk_amount` recomputation on scale-in confirmed by B-16-35 (BLK-3); stop-side direction validation confirmed by B-16-36 (REQ-5); REQ-6 ownership-only auth (deactivated account) confirmed by B-16-37 (QA-10) |
 | Nakula CI | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes thresholds; `tsc --noEmit` clean; ESLint 0 warnings; `alembic upgrade head` applies cleanly from 0014 head |
 | Yudhishthira accept | Yudhishthira | Add Trade screen accessible from nav; OPEN trade created from entry fill; CLOSED trade with P&L created from entry+exit fills; soft-delete removes trade from analytics view |
+
+---
+
+## Accepted Known Testing Risks (Sahadeva QA, 2026-09-07)
+
+The following gaps were identified by Sahadeva's final QA review and **explicitly accepted** before implementation begins. They are not implementation blockers. Both must be addressed — by adding the proposed tests — before Step 16 ships to production.
+
+| # | Finding | Description | Decision |
+|---|---------|-------------|----------|
+| QA-11 | `add_fill()` stop-side consistency guard untested | `add_fill()` step 7b.b validates that `planned_stop` remains on the correct side of `average_entry` after a scale-in moves `average_entry` past the stop. B-16-36 tests this path only in `create_trade()`. The `add_fill()` consistency guard path — where a scale-in drives `average_entry` past the recorded `planned_stop` — has no test. Proposed B-16-38: LONG trade with a BUY scale-in that moves `average_entry` below `planned_stop` → assert 422 `PLANNED_STOP_WRONG_SIDE`. | **Accepted** — scenario requires an extreme scale-in below the stop price; unlikely in normal use. The implementation path is straightforward from the spec. Add B-16-38 before production release. |
+| QA-12 | DELETE with all fills pre-excluded untested | AMB-02 specifies that `DELETE /v1/trades/{id}` succeeds (sets `is_deleted = true`) even when `fills_to_exclude` is empty because all fills were already individually excluded. Step 3 of the DELETE sequence handles this case explicitly. No test covers it. Proposed B-16-39: create a trade, individually exclude all fills via fill_exclusions, then `DELETE /v1/trades/{id}` → assert 204 and `is_deleted = true` in the database. | **Accepted** — simple code path, explicitly specified in AMB-02 and documented in the implementation sequence. Add B-16-39 before production release. |
 
 ---
 
@@ -818,5 +830,5 @@ This is within the Phase 1 plan estimate of 1–2 sessions, at the high end due 
 *Risk review: Dhanvantari (Risk Management Engineer) — 2026-09-06 — BLK-1, BLK-2, REQ-1 through REQ-4 applied; BLK-1 data path corrected 2026-09-07 (Bhima inspection); second review 2026-09-07 — BLK-3 (`planned_risk_amount` recomputation in `add_fill()`), REQ-5 (stop-side direction validation), REQ-6 (`add_fill()` ownership-only auth), REQ-7 (engine flush dependency), R-16-6 (likelihood elevated to Medium), R-16-7 (B-16-C audit requirement added) applied*  
 *Architecture review: Mayasura (Senior Software Architect) — 2026-09-07 — A-16-1 through A-16-5 applied; A-16-1 session contract confirmed by Bhima inspection*  
 *Backend inspection: Bhima (Senior Backend Engineer) — 2026-09-07 — confirmed `PnlRepository.get_planned_risk()` reads `journal_entries.planned_risk_amount`, NOT `trades.planned_stop`; confirmed `backfill_all_closed()` uses per-request DI session; identified `trades.planned_risk_amount` as required fallback path*  
-*QA review: Sahadeva — 2026-09-07 — PLN-01/02/03 corrections and B-16-34 applied; QA-01 through QA-07, QA-09 deferred (separate task)*  
+*QA review: Sahadeva — 2026-09-07 — PLN-01/02/03 corrections and B-16-34 applied; QA-01 through QA-07, QA-09 deferred (separate task); final QA review 2026-09-07 — QA-10 (B-16-37, REQ-6 regression guard) added as required test (46 total); QA-11 (add_fill() stop-side guard) and QA-12 (DELETE pre-excluded fills) recorded as accepted known risks*  
 *Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `backend/src/tradeforge/infrastructure/repositories/fill_repo.py`, `backend/src/tradeforge/infrastructure/repositories/pnl_repo.py`, `backend/src/tradeforge/application/pnl_service.py`, `backend/src/tradeforge/application/trade/reconstruction.py`, `backend/src/tradeforge/domain/trade/types.py`, `frontend/src/app.tsx`, `frontend/src/features/accounts/context/AccountContext.tsx`*
