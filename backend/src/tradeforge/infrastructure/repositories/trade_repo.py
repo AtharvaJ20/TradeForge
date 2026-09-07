@@ -60,6 +60,16 @@ class TradeRepository:
                 Trade.instrument_id == instrument_id,
                 Trade.status.in_(("OPEN", "PARTIAL")),
                 Trade.trade_type.in_(trade_types),
+                # B-16-C: is_deleted = false is MANDATORY here.
+                # A soft-deleted OPEN trade retains status='OPEN' in the database
+                # (the is_deleted flag is the sole deletion signal; status is not
+                # changed by DELETE /v1/trades/{id}). Without this filter a
+                # soft-deleted OPEN trade would be found as the "existing open trade"
+                # by the next reconstruction run for the same processing unit,
+                # causing silent corruption of the trade history.
+                # Verified: after setting is_deleted=true directly in the DB,
+                # this method returns None for that processing unit. (B-16-C gate)
+                Trade.is_deleted.is_(False),
             )
             .with_for_update()
         )

@@ -10,6 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -120,6 +121,9 @@ class Trade(Base):
     planned_stop: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     planned_target: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     planned_risk_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     setup_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

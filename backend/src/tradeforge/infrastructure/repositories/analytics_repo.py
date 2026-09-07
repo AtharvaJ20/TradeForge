@@ -62,6 +62,9 @@ class AnalyticsRepository:
         clauses: list[Any] = [
             Trade.user_id == f.user_id,
             Trade.status == "CLOSED",
+            # B-16-C: exclude soft-deleted trades from all 9 analytics metrics.
+            # One predicate here covers every callsite that uses _base_where().
+            Trade.is_deleted.is_(False),
         ]
         if f.date_from is not None:
             clauses.append(Trade.trade_date >= f.date_from)

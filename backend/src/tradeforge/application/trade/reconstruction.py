@@ -135,6 +135,10 @@ class ReconstructionEngine:
             current_trade: OpenTradeSnapshot | None = open_trade
             current_trade_id: uuid.UUID | None = open_trade.id
 
+            # B-16-D: record the resumed trade as the affected trade so TradeService
+            # can query and return it after run() completes.
+            result.affected_trade_id = open_trade.id
+
             # Reconstruct entry accumulators from the stored average and quantity.
             entry_qty: Decimal = open_trade.total_entry_quantity
             entry_value: Decimal = open_trade.average_entry * open_trade.total_entry_quantity
@@ -235,6 +239,11 @@ class ReconstructionEngine:
                 entry_qty = fill.quantity
                 exit_fills = []
                 result.trades_opened += 1
+                # B-16-D: always overwrite affected_trade_id at every trades_opened
+                # event. For multi-cycle runs (D4: BUY→SELL→BUY), the second open
+                # overwrites the first so run() returns the last OPEN trade — the
+                # one TradeService must query and return as TradeOut.
+                result.affected_trade_id = trade_id
 
             else:
                 # Continuing an existing trade — determine fill_role.
@@ -374,6 +383,11 @@ class ReconstructionEngine:
             result.fills_processed += 1
 
         # Flush all pending changes before returning to the caller.
+        # REQ-7 (Dhanvantari): this flush is REQUIRED. It makes average_entry,
+        # total_entry_quantity, direction, and status written by the engine
+        # visible to the subsequent query in TradeService (create_trade step 8a,
+        # add_fill step 7b) within the same transaction, before any commit.
+        # Verified present by Bhima inspection 2026-09-07.
         await session.flush()
         return result
 

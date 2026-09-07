@@ -45,7 +45,14 @@ class JournalRepository:
                 Trade.user_id,
                 Trade.average_entry,
                 Trade.total_entry_quantity,
-            ).where(Trade.id == trade_id, Trade.user_id == user_id)
+            ).where(
+                Trade.id == trade_id,
+                Trade.user_id == user_id,
+                # B-16-C: soft-deleted trades are logically removed; their journal
+                # snapshot should not be accessible. The trade row still exists (FK
+                # intact) but is_deleted = true means it is no longer surfaced.
+                Trade.is_deleted.is_(False),
+            )
         )
         return cast("tuple[uuid.UUID, uuid.UUID, Any, Any] | None", result.one_or_none())
 

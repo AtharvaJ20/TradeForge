@@ -14,7 +14,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tradeforge.infrastructure.models.trade_domain import FillExclusion
+from tradeforge.infrastructure.models.trade_domain import ExecutionFill, FillExclusion
 
 
 class FillExclusionRepository:
@@ -27,6 +27,32 @@ class FillExclusionRepository:
         stmt = select(FillExclusion.id).where(FillExclusion.fill_id == fill_id).limit(1)
         result = await session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    async def get_excluded_fill_ids_for_trade(
+        self,
+        session: AsyncSession,
+        trade_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """Return the set of fill UUIDs already excluded for this trade.
+
+        Issues a single batch query rather than N per-fill exists_by_fill_id()
+        calls (A-16-5 — Mayasura). Used by soft_delete_trade() to compute which
+        fills still need exclusion records, avoiding the O(N) query amplification
+        pattern.
+
+        Query:
+            SELECT fe.fill_id
+            FROM fill_exclusions fe
+            JOIN execution_fills ef ON ef.id = fe.fill_id
+            WHERE ef.trade_id = :trade_id
+        """
+        stmt = (
+            select(FillExclusion.fill_id)
+            .join(ExecutionFill, ExecutionFill.id == FillExclusion.fill_id)
+            .where(ExecutionFill.trade_id == trade_id)
+        )
+        result = await session.execute(stmt)
+        return set(result.scalars().all())
 
     async def create_exclusion(
         self,
