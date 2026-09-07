@@ -114,6 +114,10 @@ class PnlService:
             .where(
                 Trade.user_id == user_id,
                 Trade.status == "CLOSED",
+                # B-16-C: exclude soft-deleted trades from backfill.
+                # Soft-deleted trades retain status='CLOSED'; is_deleted is the
+                # sole deletion signal. Their P&L must not be (re)calculated.
+                Trade.is_deleted.is_(False),
                 TradePnl.trade_id.is_(None),
             )
         )

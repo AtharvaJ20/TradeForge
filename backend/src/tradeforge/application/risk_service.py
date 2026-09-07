@@ -28,6 +28,13 @@ _IST = timezone(timedelta(hours=5, minutes=30))
 
 # G-RISK-01-A: include PARTIAL — partially-exited position is still open and at risk.
 # Dhanvantari: no trade_date filter on open trades — trades from prior days are at risk.
+# B-16-C: AND is_deleted = false is MANDATORY.
+#   Soft-deleted OPEN/PARTIAL trades retain status='OPEN'/'PARTIAL' (is_deleted is the
+#   sole deletion signal). Without this filter, deleted manual trades inflate the at-risk
+#   number, corrupting Layers 2-3 of the daily risk stack.
+# R-16-7 verification (Dhanvantari): _AT_RISK_BY_ACCOUNT does NOT join to trading_accounts
+#   and does NOT filter on trading_accounts.status. Orphaned open positions on INACTIVE
+#   accounts represent real capital at risk. Their inclusion is correct.
 _AT_RISK_BY_ACCOUNT = """
 SELECT
     COUNT(*)                 AS open_trade_count,
@@ -35,11 +42,14 @@ SELECT
 FROM trades
 WHERE account_id = :account_id
   AND status IN ('OPEN', 'PARTIAL')
+  AND is_deleted = false
 """
 
 # Dhanvantari Phase 1: trade_date = today in IST. MIS traders open/close same day.
 # Swing/CNC positions closed on a different date than opened may be excluded.
 # t. prefix on all trades columns avoids ambiguity in the trade_pnl JOIN.
+# B-16-C: AND t.is_deleted = false — soft-deleted closed trades must not appear in
+#   daily-loss totals.
 _DAILY_LOSS_BY_ACCOUNT = """
 SELECT
     COALESCE(SUM(tp.net_pnl), 0) AS daily_loss_inr,
@@ -49,6 +59,7 @@ JOIN trade_pnl tp ON tp.trade_id = t.id
 WHERE t.account_id = :account_id
   AND t.trade_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
   AND tp.net_pnl < 0
+  AND t.is_deleted = false
 """
 
 # ---------------------------------------------------------------------------
@@ -56,6 +67,11 @@ WHERE t.account_id = :account_id
 # Extra {account_clause} is injected when account_ids are specified.
 # ---------------------------------------------------------------------------
 
+# B-16-C: AND is_deleted = false — see _AT_RISK_BY_ACCOUNT comment above.
+# R-16-7 verification (Dhanvantari): _AT_RISK_BY_USER does NOT join to trading_accounts
+#   and does NOT filter on trading_accounts.status. Orphaned open positions on INACTIVE
+#   accounts are included — this is correct. Account administrative status does not mean
+#   positions were closed. Their omission would corrupt daily loss limit enforcement.
 _AT_RISK_BY_USER = """
 SELECT
     COUNT(*)                 AS open_trade_count,
@@ -63,9 +79,11 @@ SELECT
 FROM trades
 WHERE user_id = :user_id
   AND status IN ('OPEN', 'PARTIAL')
+  AND is_deleted = false
   {account_clause}
 """
 
+# B-16-C: AND t.is_deleted = false — soft-deleted trades must not appear in daily-loss.
 _DAILY_LOSS_BY_USER = """
 SELECT
     COALESCE(SUM(tp.net_pnl), 0) AS daily_loss_inr,
@@ -75,6 +93,7 @@ JOIN trade_pnl tp ON tp.trade_id = t.id
 WHERE t.user_id = :user_id
   AND t.trade_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
   AND tp.net_pnl < 0
+  AND t.is_deleted = false
   {account_clause}
 """
 
