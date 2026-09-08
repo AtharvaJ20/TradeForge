@@ -97,14 +97,36 @@ class PnlRepository:
         return result.scalar_one_or_none()
 
     async def get_planned_risk(self, trade_id: uuid.UUID) -> Decimal | None:
-        """Return planned_risk_amount from journal_entries for this trade."""
+        """Return planned_risk_amount for this trade.
+
+        Primary path: journal_entries.planned_risk_amount (user's explicit
+        pre-trade risk annotation). Takes priority when it exists and is non-NULL.
+
+        Fallback path: trades.planned_risk_amount — populated at create_trade()
+        time from planned_stop for manually entered trades that have no journal
+        entry (Step 16). Without this fallback, all Step 16 manually entered
+        closed trades would have a NULL r_multiple regardless of planned_stop
+        being provided. (BLK-1 — Dhanvantari, corrected 2026-09-07)
+
+        Ordering: the fallback only executes when no journal entry exists or its
+        planned_risk_amount is NULL. Existing behavior (journal entry takes
+        priority) is unchanged.
+        """
+        # Primary: journal entry (user's explicit pre-trade risk annotation)
         stmt = select(JournalEntry.planned_risk_amount).where(
             JournalEntry.trade_id == trade_id,
             JournalEntry.deleted_at.is_(None),
         )
         result = await self._db.execute(stmt)
         value = result.scalar_one_or_none()
-        return Decimal(str(value)) if value is not None else None
+        if value is not None:
+            return Decimal(str(value))
+        # Fallback: trades.planned_risk_amount — populated at create_trade time
+        # from planned_stop when no journal entry exists (Step 16 manual trades).
+        stmt2 = select(Trade.planned_risk_amount).where(Trade.id == trade_id)
+        result2 = await self._db.execute(stmt2)
+        value2 = result2.scalar_one_or_none()
+        return Decimal(str(value2)) if value2 is not None else None
 
     # ------------------------------------------------------------------
     # trade_pnl write
