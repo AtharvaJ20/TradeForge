@@ -12,6 +12,7 @@ import { AccountProvider } from './features/accounts/context/AccountContext'
 import { AppShell } from './layout/AppShell'
 import { RequireAuth } from './components/RequireAuth'
 import { PlaceholderPage } from './components/PlaceholderPage'
+import { ImportTradesPage } from './features/imports/ImportTradesPage'
 
 export function App() {
   return (
@@ -38,7 +39,7 @@ export function App() {
           <Route path="/risk" element={<PlaceholderPage title="Risk" />} />
           <Route path="/trades" element={<PlaceholderPage title="Trades" />} />
           <Route path="/trades/new" element={<AddTradePage />} />
-          <Route path="/import" element={<PlaceholderPage title="Import" />} />
+          <Route path="/import" element={<ImportTradesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Route>

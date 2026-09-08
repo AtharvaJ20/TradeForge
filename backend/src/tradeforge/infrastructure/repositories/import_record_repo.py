@@ -30,6 +30,22 @@ class ImportRecordRepository:
         result = await session.execute(stmt)
         return result.scalar_one_or_none() is not None
 
+    async def list_by_account(
+        self,
+        session: AsyncSession,
+        account_id: uuid.UUID,
+        limit: int = 20,
+    ) -> list[ImportRecord]:
+        """Return the most recent `limit` imports for account_id, newest first."""
+        stmt = (
+            select(ImportRecord)
+            .where(ImportRecord.account_id == account_id)
+            .order_by(ImportRecord.imported_at.desc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
     async def create(
         self,
         session: AsyncSession,

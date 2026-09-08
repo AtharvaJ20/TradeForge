@@ -115,6 +115,11 @@ def create_app() -> FastAPI:
 
     app.include_router(trades.router, prefix="/v1")
 
+    # Imports router (Step 17 — import history)
+    from tradeforge.api.v1 import imports
+
+    app.include_router(imports.router, prefix="/v1")
+
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}

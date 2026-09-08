@@ -59,6 +59,7 @@ class ImportSummary:
     trades_closed: int
     pnl_succeeded: int
     pnl_failed: int
+    status: str  # COMPLETE | PARTIAL | EMPTY | FAILED
 
 
 # maps broker string to the instrument_type that the ReconstructionEngine expects
@@ -239,6 +240,7 @@ class ImportService:
             trades_closed=trades_closed,
             pnl_succeeded=pnl_succeeded,
             pnl_failed=pnl_failed,
+            status=status,
         )
 
     # ------------------------------------------------------------------
