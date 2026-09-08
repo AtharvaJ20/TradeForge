@@ -139,7 +139,7 @@ def _derive_fill_session(fill_timestamp: datetime) -> str:
     return "POST_CLOSE"
 
 
-def _derive_trade_date(fill_timestamp: datetime) -> "date":
+def _derive_trade_date(fill_timestamp: datetime) -> date:
     return fill_timestamp.astimezone(_IST).date()
 
 
@@ -224,7 +224,7 @@ class TradeService:
         for fill_dict in fills:
             fill_ts: datetime = fill_dict["fill_timestamp"]
             normalized = NormalizedFill(
-                broker_trade_id=str(uuid.uuid4()),   # unique UUID per fill (D5)
+                broker_trade_id=str(uuid.uuid4()),  # unique UUID per fill (D5)
                 broker_order_id=str(uuid.uuid4()),
                 broker="MANUAL",
                 import_source="MANUAL",

@@ -48,9 +48,7 @@ def upgrade() -> None:
     # 2. Partial index: covers the common case (non-deleted rows) used by
     #    get_open_trade_with_lock() and other queries filtered by user_id.
     # ------------------------------------------------------------------
-    op.execute(
-        "CREATE INDEX idx_trades_user_active ON trades (user_id) WHERE is_deleted = false"
-    )
+    op.execute("CREATE INDEX idx_trades_user_active ON trades (user_id) WHERE is_deleted = false")
 
     # ------------------------------------------------------------------
     # 3. Add import_source check constraint to execution_fills.

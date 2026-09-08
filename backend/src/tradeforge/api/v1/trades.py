@@ -60,8 +60,8 @@ class InstrumentInput(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=50, description="Uppercase NSE/BSE symbol")
     exchange_segment: Literal["NSE_EQ", "NSE_FO", "BSE_EQ"]
     instrument_type: Literal["EQ", "FUT", "CE", "PE"]
-    expiry_date: date | None = None          # required for FUT, CE, PE
-    strike_price: Decimal | None = None      # required for CE, PE; gt=0
+    expiry_date: date | None = None  # required for FUT, CE, PE
+    strike_price: Decimal | None = None  # required for CE, PE; gt=0
 
 
 class CreateTradeRequest(BaseModel):

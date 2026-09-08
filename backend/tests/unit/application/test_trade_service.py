@@ -14,9 +14,7 @@ from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
-from tradeforge.application.trade_service import TradeService, TradeNotManualError
+from tradeforge.application.trade_service import TradeService
 from tradeforge.domain.import_domain.types import TradingAccount
 from tradeforge.domain.trade.types import ReconstructionResult
 from tradeforge.infrastructure.models.trade_domain import ExecutionFill, Trade
@@ -34,7 +32,7 @@ _FILL_ID_2 = uuid.uuid4()
 _UTC = UTC
 _IST = timezone(timedelta(hours=5, minutes=30))
 _NOW = datetime(2026, 9, 7, 4, 45, 0, tzinfo=UTC)  # 10:15 IST
-_FILL_TS = datetime(2026, 9, 7, 4, 45, 0, tzinfo=UTC)   # 10:15 IST
+_FILL_TS = datetime(2026, 9, 7, 4, 45, 0, tzinfo=UTC)  # 10:15 IST
 _FILL_TS2 = datetime(2026, 9, 7, 5, 0, 0, tzinfo=UTC)  # 10:30 IST
 
 
@@ -93,9 +91,7 @@ def _make_trade_orm(
     return trade
 
 
-def _make_fill_orm(
-    fill_id: uuid.UUID, import_source: str = "MANUAL"
-) -> MagicMock:
+def _make_fill_orm(fill_id: uuid.UUID, import_source: str = "MANUAL") -> MagicMock:
     fill = MagicMock(spec=ExecutionFill)
     fill.id = fill_id
     fill.trade_id = _TRADE_ID
@@ -114,12 +110,14 @@ def _make_service() -> TradeService:
 
     # Patch TaxLotRepository, ChargeScheduleRepository, PnlRepository constructors
     # so they don't need real DB drivers. The repos are set on the instance after.
-    with patch("tradeforge.application.trade_service.TaxLotRepository"), \
-         patch("tradeforge.application.trade_service.ChargeScheduleRepository"), \
-         patch("tradeforge.application.trade_service.PnlRepository"), \
-         patch("tradeforge.application.trade_service.TradingAccountService"), \
-         patch("tradeforge.application.trade_service.ReconstructionEngine"), \
-         patch("tradeforge.application.trade_service.PnlService"):
+    with (
+        patch("tradeforge.application.trade_service.TaxLotRepository"),
+        patch("tradeforge.application.trade_service.ChargeScheduleRepository"),
+        patch("tradeforge.application.trade_service.PnlRepository"),
+        patch("tradeforge.application.trade_service.TradingAccountService"),
+        patch("tradeforge.application.trade_service.ReconstructionEngine"),
+        patch("tradeforge.application.trade_service.PnlService"),
+    ):
         svc = TradeService(session=mock_session)
 
     # Replace all internal attributes with full AsyncMocks.

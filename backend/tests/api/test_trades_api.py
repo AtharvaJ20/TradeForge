@@ -18,9 +18,9 @@ the unit tier; at the API mock tier we verify add_fill() is called and returns 2
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime, timezone, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import AsyncClient
@@ -30,7 +30,6 @@ from tradeforge.application.trade_service import (
     FillTimestampBeforeTradeOpenError,
     InstrumentNotFoundError,
     PlannedStopWrongSideError,
-    ReconstructionFailedError,
     TradeAlreadyClosedError,
     TradeNotFoundError,
     TradeNotManualError,
@@ -164,9 +163,7 @@ def _make_analytics_summary():
             r_coverage_pct=zero,
             insufficient_sample=True,
         ),
-        profit_factor=ProfitFactorResult(
-            profit_factor=None, gross_profit=zero, gross_loss=zero
-        ),
+        profit_factor=ProfitFactorResult(profit_factor=None, gross_profit=zero, gross_loss=zero),
         planned_rr=PlannedRRResult(
             avg_planned_rr=None, trade_count_with_rr=0, total_count=0, coverage_pct=zero
         ),
@@ -316,9 +313,7 @@ async def test_create_trade_unknown_instrument_returns_422(
     http_client: AsyncClient, mock_trade_svc: AsyncMock
 ) -> None:
     """B-16-04: Unknown instrument → 422 INSTRUMENT_NOT_FOUND."""
-    mock_trade_svc.create_trade.side_effect = InstrumentNotFoundError(
-        "UNKNOWN", "NSE_EQ", "EQ"
-    )
+    mock_trade_svc.create_trade.side_effect = InstrumentNotFoundError("UNKNOWN", "NSE_EQ", "EQ")
 
     response = await http_client.post("/v1/trades", json=_valid_create_body())
 
@@ -395,8 +390,12 @@ async def test_create_trade_naive_timestamp_returns_422(
     """B-16-08: Naive fill_timestamp (no tz offset) → 422 FILL_TIMESTAMP_NOT_TZ_AWARE."""
     body = _valid_create_body(
         fills=[
-            {"side": "BUY", "quantity": "10", "price": "2500.00",
-             "fill_timestamp": "2026-09-07T10:15:00"}  # no UTC offset
+            {
+                "side": "BUY",
+                "quantity": "10",
+                "price": "2500.00",
+                "fill_timestamp": "2026-09-07T10:15:00",
+            }  # no UTC offset
         ]
     )
     response = await http_client.post("/v1/trades", json=body)
@@ -496,13 +495,9 @@ async def test_add_fill_to_open_trade_returns_200(
     http_client: AsyncClient, mock_trade_svc: AsyncMock
 ) -> None:
     """B-16-13: POST /v1/trades/{id}/fills on OPEN trade → 200 with updated TradeOut."""
-    mock_trade_svc.add_fill.return_value = _make_trade(
-        status="OPEN", trade_type="CNC"
-    )
+    mock_trade_svc.add_fill.return_value = _make_trade(status="OPEN", trade_type="CNC")
 
-    response = await http_client.post(
-        f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body()
-    )
+    response = await http_client.post(f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body())
 
     assert response.status_code == 200
     assert response.json()["status"] == "OPEN"
@@ -520,9 +515,7 @@ async def test_add_fill_to_closed_trade_returns_422(
     """B-16-14: Adding fill to CLOSED trade → 422 TRADE_ALREADY_CLOSED."""
     mock_trade_svc.add_fill.side_effect = TradeAlreadyClosedError(_TRADE_ID)
 
-    response = await http_client.post(
-        f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body()
-    )
+    response = await http_client.post(f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body())
 
     assert response.status_code == 422
     assert response.json()["detail"] == "TRADE_ALREADY_CLOSED"
@@ -539,9 +532,7 @@ async def test_add_fill_other_users_trade_returns_403(
     """B-16-15: Adding fill to another user's trade → 403 TRADE_NOT_OWNED."""
     mock_trade_svc.add_fill.side_effect = TradeNotOwnedError(_TRADE_ID)
 
-    response = await http_client.post(
-        f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body()
-    )
+    response = await http_client.post(f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body())
 
     assert response.status_code == 403
     assert response.json()["detail"] == "TRADE_NOT_OWNED"
@@ -608,9 +599,7 @@ async def test_delete_trade_returns_204(
     response = await http_client.delete(f"/v1/trades/{_TRADE_ID}")
 
     assert response.status_code == 204
-    mock_trade_svc.soft_delete_trade.assert_awaited_once_with(
-        user_id=_USER_ID, trade_id=_TRADE_ID
-    )
+    mock_trade_svc.soft_delete_trade.assert_awaited_once_with(user_id=_USER_ID, trade_id=_TRADE_ID)
 
 
 # ---------------------------------------------------------------------------
@@ -859,9 +848,7 @@ async def test_add_fill_recomputes_planned_risk_after_scale_in(
     """
     mock_trade_svc.add_fill.return_value = _make_trade(status="OPEN")
 
-    response = await http_client.post(
-        f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body()
-    )
+    response = await http_client.post(f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body())
 
     assert response.status_code == 200
     mock_trade_svc.add_fill.assert_awaited_once()
@@ -902,9 +889,7 @@ async def test_create_trade_short_stop_below_entry_returns_422(
 
     body = _valid_create_body(
         planned_stop="2400.00",  # below entry price 2500
-        fills=[
-            {"side": "SELL", "quantity": "10", "price": "2500.00", "fill_timestamp": _FILL_TS}
-        ],
+        fills=[{"side": "SELL", "quantity": "10", "price": "2500.00", "fill_timestamp": _FILL_TS}],
     )
     response = await http_client.post("/v1/trades", json=body)
 
@@ -931,9 +916,7 @@ async def test_add_fill_inactive_account_returns_200(
     mock_trade_svc.add_fill.return_value = _make_trade(status="OPEN")
 
     # fill timestamp is after trade open — valid
-    response = await http_client.post(
-        f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body()
-    )
+    response = await http_client.post(f"/v1/trades/{_TRADE_ID}/fills", json=_valid_add_fill_body())
 
     assert response.status_code == 200
     mock_trade_svc.add_fill.assert_awaited_once()
