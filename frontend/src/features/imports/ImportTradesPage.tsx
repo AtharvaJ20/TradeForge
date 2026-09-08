@@ -193,7 +193,7 @@ function HistoryTable({
             <th className="pb-2 pr-4">Date</th>
             <th className="pb-2 pr-4">Broker</th>
             <th className="pb-2 pr-4">File</th>
-            <th className="pb-2 pr-4">Fills</th>
+            <th className="pb-2 pr-4">Rows</th>
             <th className="pb-2 pr-4">Errors</th>
             <th className="pb-2">Status</th>
           </tr>
