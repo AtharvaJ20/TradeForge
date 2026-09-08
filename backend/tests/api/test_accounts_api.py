@@ -188,3 +188,113 @@ async def test_delete_account_not_owned_returns_404(
     response = await http_client.delete(f"/v1/accounts/{uuid.uuid4()}")
 
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# B-18-27: POST /v1/accounts — starting_capital accepted and returned
+# ---------------------------------------------------------------------------
+
+
+async def test_create_account_with_starting_capital(
+    http_client: AsyncClient, mock_account_svc: AsyncMock
+) -> None:
+    """B-18-27: POST /v1/accounts accepts starting_capital and returns it in AccountOut."""
+    from decimal import Decimal
+
+    account = TradingAccount(
+        id=_ACCOUNT_ID,
+        user_id=_USER_ID,
+        broker="ZERODHA",
+        display_name="Capital Account",
+        account_type="INDIVIDUAL",
+        base_currency="INR",
+        status="ACTIVE",
+        created_at=_NOW,
+        updated_at=_NOW,
+        starting_capital=Decimal("500000.00"),
+    )
+    mock_account_svc.create.return_value = account
+
+    response = await http_client.post(
+        "/v1/accounts",
+        json={
+            "broker": "ZERODHA",
+            "display_name": "Capital Account",
+            "account_type": "INDIVIDUAL",
+            "starting_capital": "500000.00",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["starting_capital"] == "500000.00"
+    call_kwargs = mock_account_svc.create.call_args.kwargs
+    assert call_kwargs["starting_capital"] == Decimal("500000.00")
+
+
+# ---------------------------------------------------------------------------
+# B-18-28: PATCH /v1/accounts/{id} — starting_capital updated
+# ---------------------------------------------------------------------------
+
+
+async def test_patch_account_updates_starting_capital(
+    http_client: AsyncClient, mock_account_svc: AsyncMock
+) -> None:
+    """B-18-28: PATCH /v1/accounts/{id} with starting_capital updates and returns it."""
+    from decimal import Decimal
+
+    updated = TradingAccount(
+        id=_ACCOUNT_ID,
+        user_id=_USER_ID,
+        broker="ZERODHA",
+        display_name="Main Account",
+        account_type="INDIVIDUAL",
+        base_currency="INR",
+        status="ACTIVE",
+        created_at=_NOW,
+        updated_at=_NOW,
+        starting_capital=Decimal("750000.00"),
+    )
+    mock_account_svc.update.return_value = updated
+
+    response = await http_client.patch(
+        f"/v1/accounts/{_ACCOUNT_ID}",
+        json={"starting_capital": "750000.00"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["starting_capital"] == "750000.00"
+    call_kwargs = mock_account_svc.update.call_args.kwargs
+    assert call_kwargs["starting_capital"] == Decimal("750000.00")
+
+
+# ---------------------------------------------------------------------------
+# B-18-29: POST /v1/accounts — starting_capital=0 or negative → 422
+# ---------------------------------------------------------------------------
+
+
+async def test_create_account_zero_starting_capital_returns_422(
+    http_client: AsyncClient, mock_account_svc: AsyncMock
+) -> None:
+    """B-18-29: starting_capital must be > 0; zero and negative values return 422."""
+    response_zero = await http_client.post(
+        "/v1/accounts",
+        json={
+            "broker": "ZERODHA",
+            "display_name": "Bad Capital",
+            "account_type": "INDIVIDUAL",
+            "starting_capital": "0",
+        },
+    )
+    assert response_zero.status_code == 422
+
+    response_neg = await http_client.post(
+        "/v1/accounts",
+        json={
+            "broker": "ZERODHA",
+            "display_name": "Bad Capital",
+            "account_type": "INDIVIDUAL",
+            "starting_capital": "-100",
+        },
+    )
+    assert response_neg.status_code == 422

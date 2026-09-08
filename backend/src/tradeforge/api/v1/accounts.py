@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
@@ -59,6 +60,7 @@ class CreateAccountRequest(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=100)
     account_type: str = Field(default="INDIVIDUAL", description="INDIVIDUAL or HUF")
     base_currency: str = Field(default="INR", min_length=3, max_length=3)
+    starting_capital: Decimal | None = Field(default=None, gt=0)
 
 
 class AccountOut(BaseModel):
@@ -73,6 +75,7 @@ class AccountOut(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    starting_capital: Decimal | None = None
 
 
 class UpdateAccountRequest(BaseModel):
@@ -80,6 +83,7 @@ class UpdateAccountRequest(BaseModel):
 
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
     account_type: str | None = Field(default=None)
+    starting_capital: Decimal | None = Field(default=None, gt=0)
 
 
 class ImportSummaryOut(BaseModel):
@@ -143,6 +147,7 @@ async def create_account(
             display_name=body.display_name,
             account_type=body.account_type,
             base_currency=body.base_currency,
+            starting_capital=body.starting_capital,
         )
         await db.commit()
     except ValueError as exc:
@@ -189,6 +194,7 @@ async def update_account(
             account_id=account_id,
             display_name=body.display_name,
             account_type=body.account_type,
+            starting_capital=body.starting_capital,
         )
         await db.commit()
     except AccountNotFoundError:

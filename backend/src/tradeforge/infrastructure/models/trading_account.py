@@ -5,7 +5,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String
+from decimal import Decimal
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +26,7 @@ class TradingAccount(Base):
     account_type: Mapped[str] = mapped_column(String(20), nullable=False)
     base_currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="INR")
     status: Mapped[str] = mapped_column(String(10), nullable=False, server_default="ACTIVE")
+    starting_capital: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow, server_default="now()"
     )

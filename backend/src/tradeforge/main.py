@@ -120,6 +120,11 @@ def create_app() -> FastAPI:
 
     app.include_router(imports.router, prefix="/v1")
 
+    # Dashboard router (Step 18)
+    from tradeforge.api.v1 import dashboard
+
+    app.include_router(dashboard.router, prefix="/v1")
+
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}

@@ -18,11 +18,13 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.api.v1.deps import get_current_user_id
+from tradeforge.application.trading_account_service import TradingAccountService
 from tradeforge.application.trade_service import (
     FillTimestampBeforeTradeOpenError,
     InstrumentNotFoundError,
@@ -36,6 +38,9 @@ from tradeforge.application.trade_service import (
 )
 from tradeforge.domain.import_domain.errors import AccountNotFoundError
 from tradeforge.infrastructure.db import get_db
+from tradeforge.infrastructure.models.trade_domain import Instrument, Trade
+from tradeforge.infrastructure.models.trade_pnl import TradePnl
+from tradeforge.infrastructure.repositories.trading_account_repo import TradingAccountRepository
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
@@ -105,6 +110,33 @@ class TradeOut(BaseModel):
     updated_at: datetime
 
 
+class TradeListItemOut(BaseModel):
+    id: uuid.UUID
+    account_id: uuid.UUID | None
+    symbol: str
+    instrument_type: str
+    direction: str
+    status: str
+    trade_date: date
+    last_fill_at: datetime | None
+    net_pnl: Decimal | None
+    r_multiple: Decimal | None
+
+
+# ---------------------------------------------------------------------------
+# Sort whitelist (D-18-1: no string interpolation into ORDER BY)
+# ---------------------------------------------------------------------------
+
+_SORT_COLUMNS = {
+    "last_fill_at": Trade.last_fill_at,
+    "trade_date": Trade.trade_date,
+    "net_pnl": TradePnl.net_pnl,
+    "r_multiple": TradePnl.r_multiple,
+}
+
+_VALID_STATUSES = frozenset({"OPEN", "CLOSED", "PARTIAL"})
+
+
 # ---------------------------------------------------------------------------
 # Validation helpers
 # ---------------------------------------------------------------------------
@@ -167,9 +199,76 @@ def get_trade_service(db: AsyncSession = Depends(get_db)) -> TradeService:
     return TradeService(session=db)
 
 
+def get_account_service() -> TradingAccountService:
+    return TradingAccountService(account_repo=TradingAccountRepository())
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+
+@router.get("", response_model=list[TradeListItemOut])
+async def list_trades(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+    _svc: TradingAccountService = Depends(get_account_service),
+    status: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
+    sort_by: str = Query(default="last_fill_at"),
+    sort_dir: str = Query(default="desc"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[TradeListItemOut]:
+    if status is not None and status not in _VALID_STATUSES:
+        raise HTTPException(status_code=422, detail="INVALID_STATUS")
+
+    sort_col = _SORT_COLUMNS.get(sort_by, Trade.last_fill_at)
+    ordered_col = sort_col.asc() if sort_dir == "asc" else sort_col.desc()
+
+    stmt = (
+        select(
+            Trade.id,
+            Trade.account_id,
+            Trade.direction,
+            Trade.status,
+            Trade.trade_date,
+            Trade.last_fill_at,
+            Instrument.symbol,
+            Instrument.instrument_type,
+            TradePnl.net_pnl,
+            TradePnl.r_multiple,
+        )
+        .select_from(Trade)
+        .join(Instrument, Instrument.id == Trade.instrument_id)
+        .outerjoin(TradePnl, TradePnl.trade_id == Trade.id)
+        .where(Trade.user_id == user_id, Trade.is_deleted.is_(False))
+    )
+    if status is not None:
+        stmt = stmt.where(Trade.status == status)
+    if account_id is not None:
+        stmt = stmt.where(Trade.account_id == account_id)
+
+    stmt = stmt.order_by(ordered_col).limit(limit).offset(offset)
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        TradeListItemOut(
+            id=row.id,
+            account_id=row.account_id,
+            symbol=row.symbol,
+            instrument_type=row.instrument_type,
+            direction=row.direction,
+            status=row.status,
+            trade_date=row.trade_date,
+            last_fill_at=row.last_fill_at,
+            net_pnl=row.net_pnl,
+            r_multiple=row.r_multiple,
+        )
+        for row in rows
+    ]
 
 
 @router.post("", response_model=TradeOut, status_code=201)
