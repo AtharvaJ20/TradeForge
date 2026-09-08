@@ -681,6 +681,14 @@ export const handlers = [
   http.post(`${BASE}/v1/trades`, () => HttpResponse.json(TRADE_OPEN_FIXTURE, { status: 201 })),
   http.post(`${BASE}/v1/trades/:id/fills`, () => HttpResponse.json(TRADE_OPEN_FIXTURE)),
   http.delete(`${BASE}/v1/trades/:id`, () => new HttpResponse(null, { status: 204 })),
+
+  // ---------------------------------------------------------------------------
+  // Step 17 — Imports handlers (default: success)
+  // ---------------------------------------------------------------------------
+  http.post(`${BASE}/v1/accounts/:accountId/import`, () =>
+    HttpResponse.json(IMPORT_SUCCESS_FIXTURE, { status: 201 }),
+  ),
+  http.get(`${BASE}/v1/imports`, () => HttpResponse.json(IMPORT_HISTORY_FIXTURE)),
 ]
 
 /** Override handler: GET returns 404 (no journal entry). */
@@ -807,6 +815,73 @@ export const createAccountInvalidHandler = http.post(`${BASE}/v1/accounts`, () =
 )
 
 // ---------------------------------------------------------------------------
+// Step 17 — Import fixtures
+// ---------------------------------------------------------------------------
+
+export const IMPORT_SUCCESS_FIXTURE = {
+  import_record_id: '00000000-0000-0000-0000-000000000501',
+  fills_ingested: 42,
+  fills_skipped: 3,
+  row_errors: 0,
+  trades_created: 8,
+  trades_closed: 5,
+  pnl_succeeded: 5,
+  pnl_failed: 0,
+  status: 'COMPLETE',
+}
+
+export const IMPORT_PARTIAL_FIXTURE = {
+  import_record_id: '00000000-0000-0000-0000-000000000502',
+  fills_ingested: 20,
+  fills_skipped: 0,
+  row_errors: 5,
+  trades_created: 4,
+  trades_closed: 2,
+  pnl_succeeded: 2,
+  pnl_failed: 0,
+  status: 'PARTIAL',
+}
+
+export const IMPORT_FAILED_FIXTURE = {
+  import_record_id: '00000000-0000-0000-0000-000000000503',
+  fills_ingested: 0,
+  fills_skipped: 0,
+  row_errors: 10,
+  trades_created: 0,
+  trades_closed: 0,
+  pnl_succeeded: 0,
+  pnl_failed: 0,
+  status: 'FAILED',
+}
+
+export const IMPORT_HISTORY_FIXTURE = [
+  {
+    id: '00000000-0000-0000-0000-000000000501',
+    account_id: '00000000-0000-0000-0000-000000000001',
+    broker: 'ZERODHA',
+    file_name: 'tradebook.csv',
+    row_count: 42,
+    error_count: 0,
+    status: 'COMPLETE',
+    imported_at: '2026-09-07T10:00:00Z',
+    created_at: '2026-09-07T10:00:00Z',
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000502',
+    account_id: '00000000-0000-0000-0000-000000000001',
+    broker: 'ZERODHA',
+    file_name: 'tradebook2.csv',
+    row_count: 20,
+    error_count: 5,
+    status: 'PARTIAL',
+    imported_at: '2026-09-06T10:00:00Z',
+    created_at: '2026-09-06T10:00:00Z',
+  },
+]
+
+export const IMPORT_HISTORY_EMPTY_FIXTURE: typeof IMPORT_HISTORY_FIXTURE = []
+
+// ---------------------------------------------------------------------------
 // Step 16 — Trades fixtures
 // ---------------------------------------------------------------------------
 
@@ -831,6 +906,90 @@ export const TRADE_OPEN_FIXTURE = {
   created_at: '2026-09-06T04:45:00Z',
   updated_at: '2026-09-06T04:45:00Z',
 }
+
+// ---------------------------------------------------------------------------
+// Step 16 — Trades override handlers
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Step 17 — Import override handlers
+// ---------------------------------------------------------------------------
+
+export const importPartialHandler = http.post(`${BASE}/v1/accounts/:accountId/import`, () =>
+  HttpResponse.json(IMPORT_PARTIAL_FIXTURE, { status: 201 }),
+)
+
+export const importFailedStatusHandler = http.post(`${BASE}/v1/accounts/:accountId/import`, () =>
+  HttpResponse.json(IMPORT_FAILED_FIXTURE, { status: 201 }),
+)
+
+export const importDuplicateHandler = http.post(`${BASE}/v1/accounts/:accountId/import`, () =>
+  new HttpResponse(JSON.stringify({ detail: 'DUPLICATE_IMPORT' }), {
+    status: 409,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)
+
+export const importFileTooLargeHandler = http.post(`${BASE}/v1/accounts/:accountId/import`, () =>
+  new HttpResponse(JSON.stringify({ detail: 'FILE_TOO_LARGE' }), {
+    status: 413,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)
+
+export const importEmptyFileHandler = http.post(`${BASE}/v1/accounts/:accountId/import`, () =>
+  new HttpResponse(JSON.stringify({ detail: 'EMPTY_FILE' }), {
+    status: 422,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)
+
+export const importUnrecognizedFormatHandler = http.post(
+  `${BASE}/v1/accounts/:accountId/import`,
+  () =>
+    new HttpResponse(JSON.stringify({ detail: 'UNRECOGNIZED_FILE_FORMAT' }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+)
+
+export const importMissingProductTypeHandler = http.post(
+  `${BASE}/v1/accounts/:accountId/import`,
+  () =>
+    new HttpResponse(JSON.stringify({ detail: 'MISSING_PRODUCT_TYPE' }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+)
+
+export const importAccountInactiveHandler = http.post(
+  `${BASE}/v1/accounts/:accountId/import`,
+  () =>
+    new HttpResponse(JSON.stringify({ detail: 'ACCOUNT_INACTIVE' }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+)
+
+export const importHistoryEmptyHandler = http.get(`${BASE}/v1/imports`, () =>
+  HttpResponse.json(IMPORT_HISTORY_EMPTY_FIXTURE),
+)
+
+export const accountsNonZerodhaActiveHandler = http.get(`${BASE}/v1/accounts`, () =>
+  HttpResponse.json([
+    {
+      id: '00000000-0000-0000-0000-000000000003',
+      user_id: '00000000-0000-0000-0000-000000000099',
+      broker: 'ANGEL_ONE',
+      display_name: 'Angel One Account',
+      account_type: 'INDIVIDUAL',
+      base_currency: 'INR',
+      status: 'ACTIVE',
+      created_at: '2026-08-01T10:00:00Z',
+      updated_at: '2026-08-01T10:00:00Z',
+    },
+  ]),
+)
 
 // ---------------------------------------------------------------------------
 // Step 16 — Trades override handlers

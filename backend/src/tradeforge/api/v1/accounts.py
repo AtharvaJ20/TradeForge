@@ -91,6 +91,7 @@ class ImportSummaryOut(BaseModel):
     trades_closed: int
     pnl_succeeded: int
     pnl_failed: int
+    status: str  # COMPLETE | PARTIAL | EMPTY | FAILED
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +211,7 @@ async def deactivate_account(
         raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
 
 
-@router.post("/{account_id}/import", response_model=ImportSummaryOut)
+@router.post("/{account_id}/import", response_model=ImportSummaryOut, status_code=201)
 async def import_fills(
     account_id: uuid.UUID,
     file: UploadFile = File(..., description="Broker tradebook CSV"),
@@ -219,7 +220,17 @@ async def import_fills(
     db: AsyncSession = Depends(get_db),
     svc: ImportService = Depends(get_import_service),
 ) -> ImportSummaryOut:
+    # R-16-6 (mixed-provenance double-count): if the user previously added fills
+    # manually (Step 16) for an open position and then imports a broker CSV that
+    # covers the same period, duplicate fills can be created with no system
+    # prevention.  Phase 1 mitigation: UI notice on the Import screen tells users
+    # to review and delete duplicates via the Trades screen.  Phase 2 resolution:
+    # fill-exclusion UI before re-import (deferred — requires Celery job
+    # infrastructure and a per-fill exclusion model).
     file_content = await file.read()
+    if len(file_content) > 10 * 1024 * 1024:  # D-17-1: 10 MB hard limit
+        raise HTTPException(status_code=413, detail="FILE_TOO_LARGE")
+    safe_file_name = (file.filename or "")[:255] or None  # D-17-2: DB column is String(255)
     try:
         summary: ImportSummary = await svc.import_fills(
             db,
@@ -227,7 +238,7 @@ async def import_fills(
             account_id=account_id,
             file_content=file_content,
             product_type_hint=product_type_hint,
-            file_name=file.filename,
+            file_name=safe_file_name,
         )
         await db.commit()
     except AccountNotFoundError:
@@ -253,4 +264,5 @@ async def import_fills(
         trades_closed=summary.trades_closed,
         pnl_succeeded=summary.pnl_succeeded,
         pnl_failed=summary.pnl_failed,
+        status=summary.status,
     )
