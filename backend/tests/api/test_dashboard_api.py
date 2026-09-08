@@ -365,7 +365,11 @@ async def test_dashboard_summary_realized_equity_calculation(http_client: AsyncC
     from tradeforge.main import app
 
     mock_db = _make_mock_db(
-        [_dashboard_row(starting_capital=Decimal("500000.00"), all_time_net_pnl=Decimal("27500.00"))]
+        [
+            _dashboard_row(
+                starting_capital=Decimal("500000.00"), all_time_net_pnl=Decimal("27500.00")
+            )
+        ]
     )
     app.dependency_overrides[get_db] = lambda: mock_db
     try:

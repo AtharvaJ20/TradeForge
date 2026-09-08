@@ -100,9 +100,7 @@ async def dashboard_summary(
                 0,
             ).label("wtd_net_pnl"),
             func.count(case((Trade.status == "CLOSED", 1))).label("total_closed_trades"),
-            func.count(
-                case((Trade.status.in_(["OPEN", "PARTIAL"]), 1))
-            ).label("open_trade_count"),
+            func.count(case((Trade.status.in_(["OPEN", "PARTIAL"]), 1))).label("open_trade_count"),
             capital_sq.label("starting_capital"),
         )
         .select_from(Trade)
@@ -121,9 +119,7 @@ async def dashboard_summary(
     starting_capital = (
         Decimal(str(row.starting_capital)) if row.starting_capital is not None else None
     )
-    realized_equity = (
-        starting_capital + all_time_net_pnl if starting_capital is not None else None
-    )
+    realized_equity = starting_capital + all_time_net_pnl if starting_capital is not None else None
 
     return DashboardSummaryResponse(
         account_id=str(account_id),
