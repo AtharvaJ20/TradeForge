@@ -5,7 +5,7 @@
 **Date:** 2026-09-08  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-17-import-trades` (base: `main` after Step 16 merged as PR #10)  
-**Status:** READY TO IMPLEMENT — Mayasura architectural review applied (A-17-1, A-17-2, A-17-3 resolved, 2026-09-08)
+**Status:** READY TO IMPLEMENT — Mayasura architectural review (A-17-1, A-17-2, A-17-3, 2026-09-08), Ganesha domain review (G-17-1, 2026-09-08), and Dhanvantari risk review (D-17-1, D-17-2, 2026-09-08) all applied
 
 ---
 
@@ -18,6 +18,9 @@ Three blocking issues were identified and resolved before implementation began. 
 | **A-17-1** — `POST /v1/accounts/{account_id}/import` already exists; plan proposed a duplicate `POST /v1/imports` | **Option A:** Use the existing endpoint as the canonical import route. No new POST endpoint. | B-17-B scope reduced to `GET /v1/imports` + `status` field addition to `ImportSummaryOut` only. Arjun's API client calls the existing URL. |
 | **A-17-2** — Only `ZerodhaAdapter` exists on disk; Upstox and Angel One adapters do not exist; pre-conditions were false | **Option A:** Zerodha only for Phase 1. Upstox and Angel One deferred to Phase 2 (Sanjaya). B-17-14 and B-17-15 removed. UI shows Zerodha only. | Scope reduced. Pre-conditions corrected. "Not in Step 17" table updated. |
 | **A-17-3** — Plan mapped `AccountInactiveError` to `404 ACCOUNT_NOT_FOUND`, conflicting with existing endpoint's `422 ACCOUNT_INACTIVE` | **Use `422 ACCOUNT_INACTIVE`** consistently. `AccountNotFoundError` maps to `404 ACCOUNT_NOT_FOUND`; `AccountInactiveError` maps to `422 ACCOUNT_INACTIVE`. | Error mapping table corrected. B-17-07 expected response corrected to 422. |
+| **G-17-1** (Ganesha, 2026-09-08) — `EmptyFileError` in `ZerodhaAdapter` raises `422 EMPTY_FILE` for header-only CSVs; `status = "EMPTY"` success-path in `ImportService` is unreachable in Phase 1 (Zerodha adapter has no silent-skip path). Frontend had no `422 EMPTY_FILE` handler; B-17-05 expected wrong outcome. | **Remove `EMPTY` success-path banner from Phase 1 frontend** (dead code for Zerodha-only scope; reserved for Phase 2 adapters). **Add `422 EMPTY_FILE` as an explicit frontend error state.** Correct B-17-05 to assert `422 EMPTY_FILE`. Add `IMPORT_EMPTY_FILE` MSW fixture. Add F-17-16 test. | Frontend result table updated. B-17-05 corrected. MSW and test added. EMPTY banner removed from Phase 1 scope. |
+| **D-17-1** (Dhanvantari, 2026-09-08) — No server-side file size limit; `file.read()` in `accounts.py` is unbounded. Client-side warning (>5 MB) is not a block and is bypassed by direct API callers. | **Add server-side size check in `accounts.py` route handler:** files > 10 MB → `413 FILE_TOO_LARGE`. Add frontend handler, `IMPORT_FILE_TOO_LARGE` MSW fixture, B-17-14 backend test, and F-17-17 frontend test. | B-17-B scope extended. Error table updated. MSW, backend test, and frontend test added. |
+| **D-17-2** (Dhanvantari, 2026-09-08) — `file.filename` (client-controlled) stored without API-layer length validation; filenames > 255 chars cause unhandled 500s (DB `String(255)` constraint violation is not caught by existing exception handlers). | **Bhima truncates filename at the route handler** before calling `import_fills`: `file_name = (file.filename or "")[:255] or None`. One-liner in `accounts.py`. | B-17-B scope note added. No new test required (browser clients never produce filenames > 255 chars; direct API abuse is a hardening concern, not a feature-correctness test). |
 
 ---
 
@@ -131,7 +134,25 @@ class ImportSummaryOut(BaseModel):
     status: str          # NEW
 ```
 
-No route change. No DI change. The endpoint URL, authentication, and error handling in `accounts.py` are untouched.
+**Also in `accounts.py` — route handler hardening (D-17-1, D-17-2):**
+
+In the `import_fills` route handler, immediately after `file_content = await file.read()`, add a server-side file size guard:
+
+```python
+file_content = await file.read()
+if len(file_content) > 10 * 1024 * 1024:          # D-17-1: 10 MB hard limit
+    raise HTTPException(status_code=413, detail="FILE_TOO_LARGE")
+```
+
+And truncate `file.filename` before passing it downstream (D-17-2):
+
+```python
+safe_file_name = (file.filename or "")[:255] or None   # D-17-2: DB column is String(255)
+```
+
+Pass `file_name=safe_file_name` (not `file.filename`) into `svc.import_fills(...)`.
+
+No route signature change. No DI change. The endpoint URL, authentication, and existing error handling in `accounts.py` are otherwise untouched.
 
 ---
 
@@ -198,7 +219,7 @@ app.include_router(imports_router.router, prefix="/v1")
 | B-17-02 | `POST /v1/accounts/{account_id}/import` with same file for same account again → 409 `DUPLICATE_IMPORT` |
 | B-17-03 | `POST /v1/accounts/{account_id}/import` with same file for a different account owned by the same user → 201 (`file_hash + account_id` unique, not `file_hash`-only) |
 | B-17-04 | `POST /v1/accounts/{account_id}/import` with a non-CSV text file → 422 `UNRECOGNIZED_FILE_FORMAT` (existing error code from `accounts.py:241`) |
-| B-17-05 | `POST /v1/accounts/{account_id}/import` with header-only CSV → `status = "EMPTY"` in response |
+| B-17-05 | `POST /v1/accounts/{account_id}/import` with header-only CSV (zero data rows) → **422 `EMPTY_FILE`** (G-17-1: `ZerodhaAdapter` raises `EmptyFileError` before `ImportService` is reached; `status = "EMPTY"` success-path is unreachable via Zerodha) |
 | B-17-06 | `POST /v1/accounts/{account_id}/import` with another user's `account_id` → 404 `ACCOUNT_NOT_FOUND` |
 | B-17-07 | `POST /v1/accounts/{account_id}/import` with INACTIVE account → **422 `ACCOUNT_INACTIVE`** (not 404 — matches existing error mapping in `accounts.py:236`) |
 | B-17-08 | `POST /v1/accounts/{account_id}/import` unauthenticated → 401 |
@@ -208,8 +229,10 @@ app.include_router(imports_router.router, prefix="/v1")
 | B-17-12 | `GET /v1/imports?account_id=<uuid>` for a deactivated account owned by the user → 200 (ownership-only check; ACTIVE status not required for history) |
 | B-17-13 | `GET /v1/imports?account_id=<uuid>` returns empty list for account with no import history |
 
+| B-17-14 | `POST /v1/accounts/{account_id}/import` with file content > 10 MB → **413 `FILE_TOO_LARGE`** (D-17-1: server-side size guard added to route handler) |
+
 **Tests removed vs. original draft (A-17-2):**
-- ~~B-17-14~~ — Upstox CSV → 201 (deferred; adapter does not exist)
+- ~~B-17-14~~ (original) — Upstox CSV → 201 (deferred; adapter does not exist) — slot reused for D-17-1 file size test above
 - ~~B-17-15~~ — Angel One CSV → 201 (deferred; adapter does not exist)
 
 ---
@@ -292,12 +315,15 @@ Routed at `/import`. Linked from the navigation sidebar (add "Import" link to `A
 |-------|---------|
 | COMPLETE | Green success banner: "Import complete — X fills imported." Sub-line: "Y fills skipped (already imported)." |
 | PARTIAL | Amber warning banner: "Import partially completed — X fills imported, Z rows could not be read. Check that the file is a valid Zerodha export." |
-| EMPTY | Amber warning banner: "No new fills found. The file may already be fully imported or contain no data rows." |
 | FAILED | Red error banner: "Import failed — no fills could be read. Check the file format." |
 | 409 DUPLICATE_IMPORT | Red inline error: "This file has already been imported to this account." |
+| 413 FILE_TOO_LARGE | Red inline error: "The file is too large. Zerodha tradebook exports are typically under 1 MB." |
+| 422 EMPTY_FILE | Amber inline error: "The file contains no data rows. Check that you have exported the correct date range from Zerodha." |
 | 422 UNRECOGNIZED_FILE_FORMAT | Red inline error: "File format not recognised. Only Zerodha CSV exports are supported in Phase 1." |
 | 422 MISSING_PRODUCT_TYPE | Amber inline error: "This file contains F&O rows but no product type column. Select a product type above and try again." (auto-expand the product type hint select) |
 | 422 ACCOUNT_INACTIVE | Red inline error: "This account is inactive. Reactivate it in Settings before importing." |
+
+> **Note on `EMPTY` status (G-17-1):** The `status = "EMPTY"` success-path in `ImportService` is unreachable in Phase 1 — `ZerodhaAdapter` always raises `EmptyFileError` (→ `422 EMPTY_FILE`) before returning an empty fills list. The `EMPTY` success-path banner is **not implemented in Phase 1**. It is reserved for Phase 2 adapters that may return an empty result without raising `EmptyFileError`. Arjun must not wire a handler for `status === "EMPTY"` in Phase 1 — the empty-file scenario is covered by `422 EMPTY_FILE` above.
 
 > **Note on error code (A-17-3):** The existing endpoint returns `422 ACCOUNT_INACTIVE` (not `404`) for inactive accounts. Arjun must handle this as a `422` with `detail === "ACCOUNT_INACTIVE"` in the API client's error handler, not as a `404`.
 
@@ -337,7 +363,7 @@ Add MSW handlers to `src/__tests__/msw/handlers.ts`:
 
 | Handler | Fixture |
 |---------|---------|
-| `POST /v1/accounts/:accountId/import` | `IMPORT_SUCCESS` (201, status: "COMPLETE"), `IMPORT_PARTIAL` (201, status: "PARTIAL"), `IMPORT_DUPLICATE` (409), `IMPORT_UNRECOGNIZED` (422, `UNRECOGNIZED_FILE_FORMAT`), `IMPORT_MISSING_PRODUCT_TYPE` (422), `IMPORT_ACCOUNT_INACTIVE` (422, `ACCOUNT_INACTIVE`) |
+| `POST /v1/accounts/:accountId/import` | `IMPORT_SUCCESS` (201, status: "COMPLETE"), `IMPORT_PARTIAL` (201, status: "PARTIAL"), `IMPORT_DUPLICATE` (409), `IMPORT_FILE_TOO_LARGE` (413, `FILE_TOO_LARGE`), `IMPORT_EMPTY_FILE` (422, `EMPTY_FILE`), `IMPORT_UNRECOGNIZED` (422, `UNRECOGNIZED_FILE_FORMAT`), `IMPORT_MISSING_PRODUCT_TYPE` (422, `MISSING_PRODUCT_TYPE`), `IMPORT_ACCOUNT_INACTIVE` (422, `ACCOUNT_INACTIVE`) |
 | `GET /v1/imports?account_id=*` | `IMPORT_HISTORY` (list of ImportRecordOut), `IMPORT_HISTORY_EMPTY` (empty list) |
 
 **ImportTradesPage tests (`src/features/imports/__tests__/ImportTradesPage.test.tsx`):**
@@ -359,6 +385,8 @@ Add MSW handlers to `src/__tests__/msw/handlers.ts`:
 | F-17-13 | Import history list renders on mount with account_id from context |
 | F-17-14 | Import history list re-fetches after a successful import |
 | F-17-15 | Empty import history shows "No imports yet for this account." |
+| F-17-16 | On 422 `EMPTY_FILE`, shows amber inline error "The file contains no data rows. Check that you have exported the correct date range from Zerodha." (G-17-1) |
+| F-17-17 | On 413 `FILE_TOO_LARGE`, shows red inline error "The file is too large. Zerodha tradebook exports are typically under 1 MB." (D-17-1) |
 
 ---
 
@@ -382,7 +410,7 @@ From Step 16 risk register (R-16-6): if a user has added a manual fill to an ope
 
 **Mitigation for Phase 1:**
 - Bhima must add a code comment in `accounts.py:import_fills` warning future developers about this gap.
-- Arjun must add a UI notice on the Import screen: "If you've manually added fills to an open position, review those trades after importing a file that covers the same period. Duplicate fills may require support to resolve."
+- Arjun must add a UI notice on the Import screen: "If you've manually added fills to an open position, review those trades after importing a file that covers the same period. Duplicate fills can be removed from the Trades screen." (D-17-R: "may require support" was incorrect — users can self-resolve via Step 16 delete-fill capability)
 - This is an accepted known risk for Phase 1. The fill-exclusion UI (Phase 2) resolves it.
 
 ---
@@ -415,9 +443,9 @@ From Step 16 risk register (R-16-6): if a user has added a manual fill to an ope
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| Sahadeva QA | Sahadeva | All 28 new tests pass (B-17-01 through B-17-13, F-17-01 through F-17-15); no regressions in Steps 12–16 tests; `status` field present in POST response (B-17-01); `ACCOUNT_INACTIVE` as 422 confirmed by B-17-07; deactivated-account history access (200) confirmed by B-17-12; Zerodha-only guard confirmed by F-17-05; `ACCOUNT_INACTIVE` error display confirmed by F-17-10 |
-| Nakula CI | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes thresholds; `tsc --noEmit` clean; ESLint 0 warnings; no new migration (import_records table already exists); `ImportSummary.status` field confirmed in dataclass |
-| Yudhishthira accept | Yudhishthira | Import Trades screen accessible from nav; Zerodha CSV upload produces COMPLETE result with fill count and status banner; duplicate file upload shows error; ACCOUNT_INACTIVE shows correct error; import history list shows past imports |
+| Sahadeva QA | Sahadeva | All 31 new tests pass (B-17-01 through B-17-14, F-17-01 through F-17-17); no regressions in Steps 12–16 tests; `status` field present in POST response (B-17-01); `ACCOUNT_INACTIVE` as 422 confirmed by B-17-07; `EMPTY_FILE` as 422 confirmed by B-17-05; `FILE_TOO_LARGE` as 413 confirmed by B-17-14; deactivated-account history access (200) confirmed by B-17-12; Zerodha-only guard confirmed by F-17-05; `ACCOUNT_INACTIVE` error display confirmed by F-17-10; `EMPTY_FILE` error display confirmed by F-17-16; `FILE_TOO_LARGE` error display confirmed by F-17-17; `EMPTY` success-path banner absent from Phase 1 frontend (G-17-1) |
+| Nakula CI | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes thresholds; `tsc --noEmit` clean; ESLint 0 warnings; no new migration (import_records table already exists); `ImportSummary.status` field confirmed in dataclass; file size check present in `accounts.py` route handler (D-17-1); filename truncation present in route handler (D-17-2) |
+| Yudhishthira accept | Yudhishthira | Import Trades screen accessible from nav; Zerodha CSV upload produces COMPLETE result with fill count and status banner; duplicate file upload shows error; empty-file upload shows amber inline error (not a success banner); oversized file upload shows red inline error; ACCOUNT_INACTIVE shows correct error; import history list shows past imports |
 
 ---
 
@@ -425,18 +453,18 @@ From Step 16 risk register (R-16-6): if a user has added a manual fill to an ope
 
 | Owner | Work | Estimate |
 |-------|------|----------|
-| Bhima | `status` field in `ImportSummary` + `ImportSummaryOut` (additive change to existing files) | ~0.05 session |
+| Bhima | `status` field in `ImportSummary` + `ImportSummaryOut`; file size check + filename truncation in `accounts.py` (D-17-1, D-17-2) | ~0.1 session |
 | Bhima | `list_by_account()` method | ~0.05 session |
 | Bhima | `imports.py` router — GET only | ~0.1 session |
 | Bhima | Wire into `main.py` | ~0.05 session |
-| Bhima | Backend tests B-17-01 through B-17-13 | ~0.3 session |
-| Arjun | Types + API client + MSW fixtures | ~0.15 session |
-| Arjun | `ImportTradesPage.tsx` — 3 sections + Zerodha guard | ~0.45 session |
+| Bhima | Backend tests B-17-01 through B-17-14 | ~0.35 session |
+| Arjun | Types + API client + MSW fixtures (2 new fixtures: `IMPORT_EMPTY_FILE`, `IMPORT_FILE_TOO_LARGE`) | ~0.2 session |
+| Arjun | `ImportTradesPage.tsx` — 3 sections + Zerodha guard + 2 new error states | ~0.5 session |
 | Arjun | Router + AppShell updates | ~0.05 session |
-| Arjun | Frontend tests F-17-01 through F-17-15 | ~0.35 session |
-| **Total** | | **~1.55 sessions** |
+| Arjun | Frontend tests F-17-01 through F-17-17 | ~0.4 session |
+| **Total** | | **~1.8 sessions** |
 
-Reduced from 1.7 (original draft) — scope reduction from removing the duplicate POST endpoint, two adapter tests, and one observation resolved by reuse. Within Phase 1 plan estimate of 1 session; at the high end due to result/error UX states.
+Increased from 1.55 — five new items added across Ganesha (G-17-1: corrected test, 2 new error states, new MSW fixtures, new frontend test) and Dhanvantari (D-17-1: server-side size check + backend test + frontend handler; D-17-2: filename truncation). Within acceptable range for Phase 1.
 
 ---
 
@@ -454,4 +482,6 @@ Reduced from 1.7 (original draft) — scope reduction from removing the duplicat
 
 *Krishna — Senior Project Manager*  
 *Architectural review: Mayasura (Senior Software Architect) — 2026-09-08 — A-17-1 (duplicate API surface, resolved: use existing POST endpoint), A-17-2 (missing Upstox/Angel One adapters, resolved: Zerodha-only Phase 1), A-17-3 (AccountInactiveError HTTP code conflict, resolved: 422 ACCOUNT_INACTIVE) applied*  
-*Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/accounts.py`, `backend/src/tradeforge/application/import_service.py`, `backend/src/tradeforge/infrastructure/models/import_record.py`, `backend/src/tradeforge/infrastructure/repositories/import_record_repo.py`, `backend/src/tradeforge/application/trading_account_service.py`, `docs/project-status/STEP-16-EXECUTION-PLAN.md` (R-16-6)*
+*Domain review: Ganesha (Trading Domain Analyst) — 2026-09-08 — G-17-1 (422 EMPTY_FILE unhandled; EMPTY success-path unreachable in Phase 1 via Zerodha adapter; B-17-05 corrected; 422 EMPTY_FILE frontend handler + MSW fixture + F-17-16 added; EMPTY success-path banner removed from Phase 1 scope) applied*  
+*Risk review: Dhanvantari (Risk Management Engineer) — 2026-09-08 — D-17-1 (no server-side file size limit; 10 MB hard cap added to accounts.py route handler; 413 FILE_TOO_LARGE frontend handler + MSW fixture + B-17-14 + F-17-17 added), D-17-2 (file.filename not length-validated; filename truncated to 255 chars in route handler), R-16-6 notice text corrected ("can be removed from the Trades screen") applied*  
+*Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/accounts.py`, `backend/src/tradeforge/application/import_service.py`, `backend/src/tradeforge/infrastructure/models/import_record.py`, `backend/src/tradeforge/infrastructure/repositories/import_record_repo.py`, `backend/src/tradeforge/application/trading_account_service.py`, `backend/src/tradeforge/infrastructure/adapters/zerodha_adapter.py`, `docs/project-status/STEP-16-EXECUTION-PLAN.md` (R-16-6)*
