@@ -5,7 +5,7 @@
 **Date:** 2026-09-08  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-17-import-trades` (base: `main` after Step 16 merged as PR #10)  
-**Status:** READY TO IMPLEMENT — Mayasura architectural review (A-17-1, A-17-2, A-17-3, 2026-09-08), Ganesha domain review (G-17-1, 2026-09-08), and Dhanvantari risk review (D-17-1, D-17-2, 2026-09-08) all applied
+**Status:** READY TO IMPLEMENT — Mayasura architectural review (A-17-1/2/3), Ganesha domain review (G-17-1), Dhanvantari risk review (D-17-1/D-17-2), and Sahadeva QA review (QA-17-1/2/3, OBS-QA-3) all applied — 2026-09-08
 
 ---
 
@@ -16,11 +16,14 @@ Three blocking issues were identified and resolved before implementation began. 
 | Finding | Decision | Effect on plan |
 |---------|----------|----------------|
 | **A-17-1** — `POST /v1/accounts/{account_id}/import` already exists; plan proposed a duplicate `POST /v1/imports` | **Option A:** Use the existing endpoint as the canonical import route. No new POST endpoint. | B-17-B scope reduced to `GET /v1/imports` + `status` field addition to `ImportSummaryOut` only. Arjun's API client calls the existing URL. |
-| **A-17-2** — Only `ZerodhaAdapter` exists on disk; Upstox and Angel One adapters do not exist; pre-conditions were false | **Option A:** Zerodha only for Phase 1. Upstox and Angel One deferred to Phase 2 (Sanjaya). B-17-14 and B-17-15 removed. UI shows Zerodha only. | Scope reduced. Pre-conditions corrected. "Not in Step 17" table updated. |
+| **A-17-2** — Only `ZerodhaAdapter` exists on disk; Upstox and Angel One adapters do not exist; pre-conditions were false | **Option A:** Zerodha only for Phase 1. Upstox and Angel One deferred to Phase 2 (Sanjaya). Original Upstox and Angel One adapter tests removed. UI shows Zerodha only. | Scope reduced. Pre-conditions corrected. "Not in Step 17" table updated. (Original B-17-14/B-17-15 slots later repurposed: B-17-14 → file size test per D-17-1; B-17-15 → PARTIAL status test per QA-17-1.) |
 | **A-17-3** — Plan mapped `AccountInactiveError` to `404 ACCOUNT_NOT_FOUND`, conflicting with existing endpoint's `422 ACCOUNT_INACTIVE` | **Use `422 ACCOUNT_INACTIVE`** consistently. `AccountNotFoundError` maps to `404 ACCOUNT_NOT_FOUND`; `AccountInactiveError` maps to `422 ACCOUNT_INACTIVE`. | Error mapping table corrected. B-17-07 expected response corrected to 422. |
 | **G-17-1** (Ganesha, 2026-09-08) — `EmptyFileError` in `ZerodhaAdapter` raises `422 EMPTY_FILE` for header-only CSVs; `status = "EMPTY"` success-path in `ImportService` is unreachable in Phase 1 (Zerodha adapter has no silent-skip path). Frontend had no `422 EMPTY_FILE` handler; B-17-05 expected wrong outcome. | **Remove `EMPTY` success-path banner from Phase 1 frontend** (dead code for Zerodha-only scope; reserved for Phase 2 adapters). **Add `422 EMPTY_FILE` as an explicit frontend error state.** Correct B-17-05 to assert `422 EMPTY_FILE`. Add `IMPORT_EMPTY_FILE` MSW fixture. Add F-17-16 test. | Frontend result table updated. B-17-05 corrected. MSW and test added. EMPTY banner removed from Phase 1 scope. |
 | **D-17-1** (Dhanvantari, 2026-09-08) — No server-side file size limit; `file.read()` in `accounts.py` is unbounded. Client-side warning (>5 MB) is not a block and is bypassed by direct API callers. | **Add server-side size check in `accounts.py` route handler:** files > 10 MB → `413 FILE_TOO_LARGE`. Add frontend handler, `IMPORT_FILE_TOO_LARGE` MSW fixture, B-17-14 backend test, and F-17-17 frontend test. | B-17-B scope extended. Error table updated. MSW, backend test, and frontend test added. |
 | **D-17-2** (Dhanvantari, 2026-09-08) — `file.filename` (client-controlled) stored without API-layer length validation; filenames > 255 chars cause unhandled 500s (DB `String(255)` constraint violation is not caught by existing exception handlers). | **Bhima truncates filename at the route handler** before calling `import_fills`: `file_name = (file.filename or "")[:255] or None`. One-liner in `accounts.py`. | B-17-B scope note added. No new test required (browser clients never produce filenames > 255 chars; direct API abuse is a hardening concern, not a feature-correctness test). |
+| **QA-17-1** (Sahadeva, 2026-09-08) — Backend tests cover `status = "COMPLETE"` (B-17-01) but not `"PARTIAL"` or `"FAILED"`. Two of three reachable success-path status values have zero backend test coverage despite being the primary deliverable of B-17-B. | **Add B-17-15** (PARTIAL: CSV with valid and invalid rows → 201, `status = "PARTIAL"`, `fills_ingested > 0`, `row_errors > 0`) and **B-17-16** (FAILED: CSV where all data rows are malformed → 201, `status = "FAILED"`, `fills_ingested == 0`, `row_errors > 0`). | Backend test list extended to B-17-16. Test count +2. |
+| **QA-17-2** (Sahadeva, 2026-09-08) — `IMPORT_PARTIAL` MSW fixture defined but used by no test. `IMPORT_FAILED` fixture not defined and no test for FAILED banner. PARTIAL and FAILED result banners are specified in the plan with no frontend test coverage. | **Add `IMPORT_FAILED` MSW fixture** (201, `status: "FAILED"`, `fills_ingested: 0`, `row_errors: N`). **Add F-17-18** (PARTIAL banner) and **F-17-19** (FAILED banner). | MSW table updated. Frontend tests extended to F-17-19. Test count +2. |
+| **QA-17-3** (Sahadeva, 2026-09-08) — Client-side > 5 MB warning ("This file is unusually large...") is explicitly specified in the upload form section but has no frontend test. It is a distinct code path from the 413 server-side response (F-17-17). | **Add F-17-20** (selecting a file > 5 MB shows the inline size warning; Import button remains enabled — not a block). | Frontend tests extended to F-17-20. Test count +1. |
 
 ---
 
@@ -211,7 +214,7 @@ app.include_router(imports_router.router, prefix="/v1")
 
 **New file:** `backend/tests/api/test_imports_api.py`
 
-**Note on the existing import endpoint:** `POST /v1/accounts/{account_id}/import` was already tested in Step 11. Do not re-test the full pipeline. These tests target the new `status` field (B-17-01 through B-17-07) and the new `GET /v1/imports` endpoint (B-17-08 through B-17-13). Use real Zerodha fixture CSV bytes already present from Step 11.
+**Note on the existing import endpoint:** `POST /v1/accounts/{account_id}/import` was already tested in Step 11. Do not re-test the full pipeline. These tests target the new `status` field (B-17-01 through B-17-07, B-17-14 through B-17-16) and the new `GET /v1/imports` endpoint (B-17-08 through B-17-13). Use real Zerodha fixture CSV bytes already present from Step 11. B-17-15 and B-17-16 require crafted fixture CSVs: a mixed-row CSV (valid EQ rows + CD-segment rows) for PARTIAL, and an all-malformed CSV (every row has a non-numeric price) for FAILED.
 
 | Test ID | Description |
 |---------|-------------|
@@ -230,10 +233,13 @@ app.include_router(imports_router.router, prefix="/v1")
 | B-17-13 | `GET /v1/imports?account_id=<uuid>` returns empty list for account with no import history |
 
 | B-17-14 | `POST /v1/accounts/{account_id}/import` with file content > 10 MB → **413 `FILE_TOO_LARGE`** (D-17-1: server-side size guard added to route handler) |
+| B-17-15 | `POST /v1/accounts/{account_id}/import` with a CSV containing some valid rows and some invalid rows (e.g., valid EQ rows alongside rows with `segment = "CD"` which the adapter rejects) → 201; `status = "PARTIAL"`, `fills_ingested > 0`, `row_errors > 0` (QA-17-1: PARTIAL is a primary status value with no prior test) |
+| B-17-16 | `POST /v1/accounts/{account_id}/import` with a CSV where **all** data rows are malformed (e.g., every row has a non-numeric `price`) → 201; `status = "FAILED"`, `fills_ingested == 0`, `fills_skipped == 0`, `row_errors > 0` (QA-17-1: FAILED is a primary status value with no prior test) |
 
-**Tests removed vs. original draft (A-17-2):**
-- ~~B-17-14~~ (original) — Upstox CSV → 201 (deferred; adapter does not exist) — slot reused for D-17-1 file size test above
-- ~~B-17-15~~ — Angel One CSV → 201 (deferred; adapter does not exist)
+**Original tests removed (A-17-2) and slots repurposed:**
+- ~~Upstox CSV → 201~~ (deferred; adapter does not exist) — original B-17-14 slot **repurposed** → B-17-14: file size > 10 MB → 413 FILE_TOO_LARGE (D-17-1)
+- ~~Angel One CSV → 201~~ (deferred; adapter does not exist) — original B-17-15 slot **repurposed** → B-17-15: PARTIAL status CSV → 201 status="PARTIAL" (QA-17-1)
+- B-17-16 is a net-new slot added by QA-17-1 for FAILED status coverage
 
 ---
 
@@ -363,7 +369,7 @@ Add MSW handlers to `src/__tests__/msw/handlers.ts`:
 
 | Handler | Fixture |
 |---------|---------|
-| `POST /v1/accounts/:accountId/import` | `IMPORT_SUCCESS` (201, status: "COMPLETE"), `IMPORT_PARTIAL` (201, status: "PARTIAL"), `IMPORT_DUPLICATE` (409), `IMPORT_FILE_TOO_LARGE` (413, `FILE_TOO_LARGE`), `IMPORT_EMPTY_FILE` (422, `EMPTY_FILE`), `IMPORT_UNRECOGNIZED` (422, `UNRECOGNIZED_FILE_FORMAT`), `IMPORT_MISSING_PRODUCT_TYPE` (422, `MISSING_PRODUCT_TYPE`), `IMPORT_ACCOUNT_INACTIVE` (422, `ACCOUNT_INACTIVE`) |
+| `POST /v1/accounts/:accountId/import` | `IMPORT_SUCCESS` (201, status: "COMPLETE", fills_ingested: N, fills_skipped: 0, row_errors: 0), `IMPORT_PARTIAL` (201, status: "PARTIAL", fills_ingested: N, row_errors: M where M > 0), `IMPORT_FAILED` (201, status: "FAILED", fills_ingested: 0, fills_skipped: 0, row_errors: N where N > 0), `IMPORT_DUPLICATE` (409), `IMPORT_FILE_TOO_LARGE` (413, `FILE_TOO_LARGE`), `IMPORT_EMPTY_FILE` (422, `EMPTY_FILE`), `IMPORT_UNRECOGNIZED` (422, `UNRECOGNIZED_FILE_FORMAT`), `IMPORT_MISSING_PRODUCT_TYPE` (422, `MISSING_PRODUCT_TYPE`), `IMPORT_ACCOUNT_INACTIVE` (422, `ACCOUNT_INACTIVE`) |
 | `GET /v1/imports?account_id=*` | `IMPORT_HISTORY` (list of ImportRecordOut), `IMPORT_HISTORY_EMPTY` (empty list) |
 
 **ImportTradesPage tests (`src/features/imports/__tests__/ImportTradesPage.test.tsx`):**
@@ -387,6 +393,9 @@ Add MSW handlers to `src/__tests__/msw/handlers.ts`:
 | F-17-15 | Empty import history shows "No imports yet for this account." |
 | F-17-16 | On 422 `EMPTY_FILE`, shows amber inline error "The file contains no data rows. Check that you have exported the correct date range from Zerodha." (G-17-1) |
 | F-17-17 | On 413 `FILE_TOO_LARGE`, shows red inline error "The file is too large. Zerodha tradebook exports are typically under 1 MB." (D-17-1) |
+| F-17-18 | On 201 `PARTIAL` status, shows amber warning banner "Import partially completed — X fills imported, Z rows could not be read." with correct `fills_ingested` count and `row_errors` count from response (QA-17-2; uses `IMPORT_PARTIAL` fixture) |
+| F-17-19 | On 201 `FAILED` status, shows red error banner "Import failed — no fills could be read. Check the file format." (QA-17-2; uses `IMPORT_FAILED` fixture) |
+| F-17-20 | Selecting a file with `size > 5 MB` shows inline warning "This file is unusually large for a broker export. Proceed?"; Import button **remains enabled** (warning is not a block — user can proceed) (QA-17-3) |
 
 ---
 
@@ -419,12 +428,17 @@ From Step 16 risk register (R-16-6): if a user has added a manual fill to an ope
 
 ### Bhima (backend — can start immediately)
 
-1. Add `status: str` to `ImportSummary` dataclass in `import_service.py` and populate it before the `return`.
-2. Add `status: str` to `ImportSummaryOut` in `accounts.py` and include `status=summary.status` in the response construction.
-3. Add `list_by_account()` to `ImportRecordRepository`.
-4. Create `backend/src/tradeforge/api/v1/imports.py` with `GET /v1/imports` only.
-5. Wire `imports` router into `main.py`.
-6. Write backend tests B-17-01 through B-17-13.
+1. **Pre-implementation check (OBS-QA-3):** Before touching `import_service.py`, grep all Step 11 test files for direct `ImportSummary(` construction. The `ImportSummary` dataclass is `frozen=True`; adding `status: str` as a new field will break any test that constructs it without the new argument (`TypeError: missing required argument 'status'`). Update any such callsites before proceeding.
+   ```
+   grep -r "ImportSummary(" backend/tests/
+   ```
+2. Add `status: str` to `ImportSummary` dataclass in `import_service.py` and populate it before the `return`.
+3. Add `status: str` to `ImportSummaryOut` in `accounts.py` and include `status=summary.status` in the response construction.
+4. Add file size guard and filename truncation to the `import_fills` route handler in `accounts.py` (D-17-1, D-17-2).
+5. Add `list_by_account()` to `ImportRecordRepository`.
+6. Create `backend/src/tradeforge/api/v1/imports.py` with `GET /v1/imports` only.
+7. Wire `imports` router into `main.py`.
+8. Write backend tests B-17-01 through B-17-16.
 
 ### Arjun (frontend — steps 1–2 can start in parallel with Bhima)
 
@@ -433,7 +447,7 @@ From Step 16 risk register (R-16-6): if a user has added a manual fill to an ope
 3. Implement `src/features/imports/ImportTradesPage.tsx` — upload form (Zerodha-only guard), result section, history list.
 4. Update `frontend/src/app.tsx` to add the `/import` route.
 5. Update `AppShell.tsx` to add "Import" sidebar link.
-6. Write frontend tests F-17-01 through F-17-15.
+6. Write frontend tests F-17-01 through F-17-20.
 
 **Arjun dependency on Bhima:** All frontend work can be developed against MSW fixtures. The `status` field on the upload response is in the fixture, not required from the live server. No blocker.
 
@@ -443,9 +457,9 @@ From Step 16 risk register (R-16-6): if a user has added a manual fill to an ope
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| Sahadeva QA | Sahadeva | All 31 new tests pass (B-17-01 through B-17-14, F-17-01 through F-17-17); no regressions in Steps 12–16 tests; `status` field present in POST response (B-17-01); `ACCOUNT_INACTIVE` as 422 confirmed by B-17-07; `EMPTY_FILE` as 422 confirmed by B-17-05; `FILE_TOO_LARGE` as 413 confirmed by B-17-14; deactivated-account history access (200) confirmed by B-17-12; Zerodha-only guard confirmed by F-17-05; `ACCOUNT_INACTIVE` error display confirmed by F-17-10; `EMPTY_FILE` error display confirmed by F-17-16; `FILE_TOO_LARGE` error display confirmed by F-17-17; `EMPTY` success-path banner absent from Phase 1 frontend (G-17-1) |
+| Sahadeva QA | Sahadeva | All 36 new tests pass (B-17-01 through B-17-16, F-17-01 through F-17-20); no regressions in Steps 11–16 tests (including Step 11 `ImportSummary(` direct-construction callsites updated per OBS-QA-3); `status` field present in POST response (B-17-01); `status = "PARTIAL"` confirmed by B-17-15; `status = "FAILED"` confirmed by B-17-16; `ACCOUNT_INACTIVE` as 422 confirmed by B-17-07; `EMPTY_FILE` as 422 confirmed by B-17-05; `FILE_TOO_LARGE` as 413 confirmed by B-17-14; deactivated-account history access (200) confirmed by B-17-12; Zerodha-only guard confirmed by F-17-05; PARTIAL banner confirmed by F-17-18; FAILED banner confirmed by F-17-19; `>5 MB` client warning confirmed by F-17-20; `EMPTY_FILE` error display confirmed by F-17-16; `FILE_TOO_LARGE` error display confirmed by F-17-17; `EMPTY` success-path banner absent from Phase 1 frontend (G-17-1) |
 | Nakula CI | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes thresholds; `tsc --noEmit` clean; ESLint 0 warnings; no new migration (import_records table already exists); `ImportSummary.status` field confirmed in dataclass; file size check present in `accounts.py` route handler (D-17-1); filename truncation present in route handler (D-17-2) |
-| Yudhishthira accept | Yudhishthira | Import Trades screen accessible from nav; Zerodha CSV upload produces COMPLETE result with fill count and status banner; duplicate file upload shows error; empty-file upload shows amber inline error (not a success banner); oversized file upload shows red inline error; ACCOUNT_INACTIVE shows correct error; import history list shows past imports |
+| Yudhishthira accept | Yudhishthira | Import Trades screen accessible from nav; Zerodha CSV upload produces COMPLETE result with fill count and status banner; PARTIAL import shows amber warning banner; oversized file upload shows red inline error; empty-file upload shows amber inline error (not a success banner); duplicate file upload shows error; ACCOUNT_INACTIVE shows correct error; import history list shows past imports |
 
 ---
 
@@ -453,18 +467,18 @@ From Step 16 risk register (R-16-6): if a user has added a manual fill to an ope
 
 | Owner | Work | Estimate |
 |-------|------|----------|
-| Bhima | `status` field in `ImportSummary` + `ImportSummaryOut`; file size check + filename truncation in `accounts.py` (D-17-1, D-17-2) | ~0.1 session |
+| Bhima | Pre-implementation Step 11 grep check (OBS-QA-3) + `status` field in `ImportSummary` + `ImportSummaryOut`; file size check + filename truncation in `accounts.py` (D-17-1, D-17-2) | ~0.1 session |
 | Bhima | `list_by_account()` method | ~0.05 session |
 | Bhima | `imports.py` router — GET only | ~0.1 session |
 | Bhima | Wire into `main.py` | ~0.05 session |
-| Bhima | Backend tests B-17-01 through B-17-14 | ~0.35 session |
-| Arjun | Types + API client + MSW fixtures (2 new fixtures: `IMPORT_EMPTY_FILE`, `IMPORT_FILE_TOO_LARGE`) | ~0.2 session |
-| Arjun | `ImportTradesPage.tsx` — 3 sections + Zerodha guard + 2 new error states | ~0.5 session |
+| Bhima | Backend tests B-17-01 through B-17-16 (PARTIAL + FAILED fixture CSVs included) | ~0.4 session |
+| Arjun | Types + API client + MSW fixtures (3 new: `IMPORT_EMPTY_FILE`, `IMPORT_FILE_TOO_LARGE`, `IMPORT_FAILED`; `IMPORT_PARTIAL` fields corrected with `row_errors`) | ~0.2 session |
+| Arjun | `ImportTradesPage.tsx` — 3 sections + Zerodha guard + all error/status states | ~0.5 session |
 | Arjun | Router + AppShell updates | ~0.05 session |
-| Arjun | Frontend tests F-17-01 through F-17-17 | ~0.4 session |
-| **Total** | | **~1.8 sessions** |
+| Arjun | Frontend tests F-17-01 through F-17-20 | ~0.45 session |
+| **Total** | | **~1.9 sessions** |
 
-Increased from 1.55 — five new items added across Ganesha (G-17-1: corrected test, 2 new error states, new MSW fixtures, new frontend test) and Dhanvantari (D-17-1: server-side size check + backend test + frontend handler; D-17-2: filename truncation). Within acceptable range for Phase 1.
+Increased from 1.8 — Sahadeva QA review added 5 tests (B-17-15, B-17-16, F-17-18, F-17-19, F-17-20), 1 MSW fixture (`IMPORT_FAILED`), and a pre-implementation grep check. Within acceptable range for Phase 1.
 
 ---
 
@@ -484,4 +498,5 @@ Increased from 1.55 — five new items added across Ganesha (G-17-1: corrected t
 *Architectural review: Mayasura (Senior Software Architect) — 2026-09-08 — A-17-1 (duplicate API surface, resolved: use existing POST endpoint), A-17-2 (missing Upstox/Angel One adapters, resolved: Zerodha-only Phase 1), A-17-3 (AccountInactiveError HTTP code conflict, resolved: 422 ACCOUNT_INACTIVE) applied*  
 *Domain review: Ganesha (Trading Domain Analyst) — 2026-09-08 — G-17-1 (422 EMPTY_FILE unhandled; EMPTY success-path unreachable in Phase 1 via Zerodha adapter; B-17-05 corrected; 422 EMPTY_FILE frontend handler + MSW fixture + F-17-16 added; EMPTY success-path banner removed from Phase 1 scope) applied*  
 *Risk review: Dhanvantari (Risk Management Engineer) — 2026-09-08 — D-17-1 (no server-side file size limit; 10 MB hard cap added to accounts.py route handler; 413 FILE_TOO_LARGE frontend handler + MSW fixture + B-17-14 + F-17-17 added), D-17-2 (file.filename not length-validated; filename truncated to 255 chars in route handler), R-16-6 notice text corrected ("can be removed from the Trades screen") applied*  
+*QA review: Sahadeva (Senior QA/Testing Engineer) — 2026-09-08 — QA-17-1 (PARTIAL and FAILED status values untested; B-17-15 + B-17-16 added), QA-17-2 (IMPORT_PARTIAL fixture unused, IMPORT_FAILED fixture missing; IMPORT_FAILED added, F-17-18 + F-17-19 added), QA-17-3 (>5 MB client-side warning untested; F-17-20 added), OBS-QA-3 (Step 11 ImportSummary frozen dataclass construction regression risk; pre-implementation grep check added to Bhima order of work) applied*  
 *Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/accounts.py`, `backend/src/tradeforge/application/import_service.py`, `backend/src/tradeforge/infrastructure/models/import_record.py`, `backend/src/tradeforge/infrastructure/repositories/import_record_repo.py`, `backend/src/tradeforge/application/trading_account_service.py`, `backend/src/tradeforge/infrastructure/adapters/zerodha_adapter.py`, `docs/project-status/STEP-16-EXECUTION-PLAN.md` (R-16-6)*
