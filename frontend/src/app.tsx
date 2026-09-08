@@ -13,6 +13,7 @@ import { AppShell } from './layout/AppShell'
 import { RequireAuth } from './components/RequireAuth'
 import { PlaceholderPage } from './components/PlaceholderPage'
 import { ImportTradesPage } from './features/imports/ImportTradesPage'
+import { DashboardPage } from './features/dashboard/DashboardPage'
 
 export function App() {
   return (
@@ -34,7 +35,8 @@ export function App() {
             </AccountProvider>
           }
         >
-          <Route path="/" element={<Navigate to="/analytics" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/risk" element={<PlaceholderPage title="Risk" />} />
           <Route path="/trades" element={<PlaceholderPage title="Trades" />} />

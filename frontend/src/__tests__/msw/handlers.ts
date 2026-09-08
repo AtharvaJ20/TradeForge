@@ -689,6 +689,13 @@ export const handlers = [
     HttpResponse.json(IMPORT_SUCCESS_FIXTURE, { status: 201 }),
   ),
   http.get(`${BASE}/v1/imports`, () => HttpResponse.json(IMPORT_HISTORY_FIXTURE)),
+
+  // ---------------------------------------------------------------------------
+  // Step 18 — Dashboard handlers
+  // ---------------------------------------------------------------------------
+  http.get(`${BASE}/v1/dashboard/summary`, () => HttpResponse.json(DASHBOARD_SUMMARY)),
+  http.get(`${BASE}/v1/trades`, () => HttpResponse.json(TRADES_LIST)),
+  http.get(`${BASE}/v1/journal/recent`, () => HttpResponse.json(JOURNAL_RECENT)),
 ]
 
 /** Override handler: GET returns 404 (no journal entry). */
@@ -910,6 +917,64 @@ export const TRADE_OPEN_FIXTURE = {
 // ---------------------------------------------------------------------------
 // Step 16 — Trades override handlers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Step 18 — Dashboard fixtures
+// ---------------------------------------------------------------------------
+
+const ACCOUNT_ID_0001 = '00000000-0000-0000-0000-000000000001'
+
+export const DASHBOARD_SUMMARY = {
+  account_id: ACCOUNT_ID_0001,
+  as_of_date: '2026-09-08',
+  all_time_net_pnl: 27500,
+  mtd_net_pnl: 5000,
+  wtd_net_pnl: 1500,
+  starting_capital: 500000,
+  realized_equity: 527500,
+  total_closed_trades: 30,
+  open_trade_count: 2,
+}
+
+export const DASHBOARD_SUMMARY_EMPTY = {
+  account_id: ACCOUNT_ID_0001,
+  as_of_date: '2026-09-08',
+  all_time_net_pnl: 0,
+  mtd_net_pnl: 0,
+  wtd_net_pnl: 0,
+  starting_capital: null,
+  realized_equity: null,
+  total_closed_trades: 0,
+  open_trade_count: 0,
+}
+
+export const TRADES_LIST = Array.from({ length: 10 }, (_, i) => ({
+  id: `trade-${String(i + 1).padStart(3, '0')}`,
+  symbol: `SYM${i + 1}`,
+  instrument_type: 'EQUITY',
+  direction: i % 2 === 0 ? 'LONG' : 'SHORT',
+  status: 'CLOSED',
+  trade_date: '2026-09-01',
+  last_fill_at: `2026-09-0${(i % 7) + 1}T10:00:00Z`,
+  net_pnl: i % 3 === 0 ? -(i + 1) * 100 : (i + 1) * 200,
+  r_multiple: i % 3 === 0 ? -1.0 : 1.5,
+}))
+
+export const TRADES_LIST_EMPTY: typeof TRADES_LIST = []
+
+export const JOURNAL_RECENT = Array.from({ length: 5 }, (_, i) => ({
+  trade_id: `trade-${String(i + 1).padStart(3, '0')}`,
+  symbol: `SYM${i + 1}`,
+  instrument_type: 'EQUITY',
+  trade_date: `2026-09-0${i + 1}`,
+  last_fill_at: `2026-09-0${i + 1}T10:00:00Z`,
+  discipline_score: 7 + (i % 3),
+  emotion_before: i % 2 === 0 ? 'CALM' : 'ANXIOUS',
+  emotion_during: 'CONFIDENT',
+  emotion_after: i % 2 === 0 ? 'SATISFIED' : 'CALM',
+}))
+
+export const JOURNAL_RECENT_EMPTY: typeof JOURNAL_RECENT = []
 
 // ---------------------------------------------------------------------------
 // Step 17 — Import override handlers

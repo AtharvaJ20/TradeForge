@@ -5,7 +5,7 @@
 **Date:** 2026-09-08  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-18-dashboard` (base: `main` after Steps 16 + 17 merged)  
-**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-08; Ganesha trading domain review applied 2026-09-08
+**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-08; Ganesha trading domain review applied 2026-09-08; Dhanvantari risk review applied 2026-09-08
 
 ---
 
@@ -30,6 +30,15 @@
 | G-18-1 | Blocking → Resolved | **MTD/WTD boundaries and `as_of_date` now use IST calendar date.** A-18-4 fixed the type comparison bug but left `CURRENT_DATE` (UTC server date) as the boundary anchor. Between midnight IST and 05:30 IST, the UTC date lags the IST date by one day — causing WTD to span into the prior week and MTD to span into the prior month on boundary mornings. Fix: replace `CURRENT_DATE` with `(NOW() AT TIME ZONE 'Asia/Kolkata')::date` in all three SQL expressions and in `as_of_date` computation. |
 | G-18-2 | Required → Resolved | **`current_equity` renamed to `realized_equity` throughout.** The formula `starting_capital + all_time_net_pnl (CLOSED trades only)` excludes unrealized P&L from OPEN/PARTIAL positions. "Current equity" implies the live account value including open positions; "realized equity" is accurate. Unrealized P&L in equity display is deferred to Phase 2. |
 | G-18-3 | Required → Resolved | **Recent Journal `ORDER BY` changed from `je.updated_at DESC` to `t.trade_date DESC, t.last_fill_at DESC, t.id DESC`.** `updated_at` ordering surfaced recently-edited old entries at the top, not the most recent trades with journal entries. Chronological trade ordering matches "last 5 trades with a journal entry" acceptance criterion. B-18-23 test updated. |
+
+---
+
+## Risk Review Decisions (Dhanvantari — 2026-09-08)
+
+| ID | Severity | Decision |
+|----|----------|----------|
+| D-18-1 | Blocking → Resolved | **`sort_dir` whitelist and implementation note added to B-18-C step 4.** The plan specified a whitelist for `sort_by` but applied no equivalent control to `sort_dir`. A naive implementation would interpolate `sort_dir` as a raw string into the ORDER BY clause — a SQL injection vector. Fix: validate `sort_dir` against `{'asc', 'desc'}`; unknown values default silently to `'desc'`. Apply using SQLAlchemy's `.asc()`/`.desc()` column methods — never string interpolation. Sahadeva gate criterion added. |
+| D-18-2 | Required → Resolved | **`status` parameter validation changed from silent filter to 422 `INVALID_STATUS`.** An unrecognised `status` value (e.g. `'closed'` in lowercase, `'DELETED'`) would silently execute a WHERE clause that matches zero rows, returning `200 []` — indistinguishable from a valid empty result. Fix: validate `status` against `{'OPEN', 'PARTIAL', 'CLOSED'}` (case-sensitive); return `422 UNPROCESSABLE_ENTITY` with detail `INVALID_STATUS` for any other value. Test B-18-13b added. |
 
 ---
 
@@ -212,8 +221,8 @@ async def list_trades(
 
 1. Verify account ownership (same pattern as B-18-B step 1 — `TradingAccountService.get()`). Return `404 ACCOUNT_NOT_FOUND` if not owned.
 2. Build query: `SELECT t.*, i.symbol, i.instrument_type, tp.net_pnl, tp.r_multiple FROM trades t JOIN instruments i ON i.id = t.instrument_id LEFT JOIN trade_pnl tp ON tp.trade_id = t.id WHERE t.account_id = :account_id AND t.is_deleted = false`.
-3. Apply `status` filter if provided. `status=OPEN` returns only rows where `t.status = 'OPEN'`; `status=PARTIAL` returns only `'PARTIAL'`; `status=CLOSED` returns only `'CLOSED'`. Each value is an exact match.
-4. Apply sort: whitelist `sort_by` to `{last_fill_at, trade_date, net_pnl, r_multiple}`; apply `sort_dir`. For `net_pnl` and `r_multiple`, sort on `tp.net_pnl` / `tp.r_multiple` (NULLs last in desc, first in asc — default PostgreSQL behaviour for NULLs is acceptable for Phase 1).
+3. Apply `status` filter if provided. `status=OPEN` returns only rows where `t.status = 'OPEN'`; `status=PARTIAL` returns only `'PARTIAL'`; `status=CLOSED` returns only `'CLOSED'`. Each value is an exact, case-sensitive match. If an unrecognised `status` value is supplied (including lowercase variants such as `'closed'`), return `422 UNPROCESSABLE_ENTITY` with detail `INVALID_STATUS` — do not silently execute the filter against the database, as a non-matching status would return an empty list indistinguishable from a valid empty result.
+4. Apply sort: whitelist `sort_by` to `{last_fill_at, trade_date, net_pnl, r_multiple}`; unknown values default silently to `last_fill_at`. Validate `sort_dir` against `{'asc', 'desc'}`; unknown values default silently to `'desc'`. Apply direction using SQLAlchemy's `column.asc()` / `column.desc()` methods — never by string interpolation into SQL (injectable). For `net_pnl` and `r_multiple`, sort on `tp.net_pnl` / `tp.r_multiple` (NULLs last in desc, first in asc — default PostgreSQL behaviour for NULLs is acceptable for Phase 1).
 5. Apply `LIMIT limit OFFSET offset`.
 6. Map rows to `TradeListItemOut`.
 
@@ -299,6 +308,7 @@ Tests cover `GET /v1/dashboard/summary`, `GET /v1/trades`, and `GET /v1/journal/
 | B-18-11 | Default `limit=10` — account with 15 trades returns 10 rows |
 | B-18-12 | `status=CLOSED` filter — only CLOSED trades returned |
 | B-18-13 | `status=OPEN` filter — only OPEN trades returned (PARTIAL trades are not returned unless `status=PARTIAL` is passed explicitly); `net_pnl = null` for all returned rows |
+| B-18-13b | `status=invalid` → 422 `INVALID_STATUS`; `status=closed` (lowercase) → 422 `INVALID_STATUS` |
 | B-18-14 | `offset=10` paginates correctly — skips first 10, returns next batch |
 | B-18-15 | Default sort is `last_fill_at DESC` — most recent trade is first |
 | B-18-16 | Another user's `account_id` → 404 |
@@ -326,7 +336,7 @@ Tests cover `GET /v1/dashboard/summary`, `GET /v1/trades`, and `GET /v1/journal/
 | B-18-28 | `POST /v1/accounts` without `starting_capital` → 201; `AccountOut.starting_capital = null` |
 | B-18-29 | `PATCH /v1/accounts/{id}` with `starting_capital: 750000` → 200; `AccountOut.starting_capital = 750000` |
 
-**Total new backend tests:** 26.
+**Total new backend tests:** 27.
 
 ---
 
@@ -580,7 +590,7 @@ Make `/` redirect to `/dashboard` (logged-in users land on the dashboard):
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| **Sahadeva QA** | Sahadeva | All new backend tests pass (B-18-01 through B-18-29); all new frontend tests pass (F-18-01 through F-18-15); no regressions in Steps 15–17 tests; `GET /v1/trades` list excludes `is_deleted = true` trades (B-18-19); WTD anchors to Monday (B-18-03); deactivated-account dashboard returns 200 (B-18-06); account switching triggers re-fetch (F-18-12); `/` redirect confirmed (F-18-14); Recent Trades row links include trade id (F-18-08); `status=OPEN` returns only OPEN (not PARTIAL) trades (B-18-13); Recent Journal ordered by trade date descending — editing an old journal entry does not reorder the tile (B-18-23); `realized_equity` field present (not `current_equity`) in dashboard summary response (B-18-08) |
+| **Sahadeva QA** | Sahadeva | All new backend tests pass (B-18-01 through B-18-29 including B-18-13b); all new frontend tests pass (F-18-01 through F-18-15); no regressions in Steps 15–17 tests; `GET /v1/trades` list excludes `is_deleted = true` trades (B-18-19); WTD anchors to Monday (B-18-03); deactivated-account dashboard returns 200 (B-18-06); account switching triggers re-fetch (F-18-12); `/` redirect confirmed (F-18-14); Recent Trades row links include trade id (F-18-08); `status=OPEN` returns only OPEN (not PARTIAL) trades (B-18-13); `status=invalid` and `status=closed` (lowercase) each return 422 `INVALID_STATUS` (B-18-13b); `sort_dir` with a value other than `asc`/`desc` returns the same result as `desc` without error; Recent Journal ordered by trade date descending — editing an old journal entry does not reorder the tile (B-18-23); `realized_equity` field present (not `current_equity`) in dashboard summary response (B-18-08) |
 | **Nakula CI** | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes; `tsc --noEmit` clean; ESLint 0 warnings; migration applies cleanly with `alembic upgrade head`; `GET /v1/trades` route confirmed in OpenAPI schema |
 | **Yudhishthira ACCEPT** | Yudhishthira | Dashboard accessible from nav; Account Overview shows three P&L periods and displays "Realized Equity" label (not "Current Equity") when `starting_capital` is set; Performance tile shows win rate, expectancy, profit factor; Streaks tile shows current streak; Recent Trades list renders last 10 closed trades with P&L coloured correctly; Recent Journal shows most recently traded instruments (not most recently edited journal entries); switching accounts refreshes all tiles |
 

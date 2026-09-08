@@ -42,18 +42,20 @@ _INSTR_ID = uuid.uuid4()
 
 
 def _dashboard_row(
-    all_time_pnl: Any = Decimal("12345.67"),
-    mtd_pnl: Any = Decimal("1000.00"),
-    wtd_pnl: Any = Decimal("500.00"),
-    total_closed: int = 42,
-    open_count: int = 3,
+    all_time_net_pnl: Any = Decimal("12345.67"),
+    mtd_net_pnl: Any = Decimal("1000.00"),
+    wtd_net_pnl: Any = Decimal("500.00"),
+    total_closed_trades: int = 42,
+    open_trade_count: int = 3,
+    starting_capital: Any = Decimal("500000.00"),
 ) -> MagicMock:
     row = MagicMock()
-    row.all_time_pnl = all_time_pnl
-    row.mtd_pnl = mtd_pnl
-    row.wtd_pnl = wtd_pnl
-    row.total_closed = total_closed
-    row.open_count = open_count
+    row.all_time_net_pnl = all_time_net_pnl
+    row.mtd_net_pnl = mtd_net_pnl
+    row.wtd_net_pnl = wtd_net_pnl
+    row.total_closed_trades = total_closed_trades
+    row.open_trade_count = open_trade_count
+    row.starting_capital = starting_capital
     return row
 
 
@@ -151,93 +153,97 @@ async def test_dashboard_summary_returns_200(http_client: AsyncClient) -> None:
     mock_db = _make_mock_db([_dashboard_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
     body = response.json()
-    assert "all_time_pnl" in body
-    assert "mtd_pnl" in body
-    assert "wtd_pnl" in body
-    assert "total_closed" in body
-    assert "open_count" in body
+    assert "account_id" in body
+    assert "as_of_date" in body
+    assert "all_time_net_pnl" in body
+    assert "mtd_net_pnl" in body
+    assert "wtd_net_pnl" in body
+    assert "starting_capital" in body
+    assert "realized_equity" in body
+    assert "total_closed_trades" in body
+    assert "open_trade_count" in body
 
 
 async def test_dashboard_summary_all_time_pnl(http_client: AsyncClient) -> None:
-    """B-18-02: all_time_pnl matches aggregate row value."""
+    """B-18-02: all_time_net_pnl matches aggregate row value."""
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(all_time_pnl=Decimal("99999.99"))])
+    mock_db = _make_mock_db([_dashboard_row(all_time_net_pnl=Decimal("99999.99"))])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
-    assert Decimal(response.json()["all_time_pnl"]) == Decimal("99999.99")
+    assert Decimal(response.json()["all_time_net_pnl"]) == Decimal("99999.99")
 
 
 async def test_dashboard_summary_mtd_pnl(http_client: AsyncClient) -> None:
-    """B-18-03: mtd_pnl matches the month-to-date slice."""
+    """B-18-03: mtd_net_pnl matches the month-to-date slice."""
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(mtd_pnl=Decimal("1500.00"))])
+    mock_db = _make_mock_db([_dashboard_row(mtd_net_pnl=Decimal("1500.00"))])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
-    assert Decimal(response.json()["mtd_pnl"]) == Decimal("1500.00")
+    assert Decimal(response.json()["mtd_net_pnl"]) == Decimal("1500.00")
 
 
 async def test_dashboard_summary_wtd_pnl(http_client: AsyncClient) -> None:
-    """B-18-04: wtd_pnl matches the week-to-date slice."""
+    """B-18-04: wtd_net_pnl matches the week-to-date slice."""
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(wtd_pnl=Decimal("300.00"))])
+    mock_db = _make_mock_db([_dashboard_row(wtd_net_pnl=Decimal("300.00"))])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
-    assert Decimal(response.json()["wtd_pnl"]) == Decimal("300.00")
+    assert Decimal(response.json()["wtd_net_pnl"]) == Decimal("300.00")
 
 
 async def test_dashboard_summary_total_closed(http_client: AsyncClient) -> None:
-    """B-18-05: total_closed is the count of CLOSED trades."""
+    """B-18-05: total_closed_trades is the count of CLOSED trades."""
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(total_closed=17)])
+    mock_db = _make_mock_db([_dashboard_row(total_closed_trades=17)])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
-    assert response.json()["total_closed"] == 17
+    assert response.json()["total_closed_trades"] == 17
 
 
 async def test_dashboard_summary_open_count(http_client: AsyncClient) -> None:
-    """B-18-06: open_count is the count of OPEN + PARTIAL trades."""
+    """B-18-06: open_trade_count is the count of OPEN + PARTIAL trades."""
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(open_count=5)])
+    mock_db = _make_mock_db([_dashboard_row(open_trade_count=5)])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
-    assert response.json()["open_count"] == 5
+    assert response.json()["open_trade_count"] == 5
 
 
 async def test_dashboard_summary_zero_pnl_on_no_trades(http_client: AsyncClient) -> None:
@@ -245,17 +251,17 @@ async def test_dashboard_summary_zero_pnl_on_no_trades(http_client: AsyncClient)
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(all_time_pnl=0, mtd_pnl=0, wtd_pnl=0)])
+    mock_db = _make_mock_db([_dashboard_row(all_time_net_pnl=0, mtd_net_pnl=0, wtd_net_pnl=0)])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
     body = response.json()
-    assert body["all_time_pnl"] is not None
-    assert body["mtd_pnl"] is not None
-    assert body["wtd_pnl"] is not None
+    assert body["all_time_net_pnl"] is not None
+    assert body["mtd_net_pnl"] is not None
+    assert body["wtd_net_pnl"] is not None
 
 
 async def test_dashboard_summary_negative_pnl(http_client: AsyncClient) -> None:
@@ -263,14 +269,14 @@ async def test_dashboard_summary_negative_pnl(http_client: AsyncClient) -> None:
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(all_time_pnl=Decimal("-5000.00"))])
+    mock_db = _make_mock_db([_dashboard_row(all_time_net_pnl=Decimal("-5000.00"))])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
-    assert Decimal(response.json()["all_time_pnl"]) == Decimal("-5000.00")
+    assert Decimal(response.json()["all_time_net_pnl"]) == Decimal("-5000.00")
 
 
 async def test_dashboard_summary_requires_auth(http_client: AsyncClient) -> None:
@@ -280,7 +286,7 @@ async def test_dashboard_summary_requires_auth(http_client: AsyncClient) -> None
 
     app.dependency_overrides.pop(get_current_user_id, None)
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides[get_current_user_id] = lambda: _USER_ID
 
@@ -288,20 +294,20 @@ async def test_dashboard_summary_requires_auth(http_client: AsyncClient) -> None
 
 
 async def test_dashboard_summary_counts_are_int(http_client: AsyncClient) -> None:
-    """B-18-10: total_closed and open_count are integers, not floats."""
+    """B-18-10: total_closed_trades and open_trade_count are integers, not floats."""
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(total_closed=10, open_count=2)])
+    mock_db = _make_mock_db([_dashboard_row(total_closed_trades=10, open_trade_count=2)])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
-        response = await http_client.get("/v1/dashboard/summary")
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
     body = response.json()
-    assert isinstance(body["total_closed"], int)
-    assert isinstance(body["open_count"], int)
+    assert isinstance(body["total_closed_trades"], int)
+    assert isinstance(body["open_trade_count"], int)
 
 
 async def test_dashboard_summary_large_pnl(http_client: AsyncClient) -> None:
@@ -309,14 +315,81 @@ async def test_dashboard_summary_large_pnl(http_client: AsyncClient) -> None:
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_dashboard_row(all_time_pnl=Decimal("99999999999999.99"))])
+    mock_db = _make_mock_db([_dashboard_row(all_time_net_pnl=Decimal("99999999999999.99"))])
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+
+
+async def test_dashboard_summary_missing_account_id_returns_422(
+    http_client: AsyncClient,
+) -> None:
+    """B-18-11b: Missing required account_id query param → 422."""
+    from tradeforge.infrastructure.db import get_db
+    from tradeforge.main import app
+
+    mock_db = _make_mock_db([_dashboard_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
         response = await http_client.get("/v1/dashboard/summary")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+
+
+async def test_dashboard_summary_null_starting_capital(http_client: AsyncClient) -> None:
+    """B-18-11c: starting_capital=None → realized_equity is also None."""
+    from tradeforge.infrastructure.db import get_db
+    from tradeforge.main import app
+
+    mock_db = _make_mock_db([_dashboard_row(starting_capital=None)])
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    body = response.json()
+    assert body["starting_capital"] is None
+    assert body["realized_equity"] is None
+
+
+async def test_dashboard_summary_realized_equity_calculation(http_client: AsyncClient) -> None:
+    """B-18-11d: realized_equity = starting_capital + all_time_net_pnl."""
+    from tradeforge.infrastructure.db import get_db
+    from tradeforge.main import app
+
+    mock_db = _make_mock_db(
+        [_dashboard_row(starting_capital=Decimal("500000.00"), all_time_net_pnl=Decimal("27500.00"))]
+    )
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    body = response.json()
+    assert Decimal(body["realized_equity"]) == Decimal("527500.00")
+
+
+async def test_dashboard_summary_account_id_echoed_in_response(http_client: AsyncClient) -> None:
+    """B-18-11e: account_id in the response matches the query param supplied."""
+    from tradeforge.infrastructure.db import get_db
+    from tradeforge.main import app
+
+    mock_db = _make_mock_db([_dashboard_row()])
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        response = await http_client.get(f"/v1/dashboard/summary?account_id={_ACCOUNT_ID}")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.json()["account_id"] == str(_ACCOUNT_ID)
 
 
 # ---------------------------------------------------------------------------
