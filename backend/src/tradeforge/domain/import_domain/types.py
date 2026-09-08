@@ -36,6 +36,7 @@ class TradingAccount:
     status: str
     created_at: datetime
     updated_at: datetime
+    starting_capital: Decimal | None = None
 
 
 @dataclass(frozen=True)

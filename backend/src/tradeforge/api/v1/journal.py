@@ -18,9 +18,10 @@ import uuid
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.api.v1.deps import get_client_ip, get_current_user_id
@@ -43,6 +44,8 @@ from tradeforge.domain.journal.types import (
     MistakeType,
 )
 from tradeforge.infrastructure.db import get_db
+from tradeforge.infrastructure.models.journal import JournalEntry
+from tradeforge.infrastructure.models.trade_domain import Instrument, Trade
 from tradeforge.infrastructure.repositories.auth_repo import AuditLogRepository
 from tradeforge.infrastructure.repositories.charge_schedule_repo import ChargeScheduleRepository
 from tradeforge.infrastructure.repositories.journal_repo import JournalRepository
@@ -190,6 +193,20 @@ class AttachmentConfirmOut(BaseModel):
     status: str
     download_url: str | None
     confirmed_at: str | None
+
+
+class RecentJournalItemOut(BaseModel):
+    id: uuid.UUID
+    trade_id: uuid.UUID
+    symbol: str
+    instrument_type: str
+    direction: str
+    trade_date: Any
+    discipline_score: int | None
+    emotion_before: str | None
+    emotion_during: str | None
+    emotion_after: str | None
+    created_at: str
 
 
 # ---------------------------------------------------------------------------
@@ -432,3 +449,52 @@ async def delete_attachment(
     except AttachmentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     await db.commit()
+
+
+@router.get("/recent", response_model=list[RecentJournalItemOut])
+async def list_recent_journal_entries(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=10, ge=1, le=50),
+) -> list[RecentJournalItemOut]:
+    stmt = (
+        select(
+            JournalEntry.id,
+            JournalEntry.trade_id,
+            JournalEntry.discipline_score,
+            JournalEntry.emotion_before,
+            JournalEntry.emotion_during,
+            JournalEntry.emotion_after,
+            JournalEntry.created_at,
+            Trade.trade_date,
+            Trade.direction,
+            Instrument.symbol,
+            Instrument.instrument_type,
+        )
+        .select_from(JournalEntry)
+        .join(Trade, Trade.id == JournalEntry.trade_id)
+        .join(Instrument, Instrument.id == Trade.instrument_id)
+        .where(JournalEntry.user_id == user_id, Trade.is_deleted.is_(False))
+        .order_by(JournalEntry.created_at.desc())
+        .limit(limit)
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        RecentJournalItemOut(
+            id=row.id,
+            trade_id=row.trade_id,
+            symbol=row.symbol,
+            instrument_type=row.instrument_type,
+            direction=row.direction,
+            trade_date=row.trade_date,
+            discipline_score=row.discipline_score,
+            emotion_before=row.emotion_before,
+            emotion_during=row.emotion_during,
+            emotion_after=row.emotion_after,
+            created_at=_dt_str(row.created_at),
+        )
+        for row in rows
+    ]

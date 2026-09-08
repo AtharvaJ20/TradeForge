@@ -8,6 +8,7 @@ validated against user_id ownership.
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +33,7 @@ class TradingAccountService:
         display_name: str,
         account_type: str = "INDIVIDUAL",
         base_currency: str = "INR",
+        starting_capital: Decimal | None = None,
     ) -> TradingAccount:
         """Create a new trading account for the user.
 
@@ -57,6 +59,7 @@ class TradingAccountService:
             display_name=display_name.strip(),
             account_type=account_type,
             base_currency=base_currency,
+            starting_capital=starting_capital,
         )
 
     async def list(
@@ -103,6 +106,7 @@ class TradingAccountService:
         account_id: uuid.UUID,
         display_name: str | None = None,
         account_type: str | None = None,
+        starting_capital: Decimal | None = None,
     ) -> TradingAccount:
         """Update mutable account fields.
 
@@ -124,6 +128,7 @@ class TradingAccountService:
             account_id=account_id,
             display_name=display_name.strip() if display_name else None,
             account_type=account_type,
+            starting_capital=starting_capital,
         )
         if result is None:
             raise AccountNotFoundError(account_id)

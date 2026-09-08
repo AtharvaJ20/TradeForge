@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,7 @@ class TradingAccountRepository:
         display_name: str,
         account_type: str,
         base_currency: str = "INR",
+        starting_capital: Decimal | None = None,
     ) -> TradingAccountDomain:
         pk = uuid.uuid4()
         obj = TradingAccount(
@@ -32,6 +34,7 @@ class TradingAccountRepository:
             account_type=account_type,
             base_currency=base_currency,
             status="ACTIVE",
+            starting_capital=starting_capital,
         )
         session.add(obj)
         await session.flush()
@@ -74,6 +77,7 @@ class TradingAccountRepository:
         account_id: uuid.UUID,
         display_name: str | None = None,
         account_type: str | None = None,
+        starting_capital: Decimal | None = None,
     ) -> TradingAccountDomain | None:
         """Update mutable account fields.  Returns None if not found / not owned."""
         values: dict[str, object] = {"updated_at": datetime.now(UTC)}
@@ -81,6 +85,8 @@ class TradingAccountRepository:
             values["display_name"] = display_name
         if account_type is not None:
             values["account_type"] = account_type
+        if starting_capital is not None:
+            values["starting_capital"] = starting_capital
 
         await session.execute(
             update(TradingAccount)
@@ -116,4 +122,5 @@ class TradingAccountRepository:
             status=row.status,
             created_at=row.created_at,
             updated_at=row.updated_at,
+            starting_capital=row.starting_capital,
         )

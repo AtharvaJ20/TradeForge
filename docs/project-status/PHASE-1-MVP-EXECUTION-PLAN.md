@@ -284,6 +284,8 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Owner:** Arjun (frontend), Bhima (any new backend aggregations needed)  
 **Estimate:** 1–2 sessions  
 **Dependency:** Steps 15 (account selection), 12 analytics foundation (data already computed)  
+**Execution plan:** `docs/project-status/STEP-18-EXECUTION-PLAN.md`  
+**Branch:** `feat/step-18-dashboard` (base: `main` after Steps 16 + 17 merged, commit `af57349`)  
 
 **Scope:**
 - **Account Overview tile:** Net P&L (all-time, MTD, WTD), current drawdown, starting capital, current equity
