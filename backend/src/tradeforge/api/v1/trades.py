@@ -24,7 +24,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.api.v1.deps import get_current_user_id
-from tradeforge.application.trading_account_service import TradingAccountService
 from tradeforge.application.trade_service import (
     FillTimestampBeforeTradeOpenError,
     InstrumentNotFoundError,
@@ -36,6 +35,7 @@ from tradeforge.application.trade_service import (
     TradeNotOwnedError,
     TradeService,
 )
+from tradeforge.application.trading_account_service import TradingAccountService
 from tradeforge.domain.import_domain.errors import AccountNotFoundError
 from tradeforge.infrastructure.db import get_db
 from tradeforge.infrastructure.models.trade_domain import Instrument, Trade

@@ -61,7 +61,7 @@ def _dashboard_row(
 
 def _trade_list_row(
     *,
-    id: uuid.UUID | None = None,
+    row_id: uuid.UUID | None = None,
     account_id: uuid.UUID | None = None,
     symbol: str = "RELIANCE",
     instrument_type: str = "EQ",
@@ -73,7 +73,7 @@ def _trade_list_row(
     r_multiple: Decimal | None = Decimal("2.0"),
 ) -> MagicMock:
     row = MagicMock()
-    row.id = id or _TRADE_ID
+    row.id = row_id or _TRADE_ID
     row.account_id = account_id or _ACCOUNT_ID
     row.symbol = symbol
     row.instrument_type = instrument_type
@@ -88,7 +88,7 @@ def _trade_list_row(
 
 def _journal_row(
     *,
-    id: uuid.UUID | None = None,
+    row_id: uuid.UUID | None = None,
     trade_id: uuid.UUID | None = None,
     symbol: str = "INFY",
     instrument_type: str = "EQ",
@@ -101,7 +101,7 @@ def _journal_row(
     created_at: datetime | None = None,
 ) -> MagicMock:
     row = MagicMock()
-    row.id = id or _JOURNAL_ID
+    row.id = row_id or _JOURNAL_ID
     row.trade_id = trade_id or _TRADE_ID
     row.symbol = symbol
     row.instrument_type = instrument_type

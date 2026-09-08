@@ -118,8 +118,12 @@ async def dashboard_summary(
     row = result.one()
 
     all_time_net_pnl = Decimal(str(row.all_time_net_pnl))
-    starting_capital = Decimal(str(row.starting_capital)) if row.starting_capital is not None else None
-    realized_equity = (starting_capital + all_time_net_pnl) if starting_capital is not None else None
+    starting_capital = (
+        Decimal(str(row.starting_capital)) if row.starting_capital is not None else None
+    )
+    realized_equity = (
+        starting_capital + all_time_net_pnl if starting_capital is not None else None
+    )
 
     return DashboardSummaryResponse(
         account_id=str(account_id),

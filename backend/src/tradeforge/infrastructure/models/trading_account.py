@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String
