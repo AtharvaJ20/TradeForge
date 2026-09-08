@@ -242,16 +242,21 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Options leg builder (Phase 2)
 - Editing an existing trade's fills post-creation (Phase 2 — reconstruction implications)
 
-**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-08** (Sahadeva GO · Nakula CI GREEN · Yudhishthira ACCEPT — PR #10 merged)  
+**Test totals:** To be recorded after acceptance  
+**Branch:** `feat/step-16-manual-trade-entry` (merged to `main` as PR #10, commit `43faf38`)
 
 ---
 
 ### Step 17 — Import Trades Screen
 
 **Goal:** Give users a UI for the CSV broker import that already exists in the backend.  
-**Owner:** Arjun (frontend), Sanjaya (broker adapter correctness review)  
+**Owner:** Arjun (frontend), Bhima (import API router)  
 **Estimate:** 1 session  
-**Dependency:** Step 15 (account selection). Backend adapters (Zerodha, Upstox, Angel One) are already complete.  
+**Dependency:** Step 15 (account selection) ✅. Backend adapters (Zerodha, Upstox, Angel One) already complete. Step 16 merged ✅.  
+**Execution plan:** `docs/project-status/STEP-17-EXECUTION-PLAN.md`  
+**Branch:** `feat/step-17-import-trades` (base: `main` after PR #10)  
 
 **Frontend scope (Arjun):**
 - Import Trades screen: broker selector (Zerodha / Upstox / Angel One), file upload (CSV), account selector
@@ -459,7 +464,8 @@ Phase 1 is DONE when all of the following are true simultaneously:
 - [x] Step 13 accepted by Yudhishthira ✅ 2026-09-05
 - [x] Step 14 accepted by Yudhishthira ✅ 2026-09-05
 - [x] Step 15 accepted by Yudhishthira ✅ 2026-09-05
-- [ ] Steps 16, 17, 18, 19 accepted by Yudhishthira
+- [x] Step 16 accepted by Yudhishthira ✅ 2026-09-08
+- [ ] Steps 17, 18, 19 accepted by Yudhishthira
 - [ ] Step 20 security hardening accepted by Hanuman
 - [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
 - [ ] Track QA E2E suite (J-1 through J-9) passing on staging
