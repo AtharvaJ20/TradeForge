@@ -1,4 +1,4 @@
-"""Unit tests for TradeService — B-16-22, B-16-23.
+"""Unit tests for TradeService — B-16-22, B-16-23, B-16-35, B-16-37.
 
 TradeService.__init__ constructs all repositories internally. Tests replace
 the repo attributes with AsyncMocks after construction to avoid patching at
@@ -259,6 +259,182 @@ async def test_soft_delete_trade_excludes_fills_and_marks_deleted() -> None:
     # Trade must be marked is_deleted=True (and status unchanged)
     svc._trade_repo.update_trade.assert_awaited_once_with(
         svc._session, _TRADE_ID, {"is_deleted": True}
+    )
+
+
+# ---------------------------------------------------------------------------
+# B-16-35: add_fill() recomputes planned_risk_amount after reconstruction (BLK-3)
+# ---------------------------------------------------------------------------
+
+
+async def test_add_fill_recomputes_planned_risk_amount_after_scale_in() -> None:
+    """B-16-35: add_fill() calls update_trade with abs(new_avg_entry - stop) * new_qty.
+
+    BLK-3 (Dhanvantari): after scale-in reconstruction updates average_entry and
+    total_entry_quantity, planned_risk_amount must be recomputed and written back
+    before backfill_all_closed runs. This unit test is the regression guard referenced
+    by the mock-tier API test (test_trades_api.py::test_add_fill_recomputes_planned_risk_after_scale_in).
+    """
+    svc = _make_service()
+
+    # Initial trade: LONG, stop=2450, avg_entry=2500, qty=10
+    trade_row = _make_trade_orm(
+        direction="LONG",
+        planned_stop=Decimal("2450.00"),
+        average_entry=Decimal("2500.00"),
+        total_entry_quantity=Decimal("10"),
+        status="OPEN",
+    )
+    trade_row.first_fill_at = _FILL_TS
+    trade_row.status = "OPEN"
+
+    # After reconstruction: scaled in at 2480 → avg_entry=2490, qty=20
+    updated_trade = _make_trade_orm(
+        direction="LONG",
+        planned_stop=Decimal("2450.00"),
+        average_entry=Decimal("2490.00"),
+        total_entry_quantity=Decimal("20"),
+        status="OPEN",
+    )
+
+    trade_final = _make_trade_orm(status="OPEN")
+    trade_final.planned_risk_amount = Decimal("800.00")
+
+    get_sequence = [trade_row, updated_trade, trade_final]
+    get_idx = [0]
+
+    async def _get(model, pk):
+        i = get_idx[0]
+        get_idx[0] += 1
+        return get_sequence[i]
+
+    svc._session.get = _get
+
+    ownership_result = MagicMock()
+    ownership_result.one_or_none.return_value = (_ACCOUNT_ID,)
+    instrument_result = MagicMock()
+    instrument_result.scalar_one_or_none.return_value = "EQ"
+
+    exec_sequence = [ownership_result, instrument_result]
+    exec_idx = [0]
+
+    async def _execute(*args, **kwargs):
+        i = exec_idx[0]
+        exec_idx[0] += 1
+        return exec_sequence[i]
+
+    svc._session.execute = _execute
+    svc._session.flush = AsyncMock()
+    svc._fill_repo.insert_normalized_fill = AsyncMock(return_value=None)
+
+    rr = ReconstructionResult(
+        trades_opened=0, trades_closed=0, fills_processed=1, affected_trade_id=_TRADE_ID
+    )
+    svc._engine.run = AsyncMock(return_value=rr)
+    svc._trade_repo.update_trade = AsyncMock()
+    svc._pnl_service.backfill_all_closed = AsyncMock()
+
+    await svc.add_fill(
+        user_id=_USER_ID,
+        trade_id=_TRADE_ID,
+        fill_side="BUY",
+        fill_quantity=Decimal("10"),
+        fill_price=Decimal("2480.00"),
+        fill_timestamp=_FILL_TS2,
+    )
+
+    # BLK-3: abs(2490 - 2450) * 20 = 800
+    svc._trade_repo.update_trade.assert_awaited_once_with(
+        svc._session, _TRADE_ID, {"planned_risk_amount": Decimal("800.00")}
+    )
+    # Ordering constraint: flush must be called after update_trade (before backfill)
+    svc._pnl_service.backfill_all_closed.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# B-16-37: add_fill() step 2 uses ownership-only SQL — no account status filter (REQ-6)
+# ---------------------------------------------------------------------------
+
+
+async def test_add_fill_ownership_query_does_not_filter_on_account_status() -> None:
+    """B-16-37: add_fill() ownership SQL checks only user_id, NOT account status.
+
+    REQ-6 (Dhanvantari): the raw SQL at step 2 must not include any account status
+    filter. Using TradingAccountService.get_active() would block fills on trades whose
+    account has since been deactivated — which is incorrect behaviour. A user with an
+    open position on a deactivated account must still be able to add corrective fills.
+
+    This unit test is the regression guard referenced by the mock-tier API test
+    (test_trades_api.py::test_add_fill_inactive_account_returns_200). The mock-tier
+    test confirms the HTTP response; this test confirms the SQL contract.
+    """
+    svc = _make_service()
+
+    trade_row = _make_trade_orm(direction="LONG", status="OPEN")
+    trade_row.first_fill_at = _FILL_TS
+    trade_row.planned_stop = None
+
+    trade_final = _make_trade_orm(status="OPEN")
+
+    get_sequence = [trade_row, trade_final]
+    get_idx = [0]
+
+    async def _get(model, pk):
+        i = get_idx[0]
+        get_idx[0] += 1
+        return get_sequence[i]
+
+    svc._session.get = _get
+
+    captured_execute_args: list = []
+
+    ownership_result = MagicMock()
+    ownership_result.one_or_none.return_value = (_ACCOUNT_ID,)
+    instrument_result = MagicMock()
+    instrument_result.scalar_one_or_none.return_value = "EQ"
+
+    exec_sequence = [ownership_result, instrument_result]
+    exec_idx = [0]
+
+    async def _execute(*args, **kwargs):
+        captured_execute_args.append(args)
+        i = exec_idx[0]
+        exec_idx[0] += 1
+        return exec_sequence[i]
+
+    svc._session.execute = _execute
+    svc._session.flush = AsyncMock()
+    svc._fill_repo.insert_normalized_fill = AsyncMock(return_value=None)
+
+    rr = ReconstructionResult(
+        trades_opened=0, trades_closed=0, fills_processed=1, affected_trade_id=_TRADE_ID
+    )
+    svc._engine.run = AsyncMock(return_value=rr)
+    svc._trade_repo.update_trade = AsyncMock()
+    svc._pnl_service.backfill_all_closed = AsyncMock()
+
+    result = await svc.add_fill(
+        user_id=_USER_ID,
+        trade_id=_TRADE_ID,
+        fill_side="BUY",
+        fill_quantity=Decimal("10"),
+        fill_price=Decimal("2480.00"),
+        fill_timestamp=_FILL_TS2,
+    )
+
+    # Fill succeeded — ownership confirmed even when account status is not checked
+    assert result is trade_final
+
+    # REQ-6: the ownership SQL must not contain 'status' or 'active'
+    assert len(captured_execute_args) >= 1
+    ownership_sql = str(captured_execute_args[0][0]).lower()
+    assert "status" not in ownership_sql, (
+        f"Ownership query must NOT filter on account status (REQ-6). "
+        f"Found 'status' in: {ownership_sql}"
+    )
+    assert "active" not in ownership_sql, (
+        f"Ownership query must NOT filter on 'active' status (REQ-6). "
+        f"Found 'active' in: {ownership_sql}"
     )
 
 
