@@ -5,23 +5,31 @@
 **Date:** 2026-09-08  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-18-dashboard` (base: `main` after Steps 16 + 17 merged)  
-**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-08
+**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-08; Ganesha trading domain review applied 2026-09-08
 
 ---
 
 ## Architectural Review Decisions (Mayasura — 2026-09-08)
-
-The following decisions were issued during architectural review. All blocking and required items have been resolved in this document.
 
 | ID | Severity | Decision |
 |----|----------|----------|
 | A-18-1 | Ruling | **Option A approved.** Add `starting_capital NUMERIC(14,2) DEFAULT NULL` to `trading_accounts`. Additive migration; nullable; existing accounts unaffected. |
 | A-18-2 | Blocking → Resolved | **`emotion` field removed from `RecentJournalItemOut`.** `journal_entries` has no `emotion` column. Replaced with `emotion_before`, `emotion_during`, `emotion_after` (`str | None`). SQL updated accordingly. |
 | A-18-3 | Blocking → Resolved | **`capture_moment` field removed from `RecentJournalItemOut`.** `capture_moment` lives on `journal_attachments`, not `journal_entries`. Field removed entirely from the schema and SQL. |
-| A-18-4 | Blocking → Resolved | **MTD/WTD SQL rewritten to use `trade_date` (Date column) instead of `last_fill_at` (timestamptz).** `trade_date` is timezone-free and safe for IST calendar filtering. Eliminates the timezone comparison bug where `date_trunc(..., NOW() AT TIME ZONE 'Asia/Kolkata')` returns a timestamp without timezone, compared against a timestamptz on a UTC-configured server. |
-| A-18-5 | Blocking → Resolved | **`from __future__ import annotations` explicitly prohibited in `dashboard.py`.** Prohibition added to Task B-18-B. |
-| A-18-6 | Blocking → Resolved | **B-18-13 corrected.** `status=OPEN` returns only OPEN trades. PARTIAL trades are not returned unless `status=PARTIAL` is passed explicitly. |
-| A-18-7 | Required → Resolved | **All five `starting_capital` wiring locations enumerated in Task B-18-A.** "Wire through as needed" replaced with explicit checklist. |
+| A-18-4 | Blocking → Resolved | **MTD/WTD SQL rewritten to use `trade_date` (Date column) instead of `last_fill_at` (timestamptz).** `trade_date` is timezone-free and safe for IST calendar filtering. Eliminates the type comparison bug. See G-18-1 below for the follow-on IST anchor fix. |
+| A-18-5 | Blocking → Resolved | **`from __future__ import annotations` explicitly prohibited in `dashboard.py`.** |
+| A-18-6 | Blocking → Resolved | **B-18-13 corrected.** `status=OPEN` returns only OPEN trades. PARTIAL trades require `status=PARTIAL` explicitly. |
+| A-18-7 | Required → Resolved | **All five `starting_capital` wiring locations enumerated in Task B-18-A.** |
+
+---
+
+## Trading Domain Review Decisions (Ganesha — 2026-09-08)
+
+| ID | Severity | Decision |
+|----|----------|----------|
+| G-18-1 | Blocking → Resolved | **MTD/WTD boundaries and `as_of_date` now use IST calendar date.** A-18-4 fixed the type comparison bug but left `CURRENT_DATE` (UTC server date) as the boundary anchor. Between midnight IST and 05:30 IST, the UTC date lags the IST date by one day — causing WTD to span into the prior week and MTD to span into the prior month on boundary mornings. Fix: replace `CURRENT_DATE` with `(NOW() AT TIME ZONE 'Asia/Kolkata')::date` in all three SQL expressions and in `as_of_date` computation. |
+| G-18-2 | Required → Resolved | **`current_equity` renamed to `realized_equity` throughout.** The formula `starting_capital + all_time_net_pnl (CLOSED trades only)` excludes unrealized P&L from OPEN/PARTIAL positions. "Current equity" implies the live account value including open positions; "realized equity" is accurate. Unrealized P&L in equity display is deferred to Phase 2. |
+| G-18-3 | Required → Resolved | **Recent Journal `ORDER BY` changed from `je.updated_at DESC` to `t.trade_date DESC, t.last_fill_at DESC, t.id DESC`.** `updated_at` ordering surfaced recently-edited old entries at the top, not the most recent trades with journal entries. Chronological trade ordering matches "last 5 trades with a journal entry" acceptance criterion. B-18-23 test updated. |
 
 ---
 
@@ -41,7 +49,7 @@ A logged-in user with a trading account that has trades can:
 2. **See performance metrics:** Win rate, expectancy (R), and profit factor from the existing analytics summary.
 3. **See their current streak:** Current win streak or current loss streak from the existing streaks endpoint.
 4. **Scan recent trades:** Last 10 closed trades with symbol, direction, net P&L, R-multiple, and date. Clicking a row navigates to trade detail (Step 19 will build that screen — link is wired now, destination is a stub).
-5. **Scan recent journal entries:** Last 5 trades with a journal entry, showing discipline score and emotion fields.
+5. **Scan recent journal entries:** Last 5 trades with a journal entry, showing discipline score and emotion fields, ordered by most recent trade date.
 6. **Switch accounts:** The account selector (from `AccountContext`) drives all tiles. Selecting a different account refetches everything.
 
 ---
@@ -55,7 +63,7 @@ A logged-in user with a trading account that has trades can:
 | **Account context** | `AccountContext`, `useAccount()` — selected account in frontend state | `frontend/src/features/accounts/context/AccountContext.tsx` |
 | **Analytics card components** | `DrawdownCard`, `ExpectancyCard`, `ProfitFactorCard`, `StreaksCard` — all already built for AnalyticsPage | `frontend/src/features/analytics/components/` |
 | **trade_pnl schema** | `net_pnl` and `r_multiple` columns confirmed in ORM | `backend/src/tradeforge/infrastructure/models/trade_pnl.py:35,37` |
-| **Journal entry schema** | `discipline_score`, `emotion_before`, `emotion_during`, `emotion_after` fields in `journal_entries` (confirmed via ORM: `infrastructure/models/journal.py`). `capture_moment` is on `journal_attachments`, not `journal_entries`. | `backend/src/tradeforge/infrastructure/models/journal.py` |
+| **Journal entry schema** | `discipline_score`, `emotion_before`, `emotion_during`, `emotion_after` fields in `journal_entries` (confirmed via ORM). `capture_moment` is on `journal_attachments`, not `journal_entries`. | `backend/src/tradeforge/infrastructure/models/journal.py` |
 | **AppShell nav sidebar** | Navigation sidebar — add Dashboard link | `frontend/src/features/settings/` — see Step 17 AppShell update pattern |
 
 **Reuse decision for Performance tile and Streaks tile:** These tiles call the existing `GET /v1/analytics/summary` and `GET /v1/analytics/streaks` endpoints directly — no new backend needed for them. Arjun reuses or adapts the existing analytics card components. Do not build duplicate endpoints.
@@ -101,16 +109,17 @@ Register under `prefix="/dashboard"`, tag `"dashboard"`. Wire into `main.py`.
 ```python
 class DashboardSummaryResponse(BaseModel):
     account_id: UUID
-    as_of_date: str           # ISO date string, e.g. "2026-09-08"
+    as_of_date: str           # ISO date string in IST, e.g. "2026-09-08"
 
-    # P&L time windows (all computed from trade_pnl.net_pnl for the account)
+    # P&L time windows (all computed from trade_pnl.net_pnl, CLOSED trades only)
     all_time_net_pnl: Decimal
-    mtd_net_pnl: Decimal      # First calendar day of current month → today (IST)
-    wtd_net_pnl: Decimal      # Most recent Monday → today (IST)
+    mtd_net_pnl: Decimal      # First calendar day of current IST month → today
+    wtd_net_pnl: Decimal      # Most recent Monday (IST) → today
 
     # Account equity (null if starting_capital is null)
     starting_capital: Decimal | None
-    current_equity: Decimal | None   # starting_capital + all_time_net_pnl; null if starting_capital is null
+    # starting_capital + net P&L from CLOSED trades; excludes unrealized P&L from open/partial positions
+    realized_equity: Decimal | None
 
     # Activity counts
     total_closed_trades: int
@@ -124,16 +133,23 @@ class DashboardSummaryResponse(BaseModel):
 **Implementation sequence:**
 
 1. Verify account ownership: call `TradingAccountService.get(session, user_id, account_id)`. Return `404 ACCOUNT_NOT_FOUND` if the account does not exist or is not owned by the authenticated user. No ACTIVE check — history is always viewable for owned accounts.
-2. Compute P&L windows via SQL using `trade_date` (a timezone-free `Date` column) for the IST calendar boundaries — this avoids the timezone comparison bug that affects `last_fill_at` (a `timestamptz` stored in UTC):
+2. Compute the IST "today" date once and reuse it for all boundaries:
+   ```sql
+   -- IST calendar date (avoids CURRENT_DATE UTC lag between midnight IST and 05:30 IST)
+   SELECT (NOW() AT TIME ZONE 'Asia/Kolkata')::date AS ist_today
+   ```
+   Or equivalently in Python: `datetime.datetime.now(tz=pytz.timezone('Asia/Kolkata')).date()` passed as a bind parameter.
+3. Compute P&L windows via SQL using `trade_date` (timezone-free `Date` column) and the IST date as the period anchor:
    - `all_time_net_pnl` — `SELECT COALESCE(SUM(tp.net_pnl), 0) FROM trade_pnl tp JOIN trades t ON t.id = tp.trade_id WHERE t.account_id = :account_id AND t.is_deleted = false AND t.status = 'CLOSED'`
-   - `mtd_net_pnl` — same query + `AND t.trade_date >= date_trunc('month', CURRENT_DATE)::date`
-   - `wtd_net_pnl` — same query + `AND t.trade_date >= date_trunc('week', CURRENT_DATE)::date` (PostgreSQL `date_trunc('week', ...)` anchors to Monday)
+   - `mtd_net_pnl` — same base query + `AND t.trade_date >= date_trunc('month', (NOW() AT TIME ZONE 'Asia/Kolkata')::date)::date`
+   - `wtd_net_pnl` — same base query + `AND t.trade_date >= date_trunc('week', (NOW() AT TIME ZONE 'Asia/Kolkata')::date)::date` (PostgreSQL `date_trunc('week', ...)` anchors to Monday)
    - `total_closed_trades` — `COUNT(t.id)` with `status = 'CLOSED'`, `is_deleted = false`
    - `open_trade_count` — `COUNT(t.id)` with `status IN ('OPEN', 'PARTIAL')`, `is_deleted = false`
-3. Fetch `starting_capital` from the `trading_accounts` row already loaded in step 1. Compute `current_equity = starting_capital + all_time_net_pnl` if `starting_capital` is not null; else null.
-4. Return `200 DashboardSummaryResponse`.
+4. Set `as_of_date` to `(NOW() AT TIME ZONE 'Asia/Kolkata')::date` formatted as ISO string (e.g. `"2026-09-08"`). Do not use `CURRENT_DATE` or Python's `datetime.date.today()` — both return the UTC date on Railway.
+5. Fetch `starting_capital` from the `trading_accounts` row already loaded in step 1. Compute `realized_equity = starting_capital + all_time_net_pnl` if `starting_capital` is not null; else null.
+6. Return `200 DashboardSummaryResponse`.
 
-> **Why `trade_date` instead of `last_fill_at`:** `trade_date` is a timezone-free `Date` column that reflects the IST trading session date as recorded by the broker. Using `CURRENT_DATE` (server UTC date) and `date_trunc` on a `Date` column avoids the subtlety where `date_trunc('month', NOW() AT TIME ZONE 'Asia/Kolkata')` returns a `timestamp without time zone`, which compares against `last_fill_at` (`timestamptz`) using the session timezone (UTC on Railway), not IST — causing a 5:30-hour discrepancy at month/week boundaries.
+> **Why `trade_date` with IST anchor:** `trade_date` is a timezone-free `Date` column reflecting the IST trading session date as recorded by the broker. Two independent fixes are applied here: (1) A-18-4 switched from `last_fill_at` (timestamptz) to `trade_date` (Date) to eliminate the type comparison bug; (2) G-18-1 switched the boundary anchor from `CURRENT_DATE` (UTC on Railway) to `(NOW() AT TIME ZONE 'Asia/Kolkata')::date` so the period boundary is the correct IST calendar date. Between midnight IST and 05:30 IST, these two values differ by one day — using the UTC date produces a boundary one full week or month behind the IST boundary.
 
 **Wire into `main.py`:**
 ```python
@@ -224,7 +240,7 @@ class RecentJournalItemOut(BaseModel):
     emotion_after: str | None
 ```
 
-> **Schema rationale (A-18-2, A-18-3):** `journal_entries` has three emotion columns (`emotion_before`, `emotion_during`, `emotion_after`) — not a single `emotion` column. `capture_moment` is on `journal_attachments`, not `journal_entries` — it is excluded entirely from this response.
+> **Schema rationale (A-18-2, A-18-3):** `journal_entries` has three emotion columns (`emotion_before`, `emotion_during`, `emotion_after`) — not a single `emotion` column. `capture_moment` is on `journal_attachments`, not `journal_entries` — excluded entirely.
 
 #### `GET /v1/journal/recent`
 
@@ -244,10 +260,12 @@ class RecentJournalItemOut(BaseModel):
    JOIN instruments i ON i.id = t.instrument_id
    WHERE t.account_id = :account_id
      AND t.is_deleted = false
-   ORDER BY je.updated_at DESC
+   ORDER BY t.trade_date DESC, t.last_fill_at DESC, t.id DESC
    LIMIT :limit
    ```
 3. Return `list[RecentJournalItemOut]` (empty list if no journal entries).
+
+> **Ordering rationale (G-18-3):** Results are ordered by trade chronology (`t.trade_date DESC, t.last_fill_at DESC, t.id DESC`) so the tile always shows the 5 most recently closed trades that have a journal entry. `je.updated_at` ordering was rejected because editing an old journal entry would move it to the top, which contradicts the "last 5 trades with a journal entry" acceptance criterion.
 
 > This endpoint returns only trades that **have a journal entry**. Trades without a journal entry are excluded. The `journal_entries` table has one row per trade (upsert pattern — established in Step 9).
 
@@ -270,8 +288,8 @@ Tests cover `GET /v1/dashboard/summary`, `GET /v1/trades`, and `GET /v1/journal/
 | B-18-05 | Unauthenticated → 401 |
 | B-18-06 | Deactivated account owned by user → 200 (ownership-only check; ACTIVE status not required for dashboard) |
 | B-18-07 | Account with no trades → 200; `all_time_net_pnl = 0`, `mtd_net_pnl = 0`, `wtd_net_pnl = 0`, `total_closed_trades = 0`, `open_trade_count = 0` |
-| B-18-08 | Account with `starting_capital` set → `current_equity = starting_capital + all_time_net_pnl`; both fields non-null |
-| B-18-09 | Account with `starting_capital = NULL` → `starting_capital = null`, `current_equity = null` |
+| B-18-08 | Account with `starting_capital` set → `realized_equity = starting_capital + all_time_net_pnl`; both fields non-null |
+| B-18-09 | Account with `starting_capital = NULL` → `starting_capital = null`, `realized_equity = null` |
 
 #### Trade List (`GET /v1/trades`)
 
@@ -295,7 +313,7 @@ Tests cover `GET /v1/dashboard/summary`, `GET /v1/trades`, and `GET /v1/journal/
 | B-18-20 | `GET /v1/journal/recent?account_id=<uuid>&limit=5` → 200; returns list of `RecentJournalItemOut`; each has `trade_id`, `symbol`, `discipline_score`, `emotion_before`, `emotion_during`, `emotion_after` |
 | B-18-21 | Trade without a journal entry is excluded from the result |
 | B-18-22 | Limit is respected — account with 10 journaled trades returns ≤ 5 rows at default limit |
-| B-18-23 | Results are ordered by `je.updated_at DESC` — most recently journaled trade is first |
+| B-18-23 | Results are ordered by `t.trade_date DESC, t.last_fill_at DESC` — the trade with the most recent trade date (not the most recently edited journal entry) appears first |
 | B-18-24 | Another user's `account_id` → 404 |
 | B-18-25 | Unauthenticated → 401 |
 | B-18-26 | Account with no journal entries → 200 empty list |
@@ -319,12 +337,12 @@ Tests cover `GET /v1/dashboard/summary`, `GET /v1/trades`, and `GET /v1/journal/
 ```typescript
 export interface DashboardSummaryOut {
   account_id: string
-  as_of_date: string
+  as_of_date: string           // IST date, e.g. "2026-09-08"
   all_time_net_pnl: number
   mtd_net_pnl: number
   wtd_net_pnl: number
   starting_capital: number | null
-  current_equity: number | null
+  realized_equity: number | null  // starting_capital + closed-trade net P&L; excludes unrealized P&L
   total_closed_trades: number
   open_trade_count: number
 }
@@ -354,7 +372,7 @@ export interface RecentJournalItemOut {
 }
 ```
 
-> **A-18-2, A-18-3:** `emotion: string | null` and `capture_moment: string | null` removed. Replaced with three separate emotion fields matching the `journal_entries` ORM schema. No `capture_moment` — it lives on `journal_attachments`.
+> **G-18-2:** `current_equity` renamed to `realized_equity`. The field comment makes the exclusion of unrealized P&L explicit.
 
 ---
 
@@ -399,7 +417,7 @@ Routed at `/dashboard`. The default route after login — see Task F-18-E.
 | MTD net P&L | `DashboardSummaryOut.mtd_net_pnl` |
 | WTD net P&L | `DashboardSummaryOut.wtd_net_pnl` |
 | Starting capital | `DashboardSummaryOut.starting_capital` (hidden if null) |
-| Current equity | `DashboardSummaryOut.current_equity` (hidden if null) |
+| Realized equity | `DashboardSummaryOut.realized_equity` (hidden if null; display label: "Realized Equity") |
 | Open positions | `DashboardSummaryOut.open_trade_count` |
 
 P&L values are formatted with sign (+ / −) and ₹ currency. Green for positive, red for negative, neutral for zero.
@@ -455,7 +473,7 @@ Add to `src/__tests__/msw/handlers.ts`:
 
 | Handler | Fixtures |
 |---------|---------|
-| `GET /v1/dashboard/summary` | `DASHBOARD_SUMMARY` (200, all fields populated including `starting_capital`), `DASHBOARD_SUMMARY_EMPTY` (200, all P&L = 0, counts = 0, `starting_capital = null`) |
+| `GET /v1/dashboard/summary` | `DASHBOARD_SUMMARY` (200, all fields populated including `starting_capital` and `realized_equity`), `DASHBOARD_SUMMARY_EMPTY` (200, all P&L = 0, counts = 0, `starting_capital = null`, `realized_equity = null`) |
 | `GET /v1/trades` | `TRADES_LIST` (200, 10 TradeListItemOut rows with CLOSED status), `TRADES_LIST_EMPTY` (200, empty list) |
 | `GET /v1/journal/recent` | `JOURNAL_RECENT` (200, 5 RecentJournalItemOut rows with `emotion_before`, `emotion_during`, `emotion_after` populated), `JOURNAL_RECENT_EMPTY` (200, empty list) |
 
@@ -489,8 +507,8 @@ Make `/` redirect to `/dashboard` (logged-in users land on the dashboard):
 |---------|-------------|
 | F-18-01 | Dashboard renders Account Overview tile with account name from `AccountContext` |
 | F-18-02 | Account Overview tile shows all-time, MTD, WTD P&L values from `DASHBOARD_SUMMARY` fixture |
-| F-18-03 | Account Overview tile shows `starting_capital` and `current_equity` when both are non-null |
-| F-18-04 | When `starting_capital` is null, starting capital and current equity rows are not rendered |
+| F-18-03 | Account Overview tile shows `starting_capital` and `realized_equity` when both are non-null; display label reads "Realized Equity" |
+| F-18-04 | When `starting_capital` is null, starting capital and realized equity rows are not rendered |
 | F-18-05 | Performance tile shows win rate, expectancy, profit factor from analytics summary fixture |
 | F-18-06 | Streaks tile shows current win streak and current loss streak |
 | F-18-07 | Recent Trades list renders 10 rows with symbol, direction, net P&L, R-multiple |
@@ -513,6 +531,7 @@ Make `/` redirect to `/dashboard` (logged-in users land on the dashboard):
 |-------------|------|
 | Step 19 | Trade Detail screen — `/trades/<id>` (the link from Recent Trades is wired but the destination is a stub) |
 | Step 19 | Full paginated Trade List screen |
+| Phase 2 | Unrealized P&L from open/partial positions included in equity display (realized_equity currently shows closed-trade P&L only) |
 | Phase 2 | Daily P&L chart / equity curve |
 | Phase 2 | Risk utilization gauge on dashboard |
 | Phase 2 | Behavioral pattern summary tile |
@@ -561,9 +580,9 @@ Make `/` redirect to `/dashboard` (logged-in users land on the dashboard):
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| **Sahadeva QA** | Sahadeva | All new backend tests pass (B-18-01 through B-18-29); all new frontend tests pass (F-18-01 through F-18-15); no regressions in Steps 15–17 tests; `GET /v1/trades` list excludes `is_deleted = true` trades (B-18-19); WTD anchors to Monday (B-18-03); deactivated-account dashboard returns 200 (B-18-06); account switching triggers re-fetch (F-18-12); `/` redirect confirmed (F-18-14); Recent Trades row links include trade id (F-18-08); `status=OPEN` returns only OPEN (not PARTIAL) trades (B-18-13) |
+| **Sahadeva QA** | Sahadeva | All new backend tests pass (B-18-01 through B-18-29); all new frontend tests pass (F-18-01 through F-18-15); no regressions in Steps 15–17 tests; `GET /v1/trades` list excludes `is_deleted = true` trades (B-18-19); WTD anchors to Monday (B-18-03); deactivated-account dashboard returns 200 (B-18-06); account switching triggers re-fetch (F-18-12); `/` redirect confirmed (F-18-14); Recent Trades row links include trade id (F-18-08); `status=OPEN` returns only OPEN (not PARTIAL) trades (B-18-13); Recent Journal ordered by trade date descending — editing an old journal entry does not reorder the tile (B-18-23); `realized_equity` field present (not `current_equity`) in dashboard summary response (B-18-08) |
 | **Nakula CI** | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes; `tsc --noEmit` clean; ESLint 0 warnings; migration applies cleanly with `alembic upgrade head`; `GET /v1/trades` route confirmed in OpenAPI schema |
-| **Yudhishthira ACCEPT** | Yudhishthira | Dashboard accessible from nav; Account Overview shows three P&L periods; Performance tile shows win rate, expectancy, profit factor; Streaks tile shows current streak; Recent Trades list renders last 10 closed trades with P&L coloured correctly; Recent Journal shows discipline score and emotion; switching accounts refreshes all tiles |
+| **Yudhishthira ACCEPT** | Yudhishthira | Dashboard accessible from nav; Account Overview shows three P&L periods and displays "Realized Equity" label (not "Current Equity") when `starting_capital` is set; Performance tile shows win rate, expectancy, profit factor; Streaks tile shows current streak; Recent Trades list renders last 10 closed trades with P&L coloured correctly; Recent Journal shows most recently traded instruments (not most recently edited journal entries); switching accounts refreshes all tiles |
 
 ---
 
@@ -572,7 +591,7 @@ Make `/` redirect to `/dashboard` (logged-in users land on the dashboard):
 | Owner | Work | Estimate |
 |-------|------|----------|
 | Bhima | Migration + all five `starting_capital` wiring locations | ~0.1 session |
-| Bhima | `dashboard.py` — summary endpoint with date arithmetic | ~0.2 session |
+| Bhima | `dashboard.py` — summary endpoint with IST date arithmetic | ~0.2 session |
 | Bhima | `GET /v1/trades` list endpoint | ~0.2 session |
 | Bhima | `GET /v1/journal/recent` endpoint | ~0.15 session |
 | Bhima | Wire dashboard router into `main.py` | ~0.05 session |
@@ -595,10 +614,12 @@ Within the Phase 1 estimate. No scope reduction recommended.
 - `GET /v1/analytics/streaks` ✅ confirmed live (`analytics.py:450`) — Streaks tile reuses it
 - `trade_pnl.net_pnl` and `trade_pnl.r_multiple` ✅ confirmed in ORM (`trade_pnl.py:35,37`)
 - `TradingAccountService.get()` ✅ confirmed at `trading_account_service.py:70` (ownership check only, no ACTIVE filter)
+- `analytics_repo._base_where()` ✅ confirmed: always filters `status = 'CLOSED'` — dashboard `all_time_net_pnl` methodology is consistent with analytics `net_pnl`
 - **A-18-1 ruling from Mayasura** ✅ Option A approved 2026-09-08 — B-18-A is unblocked
 
 ---
 
 *Krishna — Senior Project Manager*  
 *Architectural review: Mayasura — 2026-09-08 (A-18-1 through A-18-7 applied)*  
-*Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/analytics.py`, `backend/src/tradeforge/api/v1/trades.py`, `backend/src/tradeforge/api/v1/journal.py`, `backend/src/tradeforge/infrastructure/models/trading_account.py`, `backend/src/tradeforge/infrastructure/models/trade_pnl.py`, `backend/src/tradeforge/infrastructure/models/journal.py`, `backend/src/tradeforge/api/v1/risk.py`*
+*Trading domain review: Ganesha — 2026-09-08 (G-18-1 through G-18-3 applied)*  
+*Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/analytics.py`, `backend/src/tradeforge/api/v1/trades.py`, `backend/src/tradeforge/api/v1/journal.py`, `backend/src/tradeforge/infrastructure/models/trading_account.py`, `backend/src/tradeforge/infrastructure/models/trade_pnl.py`, `backend/src/tradeforge/infrastructure/models/journal.py`, `backend/src/tradeforge/api/v1/risk.py`, `backend/src/tradeforge/infrastructure/repositories/analytics_repo.py`*
