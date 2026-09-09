@@ -5,7 +5,7 @@
 **Date:** 2026-09-09  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-19-trade-list-detail` (base: `main` at commit `af57349` — Step 17 merged)  
-**Status:** READY FOR SPECIALIST REVIEW — awaiting Mayasura architectural review and Ganesha trading domain review before implementation begins
+**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review pending
 
 ---
 
@@ -24,6 +24,20 @@ This branch was created from `main` at commit `af57349` (Step 17 merged). Step 1
 3. After rebase, `GET /v1/trades` (implemented in B-18-C) is available as the foundation for the Trade List screen. Step 19 extends it — it does not rebuild it.
 
 Do not start B-19-A or any frontend work until this rebase is confirmed.
+
+---
+
+## Architectural Review Decisions (Mayasura — 2026-09-09)
+
+| ID | Severity | Decision |
+|----|----------|----------|
+| A-19-1 | Blocking → Resolved | **Ownership check moved into WHERE clause.** The implementation sequence originally queried without `user_id`, then checked ownership post-query and raised 403. B-19-17 correctly required 404 for another user's trade. Fix: include `AND t.user_id = :user_id` in the initial SELECT WHERE clause. Return 404 for all non-owned/non-existent/deleted trades. 403 is never returned — it would confirm the trade ID exists and enable enumeration. Separate step-2 ownership check removed. |
+| A-19-2 | Blocking → Resolved | **`instrument` ILIKE uses `startswith(autoescape=True)`.** The original plan used `func.upper(Instrument.symbol).like(instrument.upper() + '%')`. While this uses a bound parameter (preventing SQL injection), `%` and `_` characters within the user's input would still be interpreted as LIKE wildcards. Fix: use `func.upper(Instrument.symbol).startswith(instrument.upper(), autoescape=True)`. D-19-1 updated accordingly. |
+| A-19-3 | Required → Resolved | **`toTradeForJournal` moved to `src/features/trades/adapters.ts`.** Functions do not belong in `types.ts`. The inline `import('../journal/types').TradeForJournal` dynamic import in a return type annotation is non-standard TypeScript. Fix: new file `adapters.ts` with a static import. `TradeDetailPage` imports from `adapters.ts`. |
+| A-19-4 | Required → Resolved | **`limit` default resolved — Option A selected.** Backend default changed to 25, cap changed to 100 in B-19-A. Aligns API contract with trade list semantics. Dashboard tile passes `limit=10` explicitly — unaffected. OI-19-4 added and immediately resolved. |
+| A-19-5 | Required → Resolved | **PARTIAL trade test B-19-14b added.** Tests OPEN and CLOSED only — PARTIAL trade has `pnl: null`, both ENTRY and EXIT fills, `hold_duration_seconds` non-null. Total backend tests: 21. |
+| A-19-6 | Informational | **`FillItemOut` quantity/price convention: use `string`.** Consistent with `FillInput` in Step 16 (`trades/types.ts`). `FillItemOut` carries raw fill prices and quantities from `Numeric(18, 4)` — `string` avoids float precision ambiguity and matches the existing project pattern for mutable/display fill data. Updated in F-19-A. |
+| A-19-7 | Informational | **Remove unused `_svc` from `list_trades`.** `TradingAccountService` dependency injected but not referenced. Bhima removes it as part of B-19-A since the handler is being modified anyway. |
 
 ---
 
@@ -81,7 +95,7 @@ Add the following optional query parameters to the existing `list_trades` route 
 | `to_date` | `date \| None` | FastAPI native date parsing | `t.trade_date <= :to_date` |
 | `instrument` | `str \| None` | Max 50 chars; uppercased before query | `i.symbol ILIKE :instrument%` (prefix match — use `func.upper(Instrument.symbol).like(instrument.upper() + '%')` — never string interpolation) |
 
-> **D-19-1 (SQL injection guard):** `instrument` must never be interpolated into SQL as a raw string. Use SQLAlchemy's `func.upper(Instrument.symbol).like(...)` with a bound parameter. Apply the same principle as the existing `sort_dir` / `sort_by` whitelist pattern.
+> **D-19-1 (SQL injection + wildcard guard — A-19-2):** `instrument` must never be interpolated into SQL as a raw string. Use `func.upper(Instrument.symbol).startswith(instrument.upper(), autoescape=True)` — this both uses a bound parameter (preventing SQL injection) and escapes any `%` or `_` characters in the user-supplied value (preventing wildcard injection). Do NOT use `.like(instrument.upper() + '%')` — it leaves `%`/`_` in the user input unescaped.
 
 > **D-19-2 (date range ordering):** If both `from_date` and `to_date` are provided and `from_date > to_date`, return 422 with detail `INVALID_DATE_RANGE`.
 
@@ -100,6 +114,14 @@ class TradeListPageOut(BaseModel):
 ```
 
 Implement with two queries: one `COUNT(*)` on the same filtered statement (without LIMIT/OFFSET), one for the data rows. This allows the frontend to render page counts and "showing X–Y of Z" UI.
+
+**Default and cap (A-19-4 — Option A):** Change the existing backend default from 50 to 25, and cap from 200 to 100:
+```python
+limit: int = Query(default=25, ge=1, le=100)
+```
+This aligns the API contract with the trade list use case. The Dashboard tile passes `limit=10` explicitly — this change does not affect it.
+
+**Remove unused dependency (A-19-7):** Remove `_svc: TradingAccountService = Depends(get_account_service)` from `list_trades`. It is injected but never referenced in the handler body.
 
 > **Design note:** The existing `GET /v1/trades` returns `list[TradeListItemOut]`. Changing the response shape is a breaking change for the Dashboard's Recent Trades tile (which calls `GET /v1/trades?limit=10&status=CLOSED`). Arjun must update `dashboard/api.ts` and its MSW handlers to read `.items` from the response. Bhima must confirm `dashboard.py` is unaffected (it does not call this endpoint).
 
@@ -181,20 +203,21 @@ async def get_trade_detail(
 
 **Implementation sequence:**
 
-1. Query the trade and instrument in one JOIN:
+1. Query the trade and instrument in one JOIN. Include `user_id` in the WHERE clause — ownership is enforced at query time, not post-query (A-19-1):
    ```sql
    SELECT t.*, i.symbol, i.exchange_segment, i.instrument_type,
           i.expiry_date, i.strike_price
    FROM trades t
    JOIN instruments i ON i.id = t.instrument_id
-   WHERE t.id = :trade_id AND t.is_deleted = false
+   WHERE t.id = :trade_id
+     AND t.user_id = :user_id
+     AND t.is_deleted = false
    ```
-   If no row: return `404 TRADE_NOT_FOUND`.
-2. Ownership check: `if trade_row.user_id != user_id: raise 403 TRADE_NOT_OWNED`. Do NOT use `TradingAccountService` — ownership is on `trades.user_id`, not account.
-3. Query fills: `SELECT * FROM execution_fills WHERE trade_id = :trade_id ORDER BY fill_timestamp ASC`. A trade with no fills is an edge case (should not exist in production) — return an empty list; do not error.
-4. Query P&L: `SELECT * FROM trade_pnl WHERE trade_id = :trade_id`. May return no row for OPEN/PARTIAL trades.
-5. Compute `hold_duration_seconds`: if `trade_row.last_fill_at` is not None, compute `int((trade_row.last_fill_at - trade_row.first_fill_at).total_seconds())`. Otherwise `None`.
-6. Build and return `TradeDetailOut`.
+   If no row (trade does not exist, is deleted, or belongs to another user): return `404 TRADE_NOT_FOUND`. **Do not raise 403.** Returning 403 would confirm the trade ID exists and enable enumeration across users. There is no separate post-query ownership check.
+2. Query fills: `SELECT * FROM execution_fills WHERE trade_id = :trade_id ORDER BY fill_timestamp ASC`. A trade with no fills is an edge case (should not exist in production) — return an empty list; do not error.
+3. Query P&L: `SELECT * FROM trade_pnl WHERE trade_id = :trade_id`. May return no row for OPEN/PARTIAL trades.
+4. Compute `hold_duration_seconds`: if `trade_row.last_fill_at` is not None, compute `int((trade_row.last_fill_at - trade_row.first_fill_at).total_seconds())`. Otherwise `None`.
+5. Build and return `TradeDetailOut`.
 
 ---
 
@@ -225,6 +248,7 @@ async def get_trade_detail(
 | B-19-12 | `GET /v1/trades/{id}` → 200 with all `TradeDetailOut` fields; `fills` list non-empty and ordered ASC by `fill_timestamp` |
 | B-19-13 | `fills` items include `fill_role` (ENTRY/EXIT/null), `import_source`, `broker` |
 | B-19-14 | CLOSED trade: `pnl` is non-null; all 7 charge components present; `r_multiple` correct |
+| B-19-14b | PARTIAL trade: `pnl` is null, `status = 'PARTIAL'`, `fills` includes both ENTRY and EXIT fill roles, `hold_duration_seconds` is non-null (A-19-5) |
 | B-19-15 | OPEN trade: `pnl` is null; `hold_duration_seconds` is null |
 | B-19-16 | `hold_duration_seconds` equals `(last_fill_at - first_fill_at).total_seconds()` for a CLOSED trade |
 | B-19-17 | Another user's trade_id → 404 `TRADE_NOT_FOUND` (user_id filter prevents data leak — do not distinguish "not found" from "not owned" in 404 response) |
@@ -232,7 +256,7 @@ async def get_trade_detail(
 | B-19-19 | `is_deleted = true` trade → 404 (excluded by `is_deleted = false` filter) |
 | B-19-20 | `setup_name` and `planned_risk_amount` fields present in response (null acceptable for trades without these fields set) |
 
-**Total new backend tests: 20.**
+**Total new backend tests: 21** (B-19-14b added per A-19-5).
 
 ---
 
@@ -240,7 +264,11 @@ async def get_trade_detail(
 
 ### Task F-19-A — Types: `src/features/trades/types.ts`
 
+Add to the existing `types.ts` (which already contains `Trade`, `CreateTradeBody`, `FillInput`, `AddFillBody` from Step 16):
+
 ```typescript
+// --- Read response types (Step 19) ---
+
 export interface TradeListPageOut {
   items: TradeListItemOut[]
   total: number
@@ -257,64 +285,79 @@ export interface TradeListItemOut {
   status: string
   trade_date: string
   last_fill_at: string | null
-  net_pnl: number | null
+  net_pnl: number | null       // P&L displayed only; number acceptable for INR ranges
   r_multiple: number | null
 }
 
+// Decimal fields from Numeric(18,4) columns are typed as string to match the
+// project convention in FillInput (Step 16) and prevent float precision loss
+// on quantities and prices. (A-19-6)
 export interface FillItemOut {
   id: string
   side: string
-  quantity: number
-  price: number
-  fill_role: string | null
-  fill_timestamp: string
-  import_source: string
+  quantity: string          // Numeric — string per project convention
+  price: string             // Numeric — string per project convention
+  fill_role: string | null  // ENTRY / EXIT / null
+  fill_timestamp: string    // ISO 8601 datetime
+  import_source: string     // MANUAL / CSV
   broker: string
 }
 
 export interface PnlBreakdownOut {
-  gross_pnl: number
-  net_pnl: number
-  total_charges: number
-  brokerage: number
-  stt: number
-  exchange_charges: number
-  sebi_charges: number
-  stamp_duty: number
-  gst: number
-  ipft: number
-  r_multiple: number | null
+  gross_pnl: string         // Numeric — string per project convention
+  net_pnl: string
+  total_charges: string
+  brokerage: string
+  stt: string
+  exchange_charges: string
+  sebi_charges: string
+  stamp_duty: string
+  gst: string
+  ipft: string
+  r_multiple: string | null
 }
 
 export interface TradeDetailOut {
   id: string
   account_id: string | null
+  // Instrument
   symbol: string
   exchange_segment: string
   instrument_type: string
   expiry_date: string | null
-  strike_price: number | null
+  strike_price: string | null   // Numeric — string
+  // Trade state
   direction: string
   trade_type: string
   status: string
   trade_date: string
   first_fill_at: string
   last_fill_at: string | null
-  total_entry_quantity: number
-  total_exit_quantity: number
-  average_entry: number | null
-  average_exit: number | null
-  planned_stop: number | null
-  planned_target: number | null
-  planned_risk_amount: number | null
+  total_entry_quantity: string  // Numeric — string
+  total_exit_quantity: string
+  average_entry: string | null
+  average_exit: string | null
+  planned_stop: string | null
+  planned_target: string | null
+  planned_risk_amount: string | null
   setup_name: string | null
   hold_duration_seconds: number | null
+  // Sub-lists
   fills: FillItemOut[]
   pnl: PnlBreakdownOut | null
 }
+```
+
+### Task F-19-A2 — Adapter: `src/features/trades/adapters.ts` *(new file)*
+
+> **A-19-3:** Cross-feature type conversion functions must not live in `types.ts`. This new file is the correct home for `toTradeForJournal`.
+
+```typescript
+import type { TradeForJournal, TradeType } from '../journal/types'
+import type { TradeDetailOut } from './types'
 
 /** Maps TradeDetailOut to the TradeForJournal interface required by JournalPanel. */
-export function toTradeForJournal(t: TradeDetailOut): import('../journal/types').TradeForJournal {
+export function toTradeForJournal(t: TradeDetailOut): TradeForJournal {
   return {
     id: t.id,
     symbol: t.symbol,
@@ -322,14 +365,14 @@ export function toTradeForJournal(t: TradeDetailOut): import('../journal/types')
     tradeDate: t.trade_date,
     firstFillAt: t.first_fill_at,
     direction: t.direction as 'LONG' | 'SHORT',
-    tradeType: t.trade_type as import('../journal/types').TradeType,
-    averageEntry: t.average_entry != null ? String(t.average_entry) : null,
-    totalEntryQuantity: String(t.total_entry_quantity),
+    tradeType: t.trade_type as TradeType,
+    averageEntry: t.average_entry ?? null,
+    totalEntryQuantity: t.total_entry_quantity,
   }
 }
 ```
 
-> **`toTradeForJournal` adapter:** `JournalPanel` expects `TradeForJournal` (camelCase, string quantities, `exchange` not `exchange_segment`). The adapter function isolates the mapping in one place — the Trade Detail page calls it once and passes the result directly to `<JournalPanel trade={...} />`.
+`TradeDetailPage` imports `toTradeForJournal` from `./adapters`, not from `./types`.
 
 ---
 
@@ -571,6 +614,7 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 | OI-19-1 | **Breaking change to `GET /v1/trades` response shape** — confirm Dashboard `dashboardApi.listTrades` updated to read `.items`. Bhima and Arjun must coordinate. | Bhima + Arjun | ❌ Open | Before B-19-A is implemented |
 | OI-19-2 | **Navigation hierarchy**: where does "Trades" sit in the AppShell sidebar relative to Dashboard, Journal, Analytics, Risk, Import, Settings? Arjun decides — product intent is "second item after Dashboard" but Arjun may adjust for visual balance. | Arjun | ❌ Open | F-19-F |
 | OI-19-3 | Confirm `JournalPanel` works when embedded in `TradeDetailPage` without a surrounding `JournalPage` context (check for any implicit context dependencies). | Arjun | ❌ Open — verify before F-19-D |
+| OI-19-4 | `limit` default — resolved as Option A (backend default changed to 25, cap to 100 in B-19-A). Dashboard tile passes `limit=10` explicitly — unaffected. | Bhima | ✅ Resolved — A-19-4 |
 
 ---
 
@@ -584,7 +628,7 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 
 ### Arjun (frontend — can start steps 1–2 immediately while Bhima works)
 
-1. Define types in `src/features/trades/types.ts` including `toTradeForJournal` adapter (F-19-A).
+1. Add read types to `src/features/trades/types.ts` (F-19-A); create `src/features/trades/adapters.ts` with `toTradeForJournal` (F-19-A2).
 2. Extend API client in `src/features/trades/api.ts`; update `dashboard/api.ts` for envelope change (F-19-B).
 3. Add/update MSW fixtures for both endpoints and the Dashboard regression (F-19-E).
 4. Implement `TradeListPage.tsx` — filter bar, table, sort, pagination (F-19-C).
@@ -600,7 +644,7 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| **Sahadeva QA** | Sahadeva | All new backend tests B-19-01 through B-19-20 pass; all new frontend tests F-19-01 through F-19-22 pass; no regressions in Dashboard, Import, or Manual Trade Entry tests; `instrument` filter uses ILIKE not exact match (B-19-10); `from_date > to_date` → 422 (B-19-09); `GET /v1/trades/{id}` returns 404 (not 403) for another user's trade (B-19-17); fills ordered ASC by `fill_timestamp` (B-19-12); `hold_duration_seconds` null for OPEN trades (B-19-15); Dashboard `DashboardPage` tests still pass after envelope shape change (F-19-22); "Next" button disabled at last page (F-19-03) |
+| **Sahadeva QA** | Sahadeva | All new backend tests B-19-01 through B-19-20 and B-19-14b pass (21 total); all new frontend tests F-19-01 through F-19-22 pass; no regressions in Dashboard, Import, or Manual Trade Entry tests; `instrument` filter uses `startswith(autoescape=True)` — passing `%` or `_` in the instrument param does not widen the match (A-19-2); `from_date > to_date` → 422 (B-19-09); `GET /v1/trades/{id}` returns 404 (not 403) for another user's trade — never 403 (A-19-1, B-19-17); fills ordered ASC by `fill_timestamp` (B-19-12); `hold_duration_seconds` null for OPEN trades (B-19-15), non-null for PARTIAL trades (B-19-14b); PARTIAL trade `pnl` is null (B-19-14b); Dashboard `DashboardPage` tests still pass after envelope shape change (F-19-22); "Next" button disabled at last page (F-19-03); `toTradeForJournal` imported from `./adapters` not `./types` |
 | **Nakula CI** | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes; `tsc --noEmit` clean; ESLint 0 warnings; `GET /v1/trades/{trade_id}` route confirmed in OpenAPI schema; `GET /v1/trades` response shape in OpenAPI schema updated to `TradeListPageOut` |
 | **Yudhishthira ACCEPT** | Yudhishthira | Trades screen accessible from nav; filter bar allows filtering by direction, status, date range; pagination "Showing X–Y of Z" renders accurately; clicking a trade opens Trade Detail; Trade Detail shows fill timeline, P&L breakdown (CLOSED) or "open" placeholder; Journal section embedded and functional; switching accounts on Trade List updates the list |
 
@@ -637,5 +681,6 @@ Within the Phase 1 estimate (plan allowed 1–2 sessions; backend simplicity fro
 ---
 
 *Krishna — Senior Project Manager*  
-*Specialist reviews required: Mayasura (architecture) · Ganesha (trading domain)*  
-*Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/trades.py`, `backend/src/tradeforge/infrastructure/models/trade_pnl.py`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `frontend/src/features/journal/components/JournalPanel.tsx`, `frontend/src/features/journal/types.ts`*
+*Architectural review: Mayasura — 2026-09-09 (A-19-1 through A-19-7 applied)*  
+*Trading domain review: Ganesha — pending*  
+*Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/trades.py`, `backend/src/tradeforge/infrastructure/models/trade_pnl.py`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `frontend/src/features/journal/components/JournalPanel.tsx`, `frontend/src/features/journal/types.ts`, `frontend/src/features/trades/api.ts`, `frontend/src/features/trades/types.ts`*
