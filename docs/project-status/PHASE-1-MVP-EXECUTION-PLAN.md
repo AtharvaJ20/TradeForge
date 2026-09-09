@@ -310,7 +310,7 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Market context summary (Phase 2)
 
 **Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
-**Status:** 🚧 **IN PROGRESS** — implementation complete on `feat/step-18-dashboard`; pending Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Status:** ✅ **ACCEPTED — 2026-09-09** (merged to `main` as PR #12, commit `04e249e` · Yudhishthira ACCEPT)
 
 ---
 
@@ -321,9 +321,9 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Estimate:** 1–2 sessions  
 **Dependency:** Step 18 (trade list endpoint already needed there). Step 14 (navigation).  
 **Execution plan:** `docs/project-status/STEP-19-EXECUTION-PLAN.md`  
-**Branch:** `feat/step-19-trade-list-detail` (base: `main` at commit `af57349` — rebase required after Step 18 merges)  
-**Review status:** ✅ APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review applied 2026-09-09 (G-19-1 through G-19-7)  
-**Implementation status:** ❌ Blocked on Step 18 merge + branch rebase before Bhima and Arjun begin  
+**Branch:** `feat/step-19-trade-list-detail` (base: `main` at commit `04e249e` — Step 18 merged, branch rebased ✅)  
+**Review status:** ✅ APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review applied 2026-09-09 (G-19-1 through G-19-7); Sahadeva QA review applied 2026-09-09 (QA-19-1 through QA-19-9)  
+**Implementation status:** 🚧 READY — Bhima and Arjun can begin implementation now  
 
 **Trade List screen:**
 - Paginated list: instrument, direction, entry date, exit date, net P&L, R-multiple, discipline score, emotion chip
@@ -476,7 +476,7 @@ Phase 1 is DONE when all of the following are true simultaneously:
 - [x] Step 15 accepted by Yudhishthira ✅ 2026-09-05
 - [x] Step 16 accepted by Yudhishthira ✅ 2026-09-08
 - [x] Step 17 accepted by Yudhishthira ✅ 2026-09-08
-- [ ] Step 18 accepted by Yudhishthira
+- [x] Step 18 accepted by Yudhishthira ✅ 2026-09-09
 - [ ] Step 19 accepted by Yudhishthira
 - [ ] Step 20 security hardening accepted by Hanuman
 - [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
@@ -516,8 +516,8 @@ Phase 1 is DONE when all of the following are true simultaneously:
 ```
 
 **Current active work (as of 2026-09-09):**
-- Step 18 (Arjun + Bhima) — 🚧 IN PROGRESS on `feat/step-18-dashboard`; pending Sahadeva → Nakula CI → Yudhishthira ACCEPT
-- Step 19 (Arjun + Bhima) — ✅ plan APPROVED (Mayasura + Ganesha reviews done); blocked on Step 18 merge + branch rebase before implementation begins
+- Step 18 (Arjun + Bhima) — ✅ CLOSED, merged to `main` as PR #12 (2026-09-09)
+- Step 19 (Arjun + Bhima) — 🚧 READY TO IMPLEMENT on `feat/step-19-trade-list-detail`; plan fully approved (Mayasura + Ganesha + Sahadeva); 25 backend + 30 frontend tests specified; branch rebased on Step 18
 - Step 20 (Hanuman → Bhima) — can proceed in parallel at any time
 
 **Steps blocked on Atharva's cloud/domain decisions:**
