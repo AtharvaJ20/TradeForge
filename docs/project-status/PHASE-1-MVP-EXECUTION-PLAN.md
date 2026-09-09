@@ -274,7 +274,10 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Column mapping UI for unknown broker formats (Phase 2)
 - Broker API integrations (Phase 2 — Sanjaya)
 
-**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-08** (576 backend tests, 301 frontend tests — all CI GREEN · Yudhishthira ACCEPT)  
+**Branch:** `feat/step-17-import-trades` (merged to `main` as PR #11, commit `af57349`)  
+**Delivered:** Zerodha CSV upload, import status banners (COMPLETE/PARTIAL/FAILED), full error handling, import history table.
 
 ---
 
@@ -306,7 +309,8 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Notification feed (Phase 2)
 - Market context summary (Phase 2)
 
-**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** 🚧 **IN PROGRESS** — implementation complete on `feat/step-18-dashboard`; pending Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
 
 ---
 
@@ -318,6 +322,8 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Dependency:** Step 18 (trade list endpoint already needed there). Step 14 (navigation).  
 **Execution plan:** `docs/project-status/STEP-19-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-19-trade-list-detail` (base: `main` at commit `af57349` — rebase required after Step 18 merges)  
+**Review status:** ✅ APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review applied 2026-09-09 (G-19-1 through G-19-7)  
+**Implementation status:** ❌ Blocked on Step 18 merge + branch rebase before Bhima and Arjun begin  
 
 **Trade List screen:**
 - Paginated list: instrument, direction, entry date, exit date, net P&L, R-multiple, discipline score, emotion chip
@@ -469,7 +475,9 @@ Phase 1 is DONE when all of the following are true simultaneously:
 - [x] Step 14 accepted by Yudhishthira ✅ 2026-09-05
 - [x] Step 15 accepted by Yudhishthira ✅ 2026-09-05
 - [x] Step 16 accepted by Yudhishthira ✅ 2026-09-08
-- [ ] Steps 17, 18, 19 accepted by Yudhishthira
+- [x] Step 17 accepted by Yudhishthira ✅ 2026-09-08
+- [ ] Step 18 accepted by Yudhishthira
+- [ ] Step 19 accepted by Yudhishthira
 - [ ] Step 20 security hardening accepted by Hanuman
 - [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
 - [ ] Track QA E2E suite (J-1 through J-9) passing on staging
@@ -507,11 +515,10 @@ Phase 1 is DONE when all of the following are true simultaneously:
               I-3: Production Deploy
 ```
 
-**Steps that can start immediately (no pending decision):**
-- Step 16 (Bhima + Arjun) — Step 15 is now complete
-- Step 17 (Arjun + Bhima) — Step 15 is now complete (parallel with Step 16)
-- Step 18 (Arjun + Bhima) — Step 15 is now complete (parallel with Steps 16/17)
-- Step 20 design (Hanuman)
+**Current active work (as of 2026-09-09):**
+- Step 18 (Arjun + Bhima) — 🚧 IN PROGRESS on `feat/step-18-dashboard`; pending Sahadeva → Nakula CI → Yudhishthira ACCEPT
+- Step 19 (Arjun + Bhima) — ✅ plan APPROVED (Mayasura + Ganesha reviews done); blocked on Step 18 merge + branch rebase before implementation begins
+- Step 20 (Hanuman → Bhima) — can proceed in parallel at any time
 
 **Steps blocked on Atharva's cloud/domain decisions:**
 - I-1 (Nakula) — nothing in the infrastructure track can begin
