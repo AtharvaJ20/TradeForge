@@ -1,6 +1,8 @@
-"""Trades REST API — v1 routes (Step 16: Manual Trade Entry).
+"""Trades REST API — v1 routes.
 
 Routes:
+  GET    /v1/trades                     — paginated, filtered, sorted trade list (B-18-C, B-19-A)
+  GET    /v1/trades/{trade_id}          — full trade detail with fills + P&L (B-19-B)
   POST   /v1/trades                     — create a new trade from manual fills
   POST   /v1/trades/{trade_id}/fills    — add a fill to an existing trade
   DELETE /v1/trades/{trade_id}          — soft-delete a manually entered trade
@@ -20,7 +22,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.api.v1.deps import get_current_user_id
@@ -35,12 +37,10 @@ from tradeforge.application.trade_service import (
     TradeNotOwnedError,
     TradeService,
 )
-from tradeforge.application.trading_account_service import TradingAccountService
 from tradeforge.domain.import_domain.errors import AccountNotFoundError
 from tradeforge.infrastructure.db import get_db
-from tradeforge.infrastructure.models.trade_domain import Instrument, Trade
+from tradeforge.infrastructure.models.trade_domain import ExecutionFill, Instrument, Trade
 from tradeforge.infrastructure.models.trade_pnl import TradePnl
-from tradeforge.infrastructure.repositories.trading_account_repo import TradingAccountRepository
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
@@ -123,6 +123,66 @@ class TradeListItemOut(BaseModel):
     r_multiple: Decimal | None
 
 
+class TradeListPageOut(BaseModel):
+    items: list[TradeListItemOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class FillItemOut(BaseModel):
+    id: uuid.UUID
+    side: str
+    quantity: Decimal
+    price: Decimal
+    fill_role: str | None
+    fill_timestamp: datetime
+    import_source: str
+    broker: str
+
+
+class PnlBreakdownOut(BaseModel):
+    gross_pnl: Decimal
+    net_pnl: Decimal
+    total_charges: Decimal
+    brokerage: Decimal
+    stt: Decimal
+    exchange_charges: Decimal
+    sebi_charges: Decimal
+    stamp_duty: Decimal
+    gst: Decimal
+    ipft: Decimal
+    r_multiple: Decimal | None
+
+
+class TradeDetailOut(BaseModel):
+    id: uuid.UUID
+    account_id: uuid.UUID | None
+    symbol: str
+    instrument_name: str
+    exchange_segment: str
+    instrument_type: str
+    expiry_date: date | None
+    strike_price: Decimal | None
+    direction: str
+    trade_type: str
+    status: str
+    trade_date: date
+    first_fill_at: datetime
+    last_fill_at: datetime | None
+    total_entry_quantity: Decimal
+    total_exit_quantity: Decimal
+    average_entry: Decimal | None
+    average_exit: Decimal | None
+    planned_stop: Decimal | None
+    planned_target: Decimal | None
+    planned_risk_amount: Decimal | None
+    setup_name: str | None
+    hold_duration_seconds: int | None
+    fills: list[FillItemOut]
+    pnl: PnlBreakdownOut | None
+
+
 # ---------------------------------------------------------------------------
 # Sort whitelist (D-18-1: no string interpolation into ORDER BY)
 # ---------------------------------------------------------------------------
@@ -135,6 +195,8 @@ _SORT_COLUMNS = {
 }
 
 _VALID_STATUSES = frozenset({"OPEN", "CLOSED", "PARTIAL"})
+_VALID_DIRECTIONS = frozenset({"LONG", "SHORT"})
+_VALID_TRADE_TYPES = frozenset({"MIS", "CNC", "CNC_SAME_DAY", "NRML_FUT", "NRML_OPT"})
 
 
 # ---------------------------------------------------------------------------
@@ -199,29 +261,67 @@ def get_trade_service(db: AsyncSession = Depends(get_db)) -> TradeService:
     return TradeService(session=db)
 
 
-def get_account_service() -> TradingAccountService:
-    return TradingAccountService(account_repo=TradingAccountRepository())
-
-
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=list[TradeListItemOut])
+@router.get("", response_model=TradeListPageOut)
 async def list_trades(
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
-    _svc: TradingAccountService = Depends(get_account_service),
     status: str | None = Query(default=None),
     account_id: uuid.UUID | None = Query(default=None),
+    direction: str | None = Query(default=None),
+    trade_type: str | None = Query(default=None),
+    from_date: date | None = Query(default=None),
+    to_date: date | None = Query(default=None),
+    instrument: str | None = Query(default=None, max_length=50),
     sort_by: str = Query(default="last_fill_at"),
     sort_dir: str = Query(default="desc"),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-) -> list[TradeListItemOut]:
+) -> TradeListPageOut:
     if status is not None and status not in _VALID_STATUSES:
         raise HTTPException(status_code=422, detail="INVALID_STATUS")
+    if direction is not None and direction not in _VALID_DIRECTIONS:
+        raise HTTPException(status_code=422, detail="INVALID_DIRECTION")
+    if trade_type is not None and trade_type not in _VALID_TRADE_TYPES:
+        raise HTTPException(status_code=422, detail="INVALID_TRADE_TYPE")
+    if from_date is not None and to_date is not None and from_date > to_date:
+        raise HTTPException(status_code=422, detail="INVALID_DATE_RANGE")
+
+    # Build shared WHERE conditions for both COUNT and data queries.
+    base_where = [Trade.user_id == user_id, Trade.is_deleted.is_(False)]
+    if status is not None:
+        base_where.append(Trade.status == status)
+    if account_id is not None:
+        base_where.append(Trade.account_id == account_id)
+    if direction is not None:
+        base_where.append(Trade.direction == direction)
+    if trade_type is not None:
+        base_where.append(Trade.trade_type == trade_type)
+    if from_date is not None:
+        base_where.append(Trade.trade_date >= from_date)
+    if to_date is not None:
+        base_where.append(Trade.trade_date <= to_date)
+    if instrument is not None:
+        instrument_upper = instrument.strip().upper()
+        if instrument_upper:
+            # D-19-1: autoescape=True prevents % and _ in user input acting as wildcards.
+            base_where.append(
+                func.upper(Instrument.symbol).startswith(instrument_upper, autoescape=True)
+            )
+
+    joins = (
+        select(func.count(Trade.id))
+        .select_from(Trade)
+        .join(Instrument, Instrument.id == Trade.instrument_id)
+        .outerjoin(TradePnl, TradePnl.trade_id == Trade.id)
+        .where(*base_where)
+    )
+    count_result = await db.execute(joins)
+    total = count_result.scalar_one()
 
     sort_col = _SORT_COLUMNS.get(sort_by, Trade.last_fill_at)
     ordered_col = sort_col.asc() if sort_dir == "asc" else sort_col.desc()
@@ -242,33 +342,167 @@ async def list_trades(
         .select_from(Trade)
         .join(Instrument, Instrument.id == Trade.instrument_id)
         .outerjoin(TradePnl, TradePnl.trade_id == Trade.id)
-        .where(Trade.user_id == user_id, Trade.is_deleted.is_(False))
+        .where(*base_where)
+        .order_by(ordered_col)
+        .limit(limit)
+        .offset(offset)
     )
-    if status is not None:
-        stmt = stmt.where(Trade.status == status)
-    if account_id is not None:
-        stmt = stmt.where(Trade.account_id == account_id)
-
-    stmt = stmt.order_by(ordered_col).limit(limit).offset(offset)
 
     result = await db.execute(stmt)
     rows = result.all()
 
-    return [
-        TradeListItemOut(
-            id=row.id,
-            account_id=row.account_id,
-            symbol=row.symbol,
-            instrument_type=row.instrument_type,
-            direction=row.direction,
-            status=row.status,
-            trade_date=row.trade_date,
-            last_fill_at=row.last_fill_at,
-            net_pnl=row.net_pnl,
-            r_multiple=row.r_multiple,
+    return TradeListPageOut(
+        items=[
+            TradeListItemOut(
+                id=row.id,
+                account_id=row.account_id,
+                symbol=row.symbol,
+                instrument_type=row.instrument_type,
+                direction=row.direction,
+                status=row.status,
+                trade_date=row.trade_date,
+                last_fill_at=row.last_fill_at,
+                net_pnl=row.net_pnl,
+                r_multiple=row.r_multiple,
+            )
+            for row in rows
+        ],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/{trade_id}", response_model=TradeDetailOut)
+async def get_trade_detail(
+    trade_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> TradeDetailOut:
+    # Step 1: Trade + Instrument JOIN. user_id in WHERE enforces ownership at query time (A-19-1).
+    stmt = (
+        select(
+            Trade.id,
+            Trade.account_id,
+            Trade.direction,
+            Trade.trade_type,
+            Trade.status,
+            Trade.trade_date,
+            Trade.first_fill_at,
+            Trade.last_fill_at,
+            Trade.total_entry_quantity,
+            Trade.total_exit_quantity,
+            Trade.average_entry,
+            Trade.average_exit,
+            Trade.planned_stop,
+            Trade.planned_target,
+            Trade.planned_risk_amount,
+            Trade.setup_name,
+            Instrument.symbol,
+            Instrument.name.label("instrument_name"),
+            Instrument.exchange_segment,
+            Instrument.instrument_type,
+            Instrument.expiry_date,
+            Instrument.strike_price,
         )
-        for row in rows
-    ]
+        .select_from(Trade)
+        .join(Instrument, Instrument.id == Trade.instrument_id)
+        .where(
+            Trade.id == trade_id,
+            Trade.user_id == user_id,
+            Trade.is_deleted.is_(False),
+        )
+    )
+    result = await db.execute(stmt)
+    trade_row = result.one_or_none()
+    if trade_row is None:
+        raise HTTPException(status_code=404, detail="TRADE_NOT_FOUND")
+
+    # Step 2: Fills ordered ASC by fill_timestamp.
+    fills_stmt = (
+        select(
+            ExecutionFill.id,
+            ExecutionFill.side,
+            ExecutionFill.quantity,
+            ExecutionFill.price,
+            ExecutionFill.fill_role,
+            ExecutionFill.fill_timestamp,
+            ExecutionFill.import_source,
+            ExecutionFill.broker,
+        )
+        .where(ExecutionFill.trade_id == trade_id)
+        .order_by(ExecutionFill.fill_timestamp.asc())
+    )
+    fills_result = await db.execute(fills_stmt)
+    fill_rows = fills_result.all()
+
+    # Step 3: P&L row (absent for OPEN/PARTIAL trades).
+    pnl_stmt = select(TradePnl).where(TradePnl.trade_id == trade_id)
+    pnl_result = await db.execute(pnl_stmt)
+    pnl_row = pnl_result.scalar_one_or_none()
+
+    # Step 4: hold_duration_seconds — None for OPEN trades where last_fill_at is null.
+    hold_duration_seconds: int | None = None
+    if trade_row.last_fill_at is not None:
+        hold_duration_seconds = int(
+            (trade_row.last_fill_at - trade_row.first_fill_at).total_seconds()
+        )
+
+    pnl: PnlBreakdownOut | None = None
+    if pnl_row is not None:
+        pnl = PnlBreakdownOut(
+            gross_pnl=pnl_row.gross_pnl,
+            net_pnl=pnl_row.net_pnl,
+            total_charges=pnl_row.total_charges,
+            brokerage=pnl_row.brokerage,
+            stt=pnl_row.stt,
+            exchange_charges=pnl_row.exchange_charges,
+            sebi_charges=pnl_row.sebi_charges,
+            stamp_duty=pnl_row.stamp_duty,
+            gst=pnl_row.gst,
+            ipft=pnl_row.ipft,
+            r_multiple=pnl_row.r_multiple,
+        )
+
+    return TradeDetailOut(
+        id=trade_row.id,
+        account_id=trade_row.account_id,
+        symbol=trade_row.symbol,
+        instrument_name=trade_row.instrument_name,
+        exchange_segment=trade_row.exchange_segment,
+        instrument_type=trade_row.instrument_type,
+        expiry_date=trade_row.expiry_date,
+        strike_price=trade_row.strike_price,
+        direction=trade_row.direction,
+        trade_type=trade_row.trade_type,
+        status=trade_row.status,
+        trade_date=trade_row.trade_date,
+        first_fill_at=trade_row.first_fill_at,
+        last_fill_at=trade_row.last_fill_at,
+        total_entry_quantity=trade_row.total_entry_quantity,
+        total_exit_quantity=trade_row.total_exit_quantity,
+        average_entry=trade_row.average_entry,
+        average_exit=trade_row.average_exit,
+        planned_stop=trade_row.planned_stop,
+        planned_target=trade_row.planned_target,
+        planned_risk_amount=trade_row.planned_risk_amount,
+        setup_name=trade_row.setup_name,
+        hold_duration_seconds=hold_duration_seconds,
+        fills=[
+            FillItemOut(
+                id=f.id,
+                side=f.side,
+                quantity=f.quantity,
+                price=f.price,
+                fill_role=f.fill_role,
+                fill_timestamp=f.fill_timestamp,
+                import_source=f.import_source,
+                broker=f.broker,
+            )
+            for f in fill_rows
+        ],
+        pnl=pnl,
+    )
 
 
 @router.post("", response_model=TradeOut, status_code=201)
