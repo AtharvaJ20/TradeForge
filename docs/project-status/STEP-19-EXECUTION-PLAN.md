@@ -5,7 +5,7 @@
 **Date:** 2026-09-09  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-19-trade-list-detail` (base: `main` at commit `af57349` — Step 17 merged)  
-**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review applied 2026-09-09 (G-19-1 through G-19-7)
+**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review applied 2026-09-09 (G-19-1 through G-19-7); Sahadeva QA review applied 2026-09-09 (QA-19-1 through QA-19-9)
 
 ---
 
@@ -52,6 +52,22 @@ Do not start B-19-A or any frontend work until this rebase is confirmed.
 | G-19-5 | Required → Resolved | **`exchange_segment` raw DB values must not be shown to users.** Values `NSE_EQ`, `NSE_FO`, `BSE_EQ` are internal tokens. Map to human-readable labels: `NSE_EQ` → "NSE Equity", `NSE_FO` → "NSE F&O", `BSE_EQ` → "BSE Equity". Define an `EXCHANGE_SEGMENT_LABELS` constant in `src/features/trades/constants.ts` and use it wherever `exchange_segment` is rendered. Updated in F-19-D and added F-19-A3. |
 | G-19-6 | Informational | **`instrument_name` not in `TradeDetailOut`.** `Instrument.name` (e.g., "RELIANCE INDUSTRIES LTD") exists in the ORM and the detail query already JOINs `instruments`. Including it lets the Trade Detail header show the full name alongside the symbol. Add `instrument_name: str` to `TradeDetailOut`, select `i.name` in the B-19-B JOIN, and add `instrument_name: string` to the `TradeDetailOut` TypeScript interface. Updated in B-19-B and F-19-A. |
 | G-19-7 | Informational | **Hold duration format must handle sub-minute scalp trades.** Format "Xh Ym" renders as "0h 0m" for trades closed within 60 seconds. Add sub-minute case: if `hold_duration_seconds < 60`, display "`{hold_duration_seconds}s`". Updated in F-19-D. |
+
+---
+
+## QA Review Decisions (Sahadeva — 2026-09-09)
+
+| ID | Severity | Decision |
+|----|----------|----------|
+| QA-19-1 | Required → Resolved | **Wildcard injection guard (A-19-2) has no dedicated test.** The gate criteria specifies "passing `%` or `_` in the instrument param does not widen the match" — but no test ID verifies this property. B-19-10 tests a normal prefix match; it does not confirm that wildcard characters in user input are escaped. A regression from `startswith(autoescape=True)` back to `.like()` would pass B-19-10 silently. Fix: add B-19-21. |
+| QA-19-2 | Required → Resolved | **Sort controls have no test coverage.** The Trade List page specifies column header cycling (ASC → DESC → default), mutual exclusion of active sorts, and an active-column arrow indicator — a non-trivial stateful interaction. No frontend test exercises any sort behavior. Fix: add F-19-23. |
+| QA-19-3 | Required → Resolved | **`exchange_segment` display mapping (G-19-5) is in gate criteria but has no test.** Gate criteria requires "exchange_segment is never rendered as a raw DB value — always mapped via EXCHANGE_SEGMENT_LABELS" — but no frontend test ID verifies this. A rendering that shows "NSE_FO" instead of "NSE F&O" would pass all 24 existing tests. Fix: add F-19-24. Set `exchange_segment: 'NSE_FO'` in `TRADE_DETAIL_CLOSED` fixture to exercise the mapping. |
+| QA-19-4 | Required → Resolved | **Quantity "entered / exited" format (G-19-4) is in gate criteria but has no test.** Gate criteria requires "Quantity shows 'entered / exited' format" — but no frontend test verifies the Trade Summary renders this. The old `×` format would pass all current tests. Fix: add F-19-25. |
+| QA-19-5 | Required → Resolved | **`instrument_name` field (G-19-6) has no test — backend or frontend.** The field was added to `TradeDetailOut` and the TypeScript interface, but B-19-12 (which checks all `TradeDetailOut` fields) predates the G-19-6 addition. No backend test verifies `instrument_name` is populated from `instruments.name`, and no frontend test verifies it renders. Fix: add B-19-22 (backend) and F-19-26 (frontend). |
+| QA-19-6 | Informational | **No multi-filter combination test.** Each filter param is tested in isolation. No test verifies that all WHERE clauses compose correctly when multiple params are active simultaneously (e.g., `direction=LONG&trade_type=MIS&from_date=2026-09-01&instrument=REL`). Interaction bugs in filter composition cannot be caught by isolated tests. Added B-19-23. |
+| QA-19-7 | Informational | **"Previous" button untested.** F-19-03 and F-19-04 cover "Next" behavior (disabled state and offset increment). No test verifies "Previous" is disabled on the first page, or that it decrements offset correctly. Added F-19-27. |
+| QA-19-8 | Informational | **Sub-minute hold duration format (G-19-7) not tested.** G-19-7 added `{n}s` rendering for trades under 60 seconds, but no test exercises this code branch. Added F-19-28. Add `TRADE_DETAIL_SCALP` fixture: CLOSED trade with `hold_duration_seconds: 45`. |
+| QA-19-9 | Plan correction | **Bhima's Order of Work cites stale test range "B-19-01 through B-19-20".** Reviews added B-19-05b (G-19-1), B-19-14b (A-19-5), and QA-19 additions (B-19-21 through B-19-23). Range is now misleading. Updated to "all backend tests". |
 
 ---
 
@@ -271,8 +287,11 @@ async def get_trade_detail(
 | B-19-18 | Unauthenticated → 401 |
 | B-19-19 | `is_deleted = true` trade → 404 (excluded by `is_deleted = false` filter) |
 | B-19-20 | `setup_name` and `planned_risk_amount` fields present in response (null acceptable for trades without these fields set) |
+| B-19-21 | `instrument=REL%ANCE` (input contains `%`) — result count is 0 (no symbol literally starts with "REL%ANCE"); confirms `autoescape=True` prevents `%` from acting as a wildcard and matching all "REL*" symbols (A-19-2, QA-19-1) |
+| B-19-22 | `GET /v1/trades/{id}` response includes `instrument_name` field populated from `instruments.name` (e.g., "RELIANCE INDUSTRIES LTD" for symbol "RELIANCE") — field is non-null and non-empty (G-19-6, QA-19-5) |
+| B-19-23 | Combined filters: `direction=LONG&trade_type=MIS&from_date=2026-09-01&instrument=REL` — returned items satisfy all four WHERE clauses simultaneously; result count is less than results for each filter applied alone (QA-19-6) |
 
-**Total new backend tests: 22** (B-19-14b added per A-19-5; B-19-05b added per G-19-1).
+**Total new backend tests: 25** (B-19-14b per A-19-5; B-19-05b per G-19-1; B-19-21 through B-19-23 per QA review).
 
 ---
 
@@ -564,7 +583,7 @@ Add to `src/__tests__/msw/handlers.ts`:
 | Handler | Fixtures |
 |---------|---------|
 | `GET /v1/trades` | Update existing `TRADES_LIST` to use `TradeListPageOut` envelope shape (`items`, `total`, `limit`, `offset`). Add `TRADES_LIST_FILTERED` (200, fewer items matching a direction/date filter). |
-| `GET /v1/trades/:tradeId` | `TRADE_DETAIL_CLOSED` (200, full `TradeDetailOut` with pnl populated, 3 fills). `TRADE_DETAIL_OPEN` (200, `pnl: null`, `hold_duration_seconds: null`). `TRADE_DETAIL_PARTIAL` (200, `status: 'PARTIAL'`, `pnl: null`, `hold_duration_seconds` non-null, both ENTRY and EXIT fills — required for F-19-17b). `TRADE_DETAIL_NOT_FOUND` (404). |
+| `GET /v1/trades/:tradeId` | `TRADE_DETAIL_CLOSED` (200, full `TradeDetailOut` with pnl populated, 3 fills — set `exchange_segment: 'NSE_FO'` and `instrument_name: 'RELIANCE INDUSTRIES LTD'` to exercise G-19-5 and G-19-6 tests). `TRADE_DETAIL_OPEN` (200, `pnl: null`, `hold_duration_seconds: null`). `TRADE_DETAIL_PARTIAL` (200, `status: 'PARTIAL'`, `pnl: null`, `hold_duration_seconds` non-null, both ENTRY and EXIT fills — required for F-19-13b and F-19-17b). `TRADE_DETAIL_SCALP` (200, CLOSED, `hold_duration_seconds: 45` — required for F-19-28). `TRADE_DETAIL_NOT_FOUND` (404). |
 
 Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope shape (required by the Dashboard test regression fix — see Task F-19-B).
 
@@ -623,8 +642,14 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 | Test ID | Description |
 |---------|-------------|
 | F-19-22 | `DashboardPage` Recent Trades tile still renders correctly after `GET /v1/trades` response shape change to `TradeListPageOut` (reads `.items` not the root array) |
+| F-19-23 | Clicking "Date" column header fires API call with `sort_by=trade_date`; clicking again cycles `sort_dir`; only one column shows an active sort indicator at a time (QA-19-2) |
+| F-19-24 | Trade Detail header renders `exchange_segment` as "NSE F&O" (not raw "NSE_FO") using `TRADE_DETAIL_CLOSED` fixture with `exchange_segment: 'NSE_FO'`; no raw DB token string appears in the rendered output (G-19-5, QA-19-3) |
+| F-19-25 | Trade Summary Quantity row for CLOSED trade shows "`{n}` entered / `{m}` exited"; for OPEN trade (`total_exit_quantity: '0'`) shows only "`{n}` entered" — the `×` character does not appear (G-19-4, QA-19-4) |
+| F-19-26 | Trade Detail header renders `instrument_name` (e.g., "RELIANCE INDUSTRIES LTD") alongside the symbol in the Trade Summary section (G-19-6, QA-19-5) |
+| F-19-27 | "Previous" button is disabled when `offset === 0` (first page); clicking "Next" then "Previous" triggers a fetch with `offset=0` and re-renders first-page rows (QA-19-7) |
+| F-19-28 | Trade Detail with `hold_duration_seconds: 45` (`TRADE_DETAIL_SCALP` fixture — CLOSED, `hold_duration_seconds < 60`) renders "45s" not "0h 0m" (G-19-7, QA-19-8) |
 
-**Total new frontend tests: 24** (F-19-13b added per G-19-2; F-19-17b added per G-19-3).
+**Total new frontend tests: 30** (F-19-13b per G-19-2; F-19-17b per G-19-3; F-19-23 through F-19-28 per QA review).
 
 ---
 
@@ -660,7 +685,7 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 
 1. Extend `GET /v1/trades` with the 5 new filter params + `TradeListPageOut` envelope (B-19-A).
 2. Add `GET /v1/trades/{trade_id}` with `TradeDetailOut` schema (B-19-B).
-3. Write backend tests B-19-01 through B-19-20.
+3. Write all backend tests (B-19-01 through B-19-23, including B-19-05b and B-19-14b) — 25 total.
 
 ### Arjun (frontend — can start steps 1–2 immediately while Bhima works)
 
@@ -670,7 +695,7 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 4. Implement `TradeListPage.tsx` — filter bar, table, sort, pagination (F-19-C).
 5. Implement `TradeDetailPage.tsx` — four sections, embed `JournalPanel` (F-19-D).
 6. Update `app.tsx` routes and `AppShell.tsx` nav (F-19-F).
-7. Write frontend tests F-19-01 through F-19-22.
+7. Write all frontend tests (F-19-01 through F-19-28, including F-19-13b and F-19-17b) — 30 total.
 
 **Arjun's blocker:** Arjun can develop against MSW fixtures from the start. The only step requiring Bhima's backend to be live is integration/E2E testing. No blocker for unit/component tests.
 
@@ -680,7 +705,7 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| **Sahadeva QA** | Sahadeva | All new backend tests B-19-01 through B-19-20, B-19-14b, and B-19-05b pass (22 total); all new frontend tests F-19-01 through F-19-22, F-19-13b, and F-19-17b pass (24 total); no regressions in Dashboard, Import, or Manual Trade Entry tests; `instrument` filter uses `startswith(autoescape=True)` — passing `%` or `_` in the instrument param does not widen the match (A-19-2); `from_date > to_date` → 422 (B-19-09); `GET /v1/trades/{id}` returns 404 (not 403) for another user's trade — never 403 (A-19-1, B-19-17); fills ordered ASC by `fill_timestamp` (B-19-12); `hold_duration_seconds` null for OPEN trades (B-19-15), non-null for PARTIAL trades (B-19-14b); PARTIAL trade `pnl` is null (B-19-14b); Dashboard `DashboardPage` tests still pass after envelope shape change (F-19-22); "Next" button disabled at last page (F-19-03); `toTradeForJournal` imported from `./adapters` not `./types`; trade type filter "CNC (Intraday)" sends `trade_type=CNC_SAME_DAY` and returns only same-day-closed CNC trades (G-19-1, B-19-05b); PARTIAL trade hold duration renders with label "Elapsed" not "Hold duration" (G-19-2, F-19-13b); OPEN and PARTIAL trades show distinct P&L placeholder text (G-19-3, F-19-17, F-19-17b); `exchange_segment` is never rendered as a raw DB value — always mapped via `EXCHANGE_SEGMENT_LABELS` (G-19-5); Quantity shows "entered / exited" format (G-19-4) |
+| **Sahadeva QA** | Sahadeva | All 25 new backend tests pass (B-19-01 through B-19-20, B-19-05b, B-19-14b, B-19-21 through B-19-23); all 30 new frontend tests pass (F-19-01 through F-19-28 including F-19-13b, F-19-17b); no regressions in Dashboard, Import, or Manual Trade Entry tests; `instrument=REL%ANCE` returns 0 results — `%` is not treated as a wildcard (A-19-2, B-19-21); `from_date > to_date` → 422 (B-19-09); `GET /v1/trades/{id}` returns 404 (not 403) for another user's trade — never 403 (A-19-1, B-19-17); fills ordered ASC by `fill_timestamp` (B-19-12); `hold_duration_seconds` null for OPEN trades (B-19-15), non-null for PARTIAL trades (B-19-14b); PARTIAL trade `pnl` is null (B-19-14b); Dashboard `DashboardPage` tests still pass after envelope shape change (F-19-22); "Next" button disabled at last page (F-19-03); "Previous" button disabled on first page (F-19-27); `toTradeForJournal` imported from `./adapters` not `./types` (verified by `tsc --noEmit` — Nakula CI gate); trade type filter "CNC (Intraday)" sends `trade_type=CNC_SAME_DAY` (G-19-1, B-19-05b); PARTIAL trade hold duration renders with label "Elapsed" not "Hold duration" (G-19-2, F-19-13b); OPEN and PARTIAL trades show distinct P&L placeholder text (G-19-3, F-19-17, F-19-17b); `exchange_segment` rendered as "NSE Equity" / "NSE F&O" / "BSE Equity" — never as raw DB token (G-19-5, F-19-24); Quantity renders as "X entered / Y exited" — not `×` (G-19-4, F-19-25); `instrument_name` present in response and rendered in Trade Detail header (G-19-6, B-19-22, F-19-26); sub-minute hold duration renders as `{n}s` (G-19-7, F-19-28); sort cycling applies correct `sort_by`/`sort_dir` params (F-19-23) |
 | **Nakula CI** | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes; `tsc --noEmit` clean; ESLint 0 warnings; `GET /v1/trades/{trade_id}` route confirmed in OpenAPI schema; `GET /v1/trades` response shape in OpenAPI schema updated to `TradeListPageOut` |
 | **Yudhishthira ACCEPT** | Yudhishthira | Trades screen accessible from nav; filter bar allows filtering by direction, status, date range; pagination "Showing X–Y of Z" renders accurately; clicking a trade opens Trade Detail; Trade Detail shows fill timeline, P&L breakdown (CLOSED) or "open" placeholder; Journal section embedded and functional; switching accounts on Trade List updates the list |
 
@@ -719,4 +744,5 @@ Within the Phase 1 estimate (plan allowed 1–2 sessions; backend simplicity fro
 *Krishna — Senior Project Manager*  
 *Architectural review: Mayasura — 2026-09-09 (A-19-1 through A-19-7 applied)*  
 *Trading domain review: Ganesha — 2026-09-09 (G-19-1 through G-19-7 applied)*  
+*QA review: Sahadeva — 2026-09-09 (QA-19-1 through QA-19-9 applied)*  
 *Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/trades.py`, `backend/src/tradeforge/infrastructure/models/trade_pnl.py`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `frontend/src/features/journal/components/JournalPanel.tsx`, `frontend/src/features/journal/types.ts`, `frontend/src/features/trades/api.ts`, `frontend/src/features/trades/types.ts`*
