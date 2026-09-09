@@ -316,6 +316,8 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Owner:** Arjun (frontend), Bhima (trade list API)  
 **Estimate:** 1–2 sessions  
 **Dependency:** Step 18 (trade list endpoint already needed there). Step 14 (navigation).  
+**Execution plan:** `docs/project-status/STEP-19-EXECUTION-PLAN.md`  
+**Branch:** `feat/step-19-trade-list-detail` (base: `main` at commit `af57349` — rebase required after Step 18 merges)  
 
 **Trade List screen:**
 - Paginated list: instrument, direction, entry date, exit date, net P&L, R-multiple, discipline score, emotion chip
