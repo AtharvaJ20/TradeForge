@@ -5,7 +5,7 @@
 **Date:** 2026-09-09  
 **Parent plan:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-19-trade-list-detail` (base: `main` at commit `af57349` — Step 17 merged)  
-**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review pending
+**Status:** APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review applied 2026-09-09 (G-19-1 through G-19-7)
 
 ---
 
@@ -38,6 +38,20 @@ Do not start B-19-A or any frontend work until this rebase is confirmed.
 | A-19-5 | Required → Resolved | **PARTIAL trade test B-19-14b added.** Tests OPEN and CLOSED only — PARTIAL trade has `pnl: null`, both ENTRY and EXIT fills, `hold_duration_seconds` non-null. Total backend tests: 21. |
 | A-19-6 | Informational | **`FillItemOut` quantity/price convention: use `string`.** Consistent with `FillInput` in Step 16 (`trades/types.ts`). `FillItemOut` carries raw fill prices and quantities from `Numeric(18, 4)` — `string` avoids float precision ambiguity and matches the existing project pattern for mutable/display fill data. Updated in F-19-A. |
 | A-19-7 | Informational | **Remove unused `_svc` from `list_trades`.** `TradingAccountService` dependency injected but not referenced. Bhima removes it as part of B-19-A since the handler is being modified anyway. |
+
+---
+
+## Trading Domain Review Decisions (Ganesha — 2026-09-09)
+
+| ID | Severity | Decision |
+|----|----------|----------|
+| G-19-1 | Blocking → Resolved | **Trade type filter "CNC" omits `CNC_SAME_DAY`.** The filter bar showed "All / MIS / CNC / Futures / Options". Selecting "CNC" sends `trade_type=CNC`, which excludes CNC positions that were opened and closed on the same trading day (stored as `CNC_SAME_DAY` by the reconstruction engine). A user filtering by "CNC" would silently miss all same-day-closed delivery positions. Fix: Rename "CNC" to "CNC (Delivery)" and add "CNC (Intraday)" as a fifth option mapping to `trade_type=CNC_SAME_DAY`. Filter options are now: All / MIS / CNC (Delivery) / CNC (Intraday) / Futures / Options. The backend whitelist `{'MIS', 'CNC', 'CNC_SAME_DAY', 'NRML_FUT', 'NRML_OPT'}` already covers `CNC_SAME_DAY` — no backend change needed. Updated in F-19-C. Added test B-19-05b. |
+| G-19-2 | Required → Resolved | **`hold_duration_seconds` label must be status-aware.** For PARTIAL trades `hold_duration_seconds` is non-null but represents elapsed time since first fill — not a completed hold duration. The Trade Detail header must: render label "Hold duration" for CLOSED trades; render label "Elapsed" (same value, different label) for PARTIAL trades; render the literal text "Open" for OPEN trades where the value is null. Updated in F-19-D Trade Summary. Added test F-19-13b. |
+| G-19-3 | Required → Resolved | **P&L placeholder must distinguish OPEN from PARTIAL.** The original placeholder "P&L not yet available — trade is open." is factually wrong for PARTIAL trades, which have executed exits. Fix: OPEN trade → "No exits yet — P&L will be available when the trade closes." PARTIAL trade → "Partially closed — final P&L will be calculated when all positions are exited." Updated in F-19-D Section 3. Added test F-19-17b. |
+| G-19-4 | Required → Resolved | **Quantity display `total_entry_quantity × total_exit_quantity` is misleading.** The `×` symbol implies multiplication, not an entry/exit relationship. Fix: render as "`{total_entry_quantity}` entered / `{total_exit_quantity}` exited". For OPEN trades where `total_exit_quantity` is 0, show "`{total_entry_quantity}` entered". Updated in F-19-D Trade Summary. |
+| G-19-5 | Required → Resolved | **`exchange_segment` raw DB values must not be shown to users.** Values `NSE_EQ`, `NSE_FO`, `BSE_EQ` are internal tokens. Map to human-readable labels: `NSE_EQ` → "NSE Equity", `NSE_FO` → "NSE F&O", `BSE_EQ` → "BSE Equity". Define an `EXCHANGE_SEGMENT_LABELS` constant in `src/features/trades/constants.ts` and use it wherever `exchange_segment` is rendered. Updated in F-19-D and added F-19-A3. |
+| G-19-6 | Informational | **`instrument_name` not in `TradeDetailOut`.** `Instrument.name` (e.g., "RELIANCE INDUSTRIES LTD") exists in the ORM and the detail query already JOINs `instruments`. Including it lets the Trade Detail header show the full name alongside the symbol. Add `instrument_name: str` to `TradeDetailOut`, select `i.name` in the B-19-B JOIN, and add `instrument_name: string` to the `TradeDetailOut` TypeScript interface. Updated in B-19-B and F-19-A. |
+| G-19-7 | Informational | **Hold duration format must handle sub-minute scalp trades.** Format "Xh Ym" renders as "0h 0m" for trades closed within 60 seconds. Add sub-minute case: if `hold_duration_seconds < 60`, display "`{hold_duration_seconds}s`". Updated in F-19-D. |
 
 ---
 
@@ -163,6 +177,7 @@ class TradeDetailOut(BaseModel):
     account_id: uuid.UUID | None
     # Instrument
     symbol: str
+    instrument_name: str          # i.name — full name e.g. "RELIANCE INDUSTRIES LTD" (G-19-6)
     exchange_segment: str
     instrument_type: str
     expiry_date: date | None
@@ -205,8 +220,8 @@ async def get_trade_detail(
 
 1. Query the trade and instrument in one JOIN. Include `user_id` in the WHERE clause — ownership is enforced at query time, not post-query (A-19-1):
    ```sql
-   SELECT t.*, i.symbol, i.exchange_segment, i.instrument_type,
-          i.expiry_date, i.strike_price
+   SELECT t.*, i.symbol, i.name AS instrument_name, i.exchange_segment,
+          i.instrument_type, i.expiry_date, i.strike_price
    FROM trades t
    JOIN instruments i ON i.id = t.instrument_id
    WHERE t.id = :trade_id
@@ -234,6 +249,7 @@ async def get_trade_detail(
 | B-19-03 | `direction=SHORT` filter — only SHORT trades returned |
 | B-19-04 | `direction=invalid` → 422 `INVALID_DIRECTION` |
 | B-19-05 | `trade_type=MIS` filter — only MIS trades returned |
+| B-19-05b | `trade_type=CNC_SAME_DAY` filter — only same-day-closed CNC trades returned; a CNC (delivery) trade is excluded (G-19-1) |
 | B-19-06 | `trade_type=invalid` → 422 `INVALID_TRADE_TYPE` |
 | B-19-07 | `from_date=2026-09-01` — trades before that date excluded |
 | B-19-08 | `to_date=2026-09-01` — trades after that date excluded |
@@ -256,7 +272,7 @@ async def get_trade_detail(
 | B-19-19 | `is_deleted = true` trade → 404 (excluded by `is_deleted = false` filter) |
 | B-19-20 | `setup_name` and `planned_risk_amount` fields present in response (null acceptable for trades without these fields set) |
 
-**Total new backend tests: 21** (B-19-14b added per A-19-5).
+**Total new backend tests: 22** (B-19-14b added per A-19-5; B-19-05b added per G-19-1).
 
 ---
 
@@ -322,6 +338,7 @@ export interface TradeDetailOut {
   account_id: string | null
   // Instrument
   symbol: string
+  instrument_name: string        // full instrument name e.g. "RELIANCE INDUSTRIES LTD" (G-19-6)
   exchange_segment: string
   instrument_type: string
   expiry_date: string | null
@@ -347,6 +364,22 @@ export interface TradeDetailOut {
   pnl: PnlBreakdownOut | null
 }
 ```
+
+### Task F-19-A3 — Display Constants: `src/features/trades/constants.ts` *(new file)*
+
+> **G-19-5:** Raw DB values must never be rendered to users verbatim.
+
+```typescript
+export const EXCHANGE_SEGMENT_LABELS: Record<string, string> = {
+  NSE_EQ: 'NSE Equity',
+  NSE_FO: 'NSE F&O',
+  BSE_EQ: 'BSE Equity',
+}
+```
+
+Import and use this map wherever `exchange_segment` is rendered (Trade Detail header, and any future Trade List column that shows it). Fallback for an unknown value: render the raw string prefixed with "?" for visibility during development.
+
+---
 
 ### Task F-19-A2 — Adapter: `src/features/trades/adapters.ts` *(new file)*
 
@@ -421,7 +454,8 @@ Routed at `/trades`.
 - Account selector — driven by `AccountContext`. If no account selected, prompt user to select one.
 - Status filter: All / Open / Partial / Closed (tab strip or segmented control)
 - Direction filter: All / Long / Short
-- Trade type filter: All / MIS / CNC / Futures / Options
+- Trade type filter: All / MIS / CNC (Delivery) / CNC (Intraday) / Futures / Options
+  - "CNC (Delivery)" sends `trade_type=CNC`; "CNC (Intraday)" sends `trade_type=CNC_SAME_DAY` (G-19-1)
 - Date range: From date / To date (date inputs)
 - Instrument search: text input — debounced 300ms; sends `instrument=` param
 - "Clear filters" button when any filter is active
@@ -467,13 +501,13 @@ Routed at `/trades/:tradeId`. Called from Trade List row clicks and from the Rec
 | Field | Source |
 |-------|--------|
 | Symbol + instrument type | `symbol`, `instrument_type` |
-| Exchange segment | `exchange_segment` |
+| Exchange segment | `exchange_segment` mapped via `EXCHANGE_SEGMENT_LABELS` (`NSE_EQ` → "NSE Equity", `NSE_FO` → "NSE F&O", `BSE_EQ` → "BSE Equity") — never render the raw DB value (G-19-5) |
 | Direction chip | `direction` |
 | Status badge | `status` |
 | Trade date | `trade_date` |
 | Entry / Exit averages | `average_entry`, `average_exit` (null for OPEN) |
-| Quantity | `total_entry_quantity` × `total_exit_quantity` |
-| Hold duration | Derived from `hold_duration_seconds` — format as "Xh Ym" or "Xd Yh" — show "Open" if null |
+| Quantity | `{total_entry_quantity}` entered / `{total_exit_quantity}` exited. For OPEN trades (`total_exit_quantity` = 0), show `{total_entry_quantity}` entered only (G-19-4) |
+| Hold duration / Elapsed | CLOSED → label "Hold duration", format `{d}d {h}h`, `{h}h {m}m`, or `{s}s` for < 60s. PARTIAL → label "Elapsed" (same value, different label — G-19-2). OPEN → "Open" (null value — no label). Sub-minute: `{hold_duration_seconds}s` (G-19-7) |
 | Setup | `setup_name` (hidden if null) |
 | Planned stop / target | `planned_stop`, `planned_target` (hidden if null) |
 
@@ -511,7 +545,7 @@ Only rendered when `pnl` is non-null (CLOSED trades).
 | **Net P&L** | `pnl.net_pnl` (bold, coloured) |
 | R-multiple | `pnl.r_multiple` (show "—" if null) |
 
-For OPEN/PARTIAL trades: render a muted "P&L not yet available — trade is open." placeholder where Section 3 would be.
+For OPEN trades: render a muted "No exits yet — P&L will be available when the trade closes." For PARTIAL trades: render "Partially closed — final P&L will be calculated when all positions are exited." (G-19-3 — do not use a single generic placeholder for both states.)
 
 **Section 4 — Journal, Attachments, and Audit History**
 
@@ -530,7 +564,7 @@ Add to `src/__tests__/msw/handlers.ts`:
 | Handler | Fixtures |
 |---------|---------|
 | `GET /v1/trades` | Update existing `TRADES_LIST` to use `TradeListPageOut` envelope shape (`items`, `total`, `limit`, `offset`). Add `TRADES_LIST_FILTERED` (200, fewer items matching a direction/date filter). |
-| `GET /v1/trades/:tradeId` | `TRADE_DETAIL_CLOSED` (200, full `TradeDetailOut` with pnl populated, 3 fills). `TRADE_DETAIL_OPEN` (200, `pnl: null`, `hold_duration_seconds: null`). `TRADE_DETAIL_NOT_FOUND` (404). |
+| `GET /v1/trades/:tradeId` | `TRADE_DETAIL_CLOSED` (200, full `TradeDetailOut` with pnl populated, 3 fills). `TRADE_DETAIL_OPEN` (200, `pnl: null`, `hold_duration_seconds: null`). `TRADE_DETAIL_PARTIAL` (200, `status: 'PARTIAL'`, `pnl: null`, `hold_duration_seconds` non-null, both ENTRY and EXIT fills — required for F-19-17b). `TRADE_DETAIL_NOT_FOUND` (404). |
 
 Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope shape (required by the Dashboard test regression fix — see Task F-19-B).
 
@@ -572,11 +606,13 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 | Test ID | Description |
 |---------|-------------|
 | F-19-12 | Trade Detail renders Trade Summary section with symbol, direction chip, status badge, trade date |
-| F-19-13 | `hold_duration_seconds` renders as formatted duration ("2h 15m"); null renders as "Open" |
+| F-19-13 | CLOSED trade: `hold_duration_seconds` renders as formatted duration ("2h 15m"); null (OPEN) renders as "Open" |
+| F-19-13b | PARTIAL trade: `hold_duration_seconds` renders the same formatted value but with label "Elapsed" not "Hold duration" (G-19-2) |
 | F-19-14 | Execution Timeline renders all fills from `TRADE_DETAIL_CLOSED.fills` in order; each row shows timestamp, side, role, quantity, price |
 | F-19-15 | Fill `fill_role` null renders as "—" in the Role column |
 | F-19-16 | P&L Breakdown section visible for CLOSED trade; gross P&L, all 7 charge rows, net P&L all render |
-| F-19-17 | P&L Breakdown hidden for OPEN trade (`TRADE_DETAIL_OPEN`); placeholder "P&L not yet available…" renders |
+| F-19-17 | P&L Breakdown hidden for OPEN trade (`TRADE_DETAIL_OPEN`); "No exits yet — P&L will be available when the trade closes." renders (G-19-3) |
+| F-19-17b | PARTIAL trade: P&L Breakdown hidden; "Partially closed — final P&L will be calculated when all positions are exited." renders (G-19-3) — use `TRADE_DETAIL_PARTIAL` fixture (status=PARTIAL, pnl=null) |
 | F-19-18 | `JournalPanel` is rendered for both OPEN and CLOSED trades (journal is always available regardless of P&L status) |
 | F-19-19 | Trade Detail page shows "Back to trades" link / breadcrumb navigating to `/trades` |
 | F-19-20 | `TRADE_DETAIL_NOT_FOUND` fixture: page renders a "Trade not found" error state (not a crash) |
@@ -588,7 +624,7 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 |---------|-------------|
 | F-19-22 | `DashboardPage` Recent Trades tile still renders correctly after `GET /v1/trades` response shape change to `TradeListPageOut` (reads `.items` not the root array) |
 
-**Total new frontend tests: 22.**
+**Total new frontend tests: 24** (F-19-13b added per G-19-2; F-19-17b added per G-19-3).
 
 ---
 
@@ -644,7 +680,7 @@ Update the Dashboard MSW handler for `GET /v1/trades` to match the new envelope 
 
 | Gate | Owner | Criteria |
 |------|-------|---------|
-| **Sahadeva QA** | Sahadeva | All new backend tests B-19-01 through B-19-20 and B-19-14b pass (21 total); all new frontend tests F-19-01 through F-19-22 pass; no regressions in Dashboard, Import, or Manual Trade Entry tests; `instrument` filter uses `startswith(autoescape=True)` — passing `%` or `_` in the instrument param does not widen the match (A-19-2); `from_date > to_date` → 422 (B-19-09); `GET /v1/trades/{id}` returns 404 (not 403) for another user's trade — never 403 (A-19-1, B-19-17); fills ordered ASC by `fill_timestamp` (B-19-12); `hold_duration_seconds` null for OPEN trades (B-19-15), non-null for PARTIAL trades (B-19-14b); PARTIAL trade `pnl` is null (B-19-14b); Dashboard `DashboardPage` tests still pass after envelope shape change (F-19-22); "Next" button disabled at last page (F-19-03); `toTradeForJournal` imported from `./adapters` not `./types` |
+| **Sahadeva QA** | Sahadeva | All new backend tests B-19-01 through B-19-20, B-19-14b, and B-19-05b pass (22 total); all new frontend tests F-19-01 through F-19-22, F-19-13b, and F-19-17b pass (24 total); no regressions in Dashboard, Import, or Manual Trade Entry tests; `instrument` filter uses `startswith(autoescape=True)` — passing `%` or `_` in the instrument param does not widen the match (A-19-2); `from_date > to_date` → 422 (B-19-09); `GET /v1/trades/{id}` returns 404 (not 403) for another user's trade — never 403 (A-19-1, B-19-17); fills ordered ASC by `fill_timestamp` (B-19-12); `hold_duration_seconds` null for OPEN trades (B-19-15), non-null for PARTIAL trades (B-19-14b); PARTIAL trade `pnl` is null (B-19-14b); Dashboard `DashboardPage` tests still pass after envelope shape change (F-19-22); "Next" button disabled at last page (F-19-03); `toTradeForJournal` imported from `./adapters` not `./types`; trade type filter "CNC (Intraday)" sends `trade_type=CNC_SAME_DAY` and returns only same-day-closed CNC trades (G-19-1, B-19-05b); PARTIAL trade hold duration renders with label "Elapsed" not "Hold duration" (G-19-2, F-19-13b); OPEN and PARTIAL trades show distinct P&L placeholder text (G-19-3, F-19-17, F-19-17b); `exchange_segment` is never rendered as a raw DB value — always mapped via `EXCHANGE_SEGMENT_LABELS` (G-19-5); Quantity shows "entered / exited" format (G-19-4) |
 | **Nakula CI** | Nakula | `pytest` coverage thresholds pass; `npm run coverage` passes; `tsc --noEmit` clean; ESLint 0 warnings; `GET /v1/trades/{trade_id}` route confirmed in OpenAPI schema; `GET /v1/trades` response shape in OpenAPI schema updated to `TradeListPageOut` |
 | **Yudhishthira ACCEPT** | Yudhishthira | Trades screen accessible from nav; filter bar allows filtering by direction, status, date range; pagination "Showing X–Y of Z" renders accurately; clicking a trade opens Trade Detail; Trade Detail shows fill timeline, P&L breakdown (CLOSED) or "open" placeholder; Journal section embedded and functional; switching accounts on Trade List updates the list |
 
@@ -682,5 +718,5 @@ Within the Phase 1 estimate (plan allowed 1–2 sessions; backend simplicity fro
 
 *Krishna — Senior Project Manager*  
 *Architectural review: Mayasura — 2026-09-09 (A-19-1 through A-19-7 applied)*  
-*Trading domain review: Ganesha — pending*  
+*Trading domain review: Ganesha — 2026-09-09 (G-19-1 through G-19-7 applied)*  
 *Source: `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`, `backend/src/tradeforge/api/v1/trades.py`, `backend/src/tradeforge/infrastructure/models/trade_pnl.py`, `backend/src/tradeforge/infrastructure/models/trade_domain.py`, `frontend/src/features/journal/components/JournalPanel.tsx`, `frontend/src/features/journal/types.ts`, `frontend/src/features/trades/api.ts`, `frontend/src/features/trades/types.ts`*
