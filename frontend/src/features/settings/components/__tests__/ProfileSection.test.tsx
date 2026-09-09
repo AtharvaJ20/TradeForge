@@ -75,8 +75,10 @@ describe('ProfileSection — F-15-08: blank display name shows client error', ()
     const user = userEvent.setup()
     renderProfile()
 
+    // Wait until profile has loaded into the input (not just label present) to
+    // avoid a race where the useEffect resets displayName mid-test.
     await waitFor(() => {
-      expect(screen.getByLabelText(/display name/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/display name/i)).toHaveValue(USER_PROFILE_FIXTURE.display_name)
     })
 
     await user.clear(screen.getByLabelText(/display name/i))

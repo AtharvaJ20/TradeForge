@@ -8,6 +8,8 @@ import { ResetPasswordPage } from './features/auth/components/ResetPasswordPage'
 import { AnalyticsPage } from './features/analytics/AnalyticsPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { AddTradePage } from './features/trades/AddTradePage'
+import { TradeListPage } from './features/trades/TradeListPage'
+import { TradeDetailPage } from './features/trades/TradeDetailPage'
 import { AccountProvider } from './features/accounts/context/AccountContext'
 import { AppShell } from './layout/AppShell'
 import { RequireAuth } from './components/RequireAuth'
@@ -39,7 +41,8 @@ export function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/risk" element={<PlaceholderPage title="Risk" />} />
-          <Route path="/trades" element={<PlaceholderPage title="Trades" />} />
+          <Route path="/trades" element={<TradeListPage />} />
+          <Route path="/trades/:tradeId" element={<TradeDetailPage />} />
           <Route path="/trades/new" element={<AddTradePage />} />
           <Route path="/import" element={<ImportTradesPage />} />
           <Route path="/settings" element={<SettingsPage />} />

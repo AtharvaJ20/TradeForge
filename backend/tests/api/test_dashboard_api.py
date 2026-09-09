@@ -121,12 +121,23 @@ def _journal_row(
 
 
 def _make_mock_db(rows: list[Any]) -> AsyncMock:
-    """Return a mock AsyncSession whose execute() returns rows."""
+    """Return a mock AsyncSession whose execute() returns rows (single-call endpoints)."""
     mock_db = AsyncMock()
     result = MagicMock()
     result.one.return_value = rows[0] if rows else MagicMock()
     result.all.return_value = rows
     mock_db.execute.return_value = result
+    return mock_db
+
+
+def _make_mock_db_list(rows: list[Any], total: int | None = None) -> AsyncMock:
+    """Return a mock AsyncSession for list_trades (two execute() calls: COUNT then data)."""
+    mock_db = AsyncMock()
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = total if total is not None else len(rows)
+    data_result = MagicMock()
+    data_result.all.return_value = rows
+    mock_db.execute.side_effect = [count_result, data_result]
     return mock_db
 
 
@@ -402,59 +413,50 @@ async def test_dashboard_summary_account_id_echoed_in_response(http_client: Asyn
 
 
 async def test_list_trades_returns_200(http_client: AsyncClient) -> None:
-    """B-18-12: GET /v1/trades returns 200 with list of trades."""
-    from tradeforge.api.v1.trades import get_account_service
+    """B-18-12: GET /v1/trades returns 200 with TradeListPageOut envelope."""
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row()])
+    mock_db = _make_mock_db_list([_trade_list_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
     body = response.json()
-    assert isinstance(body, list)
-    assert len(body) == 1
-    assert body[0]["symbol"] == "RELIANCE"
+    assert isinstance(body["items"], list)
+    assert len(body["items"]) == 1
+    assert body["items"][0]["symbol"] == "RELIANCE"
 
 
 async def test_list_trades_status_partial_filter(http_client: AsyncClient) -> None:
     """B-18-12b: status=PARTIAL filter is accepted and returns 200."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row(status="PARTIAL")])
+    mock_db = _make_mock_db_list([_trade_list_row(status="PARTIAL")])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?status=PARTIAL")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
 
 async def test_list_trades_invalid_status_returns_422(http_client: AsyncClient) -> None:
     """B-18-13: status=INVALID → 422 INVALID_STATUS."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([])
+    mock_db = _make_mock_db_list([])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?status=INVALID")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 422
     assert response.json()["detail"] == "INVALID_STATUS"
@@ -462,18 +464,15 @@ async def test_list_trades_invalid_status_returns_422(http_client: AsyncClient) 
 
 async def test_list_trades_lowercase_status_returns_422(http_client: AsyncClient) -> None:
     """B-18-13b: status=closed (lowercase) → 422 INVALID_STATUS (case-sensitive validation)."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([])
+    mock_db = _make_mock_db_list([])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?status=closed")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 422
     assert response.json()["detail"] == "INVALID_STATUS"
@@ -481,54 +480,45 @@ async def test_list_trades_lowercase_status_returns_422(http_client: AsyncClient
 
 async def test_list_trades_sort_by_net_pnl(http_client: AsyncClient) -> None:
     """B-18-14: sort_by=net_pnl is whitelisted and returns 200."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row()])
+    mock_db = _make_mock_db_list([_trade_list_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?sort_by=net_pnl")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
 
 async def test_list_trades_sort_dir_asc(http_client: AsyncClient) -> None:
     """B-18-15: sort_dir=asc is accepted and returns 200."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row()])
+    mock_db = _make_mock_db_list([_trade_list_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?sort_dir=asc")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
 
 async def test_list_trades_invalid_sort_dir_returns_desc(http_client: AsyncClient) -> None:
     """B-18-15b: sort_dir=invalid silently defaults to desc — returns 200."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row()])
+    mock_db = _make_mock_db_list([_trade_list_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?sort_dir=RANDOM")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
@@ -537,131 +527,110 @@ async def test_list_trades_unknown_sort_by_defaults_to_last_fill_at(
     http_client: AsyncClient,
 ) -> None:
     """B-18-15c: sort_by=unknown silently defaults to last_fill_at — returns 200."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row()])
+    mock_db = _make_mock_db_list([_trade_list_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?sort_by=nonexistent_column")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
 
 async def test_list_trades_status_open_filter(http_client: AsyncClient) -> None:
     """B-18-16: status=OPEN filter is accepted and returns 200."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row(status="OPEN")])
+    mock_db = _make_mock_db_list([_trade_list_row(status="OPEN")])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?status=OPEN")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
 
 async def test_list_trades_status_closed_filter(http_client: AsyncClient) -> None:
     """B-18-17: status=CLOSED filter is accepted and returns 200."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row(status="CLOSED")])
+    mock_db = _make_mock_db_list([_trade_list_row(status="CLOSED")])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?status=CLOSED")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
 
 async def test_list_trades_account_id_filter(http_client: AsyncClient) -> None:
     """B-18-18: account_id filter is accepted and returns 200."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row()])
+    mock_db = _make_mock_db_list([_trade_list_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get(f"/v1/trades?account_id={_ACCOUNT_ID}")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
 
 async def test_list_trades_empty_result(http_client: AsyncClient) -> None:
-    """B-18-19: Returns empty list when no matching trades exist."""
-    from tradeforge.api.v1.trades import get_account_service
+    """B-18-19: Returns empty items list when no matching trades exist."""
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([])
+    mock_db = _make_mock_db_list([])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json()["items"] == []
 
 
 async def test_list_trades_pagination_limit(http_client: AsyncClient) -> None:
     """B-18-20: limit and offset query params are accepted."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row()])
+    mock_db = _make_mock_db_list([_trade_list_row()])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades?limit=10&offset=5")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     assert response.status_code == 200
 
 
 async def test_list_trades_null_pnl_for_open_trade(http_client: AsyncClient) -> None:
     """B-18-21: net_pnl and r_multiple are null for OPEN trades (no trade_pnl row)."""
-    from tradeforge.api.v1.trades import get_account_service
     from tradeforge.infrastructure.db import get_db
     from tradeforge.main import app
 
-    mock_db = _make_mock_db([_trade_list_row(status="OPEN", net_pnl=None, r_multiple=None)])
+    mock_db = _make_mock_db_list([_trade_list_row(status="OPEN", net_pnl=None, r_multiple=None)])
     app.dependency_overrides[get_db] = lambda: mock_db
-    app.dependency_overrides[get_account_service] = lambda: MagicMock()
     try:
         response = await http_client.get("/v1/trades")
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(get_account_service, None)
 
     body = response.json()
-    assert body[0]["net_pnl"] is None
-    assert body[0]["r_multiple"] is None
+    assert body["items"][0]["net_pnl"] is None
+    assert body["items"][0]["r_multiple"] is None
 
 
 # ---------------------------------------------------------------------------
