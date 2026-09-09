@@ -26,6 +26,81 @@ export interface AddFillBody {
   fill: FillInput
 }
 
+// --- Read response types (Step 19) ---
+
+export interface TradeListPageOut {
+  items: TradeListItemOut[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface TradeListItemOut {
+  id: string
+  account_id: string | null
+  symbol: string
+  instrument_type: string
+  direction: string
+  status: string
+  trade_date: string
+  last_fill_at: string | null
+  net_pnl: number | null
+  r_multiple: number | null
+}
+
+export interface FillItemOut {
+  id: string
+  side: string
+  quantity: string
+  price: string
+  fill_role: string | null
+  fill_timestamp: string
+  import_source: string
+  broker: string
+}
+
+export interface PnlBreakdownOut {
+  gross_pnl: string
+  net_pnl: string
+  total_charges: string
+  brokerage: string
+  stt: string
+  exchange_charges: string
+  sebi_charges: string
+  stamp_duty: string
+  gst: string
+  ipft: string
+  r_multiple: string | null
+}
+
+export interface TradeDetailOut {
+  id: string
+  account_id: string | null
+  symbol: string
+  instrument_name: string
+  exchange_segment: string
+  instrument_type: string
+  expiry_date: string | null
+  strike_price: string | null
+  direction: string
+  trade_type: string
+  status: string
+  trade_date: string
+  first_fill_at: string
+  last_fill_at: string | null
+  total_entry_quantity: string
+  total_exit_quantity: string
+  average_entry: string | null
+  average_exit: string | null
+  planned_stop: string | null
+  planned_target: string | null
+  planned_risk_amount: string | null
+  setup_name: string | null
+  hold_duration_seconds: number | null
+  fills: FillItemOut[]
+  pnl: PnlBreakdownOut | null
+}
+
 export interface Trade {
   id: string
   account_id: string | null

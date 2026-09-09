@@ -696,6 +696,11 @@ export const handlers = [
   http.get(`${BASE}/v1/dashboard/summary`, () => HttpResponse.json(DASHBOARD_SUMMARY)),
   http.get(`${BASE}/v1/trades`, () => HttpResponse.json(TRADES_LIST)),
   http.get(`${BASE}/v1/journal/recent`, () => HttpResponse.json(JOURNAL_RECENT)),
+
+  // ---------------------------------------------------------------------------
+  // Step 19 — Trade detail handler (default: CLOSED trade)
+  // ---------------------------------------------------------------------------
+  http.get(`${BASE}/v1/trades/:tradeId`, () => HttpResponse.json(TRADE_DETAIL_CLOSED)),
 ]
 
 /** Override handler: GET returns 404 (no journal entry). */
@@ -948,10 +953,11 @@ export const DASHBOARD_SUMMARY_EMPTY = {
   open_trade_count: 0,
 }
 
-export const TRADES_LIST = Array.from({ length: 10 }, (_, i) => ({
+const TRADES_LIST_ITEMS = Array.from({ length: 10 }, (_, i) => ({
   id: `trade-${String(i + 1).padStart(3, '0')}`,
+  account_id: ACCOUNT_ID_0001,
   symbol: `SYM${i + 1}`,
-  instrument_type: 'EQUITY',
+  instrument_type: 'EQ',
   direction: i % 2 === 0 ? 'LONG' : 'SHORT',
   status: 'CLOSED',
   trade_date: '2026-09-01',
@@ -960,7 +966,201 @@ export const TRADES_LIST = Array.from({ length: 10 }, (_, i) => ({
   r_multiple: i % 3 === 0 ? -1.0 : 1.5,
 }))
 
-export const TRADES_LIST_EMPTY: typeof TRADES_LIST = []
+export const TRADES_LIST = {
+  items: TRADES_LIST_ITEMS,
+  total: 10,
+  limit: 25,
+  offset: 0,
+}
+
+export const TRADES_LIST_EMPTY = {
+  items: [],
+  total: 0,
+  limit: 25,
+  offset: 0,
+}
+
+export const TRADES_LIST_FILTERED = {
+  items: TRADES_LIST_ITEMS.slice(0, 3).map(t => ({ ...t, direction: 'LONG' })),
+  total: 3,
+  limit: 25,
+  offset: 0,
+}
+
+// ---------------------------------------------------------------------------
+// Step 19 — Trade Detail fixtures
+// ---------------------------------------------------------------------------
+
+const TRADE_DETAIL_FILLS_CLOSED = [
+  {
+    id: 'fill-001',
+    side: 'BUY',
+    quantity: '100',
+    price: '2850.00',
+    fill_role: 'ENTRY',
+    fill_timestamp: '2026-09-01T09:15:00+05:30',
+    import_source: 'CSV',
+    broker: 'ZERODHA',
+  },
+  {
+    id: 'fill-002',
+    side: 'BUY',
+    quantity: '50',
+    price: '2840.00',
+    fill_role: 'ENTRY',
+    fill_timestamp: '2026-09-01T09:20:00+05:30',
+    import_source: 'CSV',
+    broker: 'ZERODHA',
+  },
+  {
+    id: 'fill-003',
+    side: 'SELL',
+    quantity: '150',
+    price: '2950.00',
+    fill_role: 'EXIT',
+    fill_timestamp: '2026-09-01T11:45:00+05:30',
+    import_source: 'CSV',
+    broker: 'ZERODHA',
+  },
+]
+
+export const TRADE_DETAIL_CLOSED = {
+  id: 'trade-detail-001',
+  account_id: ACCOUNT_ID_0001,
+  symbol: 'RELIANCE',
+  instrument_name: 'RELIANCE INDUSTRIES LTD',
+  exchange_segment: 'NSE_FO',
+  instrument_type: 'FUT',
+  expiry_date: '2026-09-25',
+  strike_price: null,
+  direction: 'LONG',
+  trade_type: 'MIS',
+  status: 'CLOSED',
+  trade_date: '2026-09-01',
+  first_fill_at: '2026-09-01T09:15:00+05:30',
+  last_fill_at: '2026-09-01T11:45:00+05:30',
+  total_entry_quantity: '150',
+  total_exit_quantity: '150',
+  average_entry: '2846.67',
+  average_exit: '2950.00',
+  planned_stop: '2800.00',
+  planned_target: '2950.00',
+  planned_risk_amount: '7000.00',
+  setup_name: 'Bull flag breakout',
+  hold_duration_seconds: 8100,
+  fills: TRADE_DETAIL_FILLS_CLOSED,
+  pnl: {
+    gross_pnl: '15500.00',
+    net_pnl: '14200.00',
+    total_charges: '1300.00',
+    brokerage: '40.00',
+    stt: '235.00',
+    exchange_charges: '185.00',
+    sebi_charges: '12.00',
+    stamp_duty: '43.00',
+    gst: '40.50',
+    ipft: '9.00',
+    r_multiple: '2.03',
+  },
+}
+
+export const TRADE_DETAIL_OPEN = {
+  id: 'trade-detail-002',
+  account_id: ACCOUNT_ID_0001,
+  symbol: 'INFY',
+  instrument_name: 'INFOSYS LTD',
+  exchange_segment: 'NSE_EQ',
+  instrument_type: 'EQ',
+  expiry_date: null,
+  strike_price: null,
+  direction: 'LONG',
+  trade_type: 'CNC',
+  status: 'OPEN',
+  trade_date: '2026-09-05',
+  first_fill_at: '2026-09-05T09:30:00+05:30',
+  last_fill_at: null,
+  total_entry_quantity: '200',
+  total_exit_quantity: '0',
+  average_entry: '1550.00',
+  average_exit: null,
+  planned_stop: '1500.00',
+  planned_target: '1650.00',
+  planned_risk_amount: '10000.00',
+  setup_name: null,
+  hold_duration_seconds: null,
+  fills: [
+    {
+      id: 'fill-101',
+      side: 'BUY',
+      quantity: '200',
+      price: '1550.00',
+      fill_role: 'ENTRY',
+      fill_timestamp: '2026-09-05T09:30:00+05:30',
+      import_source: 'CSV',
+      broker: 'ZERODHA',
+    },
+  ],
+  pnl: null,
+}
+
+export const TRADE_DETAIL_PARTIAL = {
+  id: 'trade-detail-003',
+  account_id: ACCOUNT_ID_0001,
+  symbol: 'HDFC',
+  instrument_name: 'HDFC BANK LTD',
+  exchange_segment: 'NSE_EQ',
+  instrument_type: 'EQ',
+  expiry_date: null,
+  strike_price: null,
+  direction: 'LONG',
+  trade_type: 'CNC',
+  status: 'PARTIAL',
+  trade_date: '2026-09-03',
+  first_fill_at: '2026-09-03T09:15:00+05:30',
+  last_fill_at: '2026-09-03T11:00:00+05:30',
+  total_entry_quantity: '100',
+  total_exit_quantity: '50',
+  average_entry: '1700.00',
+  average_exit: '1750.00',
+  planned_stop: null,
+  planned_target: null,
+  planned_risk_amount: null,
+  setup_name: null,
+  hold_duration_seconds: 6300,
+  fills: [
+    {
+      id: 'fill-201',
+      side: 'BUY',
+      quantity: '100',
+      price: '1700.00',
+      fill_role: 'ENTRY',
+      fill_timestamp: '2026-09-03T09:15:00+05:30',
+      import_source: 'CSV',
+      broker: 'ZERODHA',
+    },
+    {
+      id: 'fill-202',
+      side: 'SELL',
+      quantity: '50',
+      price: '1750.00',
+      fill_role: 'EXIT',
+      fill_timestamp: '2026-09-03T11:00:00+05:30',
+      import_source: 'CSV',
+      broker: 'ZERODHA',
+    },
+  ],
+  pnl: null,
+}
+
+export const TRADE_DETAIL_SCALP = {
+  ...TRADE_DETAIL_CLOSED,
+  id: 'trade-detail-004',
+  symbol: 'TCS',
+  instrument_name: 'TATA CONSULTANCY SERVICES LTD',
+  hold_duration_seconds: 45,
+}
+
+export const TRADE_DETAIL_NOT_FOUND_RESPONSE = { detail: 'TRADE_NOT_FOUND' }
 
 export const JOURNAL_RECENT = Array.from({ length: 5 }, (_, i) => ({
   trade_id: `trade-${String(i + 1).padStart(3, '0')}`,
@@ -1038,6 +1238,37 @@ export const importAccountInactiveHandler = http.post(
 
 export const importHistoryEmptyHandler = http.get(`${BASE}/v1/imports`, () =>
   HttpResponse.json(IMPORT_HISTORY_EMPTY_FIXTURE),
+)
+
+// ---------------------------------------------------------------------------
+// Step 19 — Trade detail override handlers
+// ---------------------------------------------------------------------------
+
+export const tradeDetailOpenHandler = http.get(`${BASE}/v1/trades/:tradeId`, () =>
+  HttpResponse.json(TRADE_DETAIL_OPEN),
+)
+
+export const tradeDetailPartialHandler = http.get(`${BASE}/v1/trades/:tradeId`, () =>
+  HttpResponse.json(TRADE_DETAIL_PARTIAL),
+)
+
+export const tradeDetailScalpHandler = http.get(`${BASE}/v1/trades/:tradeId`, () =>
+  HttpResponse.json(TRADE_DETAIL_SCALP),
+)
+
+export const tradeDetailNotFoundHandler = http.get(`${BASE}/v1/trades/:tradeId`, () =>
+  new HttpResponse(JSON.stringify(TRADE_DETAIL_NOT_FOUND_RESPONSE), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  }),
+)
+
+export const tradesListFilteredHandler = http.get(`${BASE}/v1/trades`, () =>
+  HttpResponse.json(TRADES_LIST_FILTERED),
+)
+
+export const tradesListEmptyHandler = http.get(`${BASE}/v1/trades`, () =>
+  HttpResponse.json(TRADES_LIST_EMPTY),
 )
 
 export const accountsNonZerodhaActiveHandler = http.get(`${BASE}/v1/accounts`, () =>

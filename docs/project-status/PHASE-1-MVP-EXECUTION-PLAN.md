@@ -323,7 +323,7 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 **Execution plan:** `docs/project-status/STEP-19-EXECUTION-PLAN.md`  
 **Branch:** `feat/step-19-trade-list-detail` (base: `main` at commit `04e249e` — Step 18 merged, branch rebased ✅)  
 **Review status:** ✅ APPROVED FOR IMPLEMENTATION — Mayasura architectural review applied 2026-09-09 (A-19-1 through A-19-7); Ganesha trading domain review applied 2026-09-09 (G-19-1 through G-19-7); Sahadeva QA review applied 2026-09-09 (QA-19-1 through QA-19-9)  
-**Implementation status:** 🚧 READY — Bhima and Arjun can begin implementation now  
+**Implementation status:** ✅ IMPLEMENTED — Bhima (backend: `TradeListPageOut` envelope, `GET /v1/trades/{id}`, 25 API tests); Arjun (frontend: `TradeListPage`, `TradeDetailPage`, 39 component tests, 5 test fixes)  
 
 **Trade List screen:**
 - Paginated list: instrument, direction, entry date, exit date, net P&L, R-multiple, discipline score, emotion chip
@@ -348,7 +348,11 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - AI analysis panel (Phase 3)
 - Market context section (Phase 2)
 
-**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT
+**Gate:** Sahadeva GO → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-09** (Sahadeva GO WITH RISKS [GAP-19-1: no CNC/CNC_SAME_DAY filter regression test] · Nakula CI GREEN [520 backend unit+API passed, 25/25 Step 19 tests, 39 frontend tests, TypeScript clean, ESLint clean; integration suite environment-gated, clears in CI] · Yudhishthira ACCEPT)  
+**Test totals:** 520 backend tests (≥80% coverage), ~39 Step 19 frontend tests; frontend coverage ≥80% across all features  
+**Branch:** `feat/step-19-trade-list-detail` (merge to `main` via PR)  
+**Open risk:** GAP-19-1 — no explicit test for `trade_type=CNC` and `CNC_SAME_DAY` filter paths in backend suite; accepted by Sahadeva as non-blocking coverage gap
 
 ---
 

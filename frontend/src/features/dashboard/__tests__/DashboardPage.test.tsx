@@ -102,7 +102,7 @@ beforeEach(() => {
     refetchAccounts: vi.fn(),
   })
   mockUseDashboardSummary.mockReturnValue(makeIdle(DASHBOARD_SUMMARY))
-  mockUseRecentTrades.mockReturnValue(makeIdle(TRADES_LIST))
+  mockUseRecentTrades.mockReturnValue(makeIdle(TRADES_LIST.items))
   mockUseRecentJournal.mockReturnValue(makeIdle(JOURNAL_RECENT))
   mockUseAnalyticsSummary.mockReturnValue(makeIdle(ANALYTICS_SUMMARY_FIXTURE))
   mockUseStreaks.mockReturnValue(makeIdle(STREAKS_FIXTURE))
@@ -179,7 +179,7 @@ describe('DashboardPage', () => {
   })
 
   it('F-18-09: shows empty state when trades list is empty', () => {
-    mockUseRecentTrades.mockReturnValue(makeIdle(TRADES_LIST_EMPTY))
+    mockUseRecentTrades.mockReturnValue(makeIdle(TRADES_LIST_EMPTY.items))
     renderDashboard()
     expect(screen.getByText('No closed trades yet.')).toBeInTheDocument()
   })
