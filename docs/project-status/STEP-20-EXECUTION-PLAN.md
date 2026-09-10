@@ -2,7 +2,7 @@
 
 **Document:** `docs/project-status/STEP-20-EXECUTION-PLAN.md`  
 **Author:** Krishna (Project Manager)  
-**Date:** 2026-09-10 (revised 2026-09-10 — Mayasura architectural review applied; revised 2026-09-10 — Dhanvantari risk review applied)  
+**Date:** 2026-09-10 (revised 2026-09-10 — Mayasura architectural review applied; revised 2026-09-10 — Dhanvantari risk review applied; revised 2026-09-10 — Sahadeva QA review applied)  
 **Branch:** `feat/step-20-security-hardening` (base: `main` at `8d7ca66` — PR #13 merged)  
 **Phase 1 plan ref:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md` §Step 20  
 **Gate:** Hanuman sign-off required before Step I-3 (production deployment)
@@ -15,6 +15,7 @@
 |------|----------|----------|--------|
 | 2026-09-10 | Mayasura (Architecture) | A-20-1 (BLOCKING), A-20-2 (BLOCKING), A-20-3 (REQUIRED), A-20-4 (REQUIRED), A-20-5 (REQUIRED) | ✅ All applied — plan revised |
 | 2026-09-10 | Dhanvantari (Risk) | D-20-1 (BLOCKING), D-20-2 (REQUIRED), D-20-3 (REQUIRED), D-20-4 (REQUIRED) | ✅ All applied — plan revised |
+| 2026-09-10 | Sahadeva (QA) | QA-S20-01 (BLOCKER — StubStorage.delete_object missing), Advisory 1 (AttachmentSizeLimitError location), Advisory 2 (KMS CI env var owner) | ✅ All resolved — plan revised |
 
 ---
 
@@ -161,7 +162,10 @@ reset_attempts_ip:{ip}   → 60s window, threshold 3  — password-reset/request
 - `presign_put(key, content_type, byte_size, ttl_seconds)`: returns a pre-signed S3 PUT URL signed for the given `content_type`. Size is NOT enforced at the S3 layer.
 - `presign_get(key, filename, content_type, ttl_seconds)`: returns a pre-signed S3 GET URL with `ResponseContentDisposition: attachment; filename=<filename>` and the given TTL
 - `head_object(key)`: calls `S3.head_object` in the executor; returns the metadata dict or `None` if the object does not exist (catch `ClientError` with `Error.Code == '404'`)
-- **Post-upload size validation (D-20-4):** S3 presigned PUT URLs carry no embedded size constraint — S3 will accept a PUT with any `Content-Length` on the issued URL. The confirm-upload flow in `JournalService` must call `head_object` and then assert `metadata["ContentLength"] <= ATTACHMENT_MAX_BYTES`. If the uploaded object exceeds the limit, `JournalService` must: (1) call `S3Storage.delete_object(key)` to remove the oversized object, and (2) raise `AttachmentSizeLimitError` (HTTP 422). This requires adding a `delete_object(key)` method to `StoragePort` and `S3Storage`. The `JournalService.ATTACHMENT_MAX_BYTES` check at presign time only validates the client-declared size; the post-upload check validates the actual uploaded bytes.
+- **Post-upload size validation (D-20-4):** S3 presigned PUT URLs carry no embedded size constraint — S3 will accept a PUT with any `Content-Length` on the issued URL. The confirm-upload flow in `JournalService` must call `head_object` and then assert `metadata["ContentLength"] <= ATTACHMENT_MAX_BYTES`. If the uploaded object exceeds the limit, `JournalService` must: (1) call `storage.delete_object(key)` to remove the oversized object, and (2) raise `AttachmentSizeLimitError` (HTTP 422). This requires adding a `delete_object(key) -> None` method to `StoragePort`, `S3Storage`, **and `StubStorage`**. The `JournalService.ATTACHMENT_MAX_BYTES` check at presign time only validates the client-declared size; the post-upload check validates the actual uploaded bytes.
+  - `S3Storage.delete_object(key)`: calls `s3_client.delete_object(Bucket=..., Key=key)` in the executor.
+  - `StubStorage.delete_object(key)`: no-op — returns without error (matches the existing stub pattern; the stub never stores real objects). Required because `StubStorage` implements `StoragePort` and strict mypy (`pyproject.toml: strict = true`) will reject any concrete class missing a protocol method.
+  - `AttachmentSizeLimitError`: define in the journal domain errors module (e.g., `tradeforge/domain/journal/errors.py`), following the existing `tradeforge/domain/auth/errors.py` pattern. Maps to HTTP 422 at the router layer.
 - `S3Storage.__init__` accepts `endpoint`, `bucket`, `access_key`, `secret_key`, `region` — all from `Settings`. Creates a `boto3.client('s3', ...)` once at construction time (not per-call).
 
 **Settings additions** (`settings.py`):
@@ -224,7 +228,7 @@ kms_key_arn: str = ""          # Phase 2 — broker credential KMS; empty in Pha
 kms_endpoint_url: str = ""
 ```
 
-Also update the `.github/workflows/ci.yml` `KMS_KEY_ARN` env var — it is already set to a dummy value. Remove or document that it is no longer required at startup.
+Also update the `.github/workflows/ci.yml` `KMS_KEY_ARN` env var — it is already set to a dummy value. **Nakula** must add an inline comment beside the `KMS_KEY_ARN` line in `ci.yml` marking it as optional (e.g., `# Optional — KMS deferred to Phase 2; field now defaults to "" in settings.py`). Do not remove the env var; the dummy value is harmless and removal has no benefit.
 
 **No new tests required** — existing CI already works; making the field optional removes a fragility, not a feature.
 
@@ -321,7 +325,7 @@ S20-5 is blocked on all of S20-1 through S20-4 complete.
 Step 20 is DONE when:
 
 - [ ] S20-1: Three separate Redis counter keys exist — `login_attempts_ip`, `auth_attempts_ip`, `reset_attempts_ip` — with thresholds 5, 5, and 3 respectively. `confirm_password_reset` has a rate-limit call (new addition — it had none before S20-1). Counter isolation test passes. Rate-limit test for `confirm_password_reset` path passes. All rate-limit unit tests pass. CI GREEN.
-- [ ] S20-2: `S3Storage` class implemented using `boto3` + `asyncio.get_running_loop().run_in_executor()`. `presign_put` docstring corrected (no `content-length-range` claim). `delete_object` method added to `StoragePort` and `S3Storage`. Post-upload confirm flow validates `ContentLength <= ATTACHMENT_MAX_BYTES`; calls `delete_object` and raises `AttachmentSizeLimitError` on violation. Startup guard in `main.py` raises `ValueError` on partial S3 config. `StubStorage` used when `s3_bucket` is empty. `S3Storage` used when all S3 env vars are set. `moto`-based unit tests pass (including oversized-upload case). CI GREEN.
+- [ ] S20-2: `S3Storage` class implemented using `boto3` + `asyncio.get_running_loop().run_in_executor()`. `presign_put` docstring corrected (no `content-length-range` claim). `delete_object(key) -> None` added to `StoragePort`, `S3Storage` (calls S3 delete in executor), and `StubStorage` (no-op). `AttachmentSizeLimitError` defined in journal domain errors module. Post-upload confirm flow validates `ContentLength <= ATTACHMENT_MAX_BYTES`; calls `delete_object` and raises `AttachmentSizeLimitError` on violation. Startup guard in `main.py` raises `ValueError` on partial S3 config. `StubStorage` used when `s3_bucket` is empty. `S3Storage` used when all S3 env vars are set. `moto`-based unit tests pass (including oversized-upload case). mypy strict passes. CI GREEN.
 - [ ] S20-3: `kms_key_arn` has a default of `""`. Application starts without `KMS_KEY_ARN` env var. CI GREEN.
 - [ ] S20-4: `pip-audit` in `pyproject.toml` dev deps. `pip-audit` step in `ci.yml` placed after `Install backend dependencies`. No CVEs in current dependency set. CI GREEN.
 - [ ] S20-5: Hanuman written sign-off with no open HIGH or CRITICAL findings.
