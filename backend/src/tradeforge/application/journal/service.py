@@ -388,6 +388,12 @@ class JournalService:
             )
             raise AttachmentNotFoundError(attachment_id)
 
+        # D-20-4: Post-upload size enforcement — client may have uploaded a file larger than
+        # byte_size declared at presign time (presigned PUT cannot enforce content-length-range).
+        if head["ContentLength"] > ATTACHMENT_MAX_BYTES:
+            await self._storage.delete_object(att.s3_key)
+            raise AttachmentSizeLimitExceededError(head["ContentLength"], ATTACHMENT_MAX_BYTES)
+
         now = datetime.now(UTC)
         await self._repo.update_attachment_status(attachment_id, "CONFIRMED", confirmed_at=now)
 

@@ -41,7 +41,7 @@ jobs:
       REDIS_URL: redis://localhost:6379
       # KMS is not exercised by any test — a syntactically valid dummy ARN satisfies
       # settings validation without making any real AWS calls.
-      KMS_KEY_ARN: arn:aws:kms:ap-south-1:000000000000:key/ci-dummy
+      KMS_KEY_ARN: arn:aws:kms:ap-south-1:000000000000:key/ci-dummy  # Optional — KMS deferred to Phase 2; field now defaults to "" in settings.py
       KMS_ENDPOINT_URL: ""
       EMAIL_TRANSPORT: smtp
       SMTP_HOST: localhost
@@ -61,7 +61,13 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Dependency audit (pip-audit)
+        working-directory: backend
+        run: pip-audit
 
       - name: Lint (ruff check)
         working-directory: backend

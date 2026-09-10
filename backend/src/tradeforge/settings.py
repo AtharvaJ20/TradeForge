@@ -29,8 +29,15 @@ class Settings(BaseSettings):
     redis_url: str
 
     # AWS KMS (broker credential envelope encryption — ADR-002)
-    kms_key_arn: str
+    kms_key_arn: str = ""  # optional; empty disables KMS-based credential encryption
     kms_endpoint_url: str = ""  # empty = real AWS; set to LocalStack URL for local dev
+
+    # S3-compatible object store (journal attachments — S20-2)
+    s3_endpoint: str = ""  # empty = AWS; set to R2 endpoint for Cloudflare R2
+    s3_bucket: str = ""
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_region: str = "auto"  # "auto" is correct for Cloudflare R2
 
     # Transactional email
     email_transport: str  # "smtp" | "resend"
