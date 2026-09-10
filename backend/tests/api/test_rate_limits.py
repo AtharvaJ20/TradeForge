@@ -84,3 +84,21 @@ async def test_password_reset_request_returns_429_when_rate_limited(
     )
     assert response.status_code == 429
     assert response.json()["detail"] == "RATE_LIMITED"
+
+
+# ------------------------------------------------------------------
+# POST /v1/auth/password-reset/confirm
+# ------------------------------------------------------------------
+
+
+async def test_password_reset_confirm_returns_429_when_rate_limited(
+    http_client: AsyncClient, mock_auth: AsyncMock
+) -> None:
+    """S20-1: confirm_password_reset now has rate limiting — must return 429."""
+    mock_auth.confirm_password_reset.side_effect = RateLimitedError("Too many requests.")
+    response = await http_client.post(
+        "/v1/auth/password-reset/confirm",
+        json={"token": "a" * 64, "new_password": "NewPass123!"},
+    )
+    assert response.status_code == 429
+    assert response.json()["detail"] == "RATE_LIMITED"
