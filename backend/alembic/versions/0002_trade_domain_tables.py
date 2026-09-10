@@ -21,13 +21,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # ------------------------------------------------------------------
-    # Pre-requisite: btree_gist extension.
-    # Required for the lot_size_history EXCLUSION USING gist constraint.
-    # Railway's PGUSER is a superuser so CREATE EXTENSION works here.
-    # Local dev: also safe — docker/postgres/init.sql installs it first,
-    # and IF NOT EXISTS makes this a no-op.
+    # Pre-requisites: extension + application roles.
+    # btree_gist is required for the lot_size_history EXCLUSION constraint.
+    # tradeforge_app / tradeforge_audit may not exist on fresh managed-PG
+    # instances (e.g. Railway) where init.sql never ran. All ops are
+    # idempotent — IF NOT EXISTS / DO $$ guards make them safe to re-run.
     # ------------------------------------------------------------------
     op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tradeforge_app') THEN
+                CREATE ROLE tradeforge_app;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tradeforge_audit') THEN
+                CREATE ROLE tradeforge_audit;
+            END IF;
+        END $$;
+        """
+    )
 
     # ------------------------------------------------------------------
     # instruments
