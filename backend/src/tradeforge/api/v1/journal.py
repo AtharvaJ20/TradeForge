@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradeforge.api.v1.deps import get_client_ip, get_current_user_id
 from tradeforge.application.journal.service import JournalService
-from tradeforge.application.journal.storage import StubStorage
+from tradeforge.application.journal.storage import S3Storage, StoragePort, StubStorage
 from tradeforge.application.pnl_service import PnlService
 from tradeforge.domain.journal.errors import (
     AttachmentContentTypeNotAllowedError,
@@ -44,6 +44,7 @@ from tradeforge.domain.journal.types import (
     MistakeType,
 )
 from tradeforge.infrastructure.db import get_db
+from tradeforge.settings import get_settings
 from tradeforge.infrastructure.models.journal import JournalEntry
 from tradeforge.infrastructure.models.trade_domain import Instrument, Trade
 from tradeforge.infrastructure.repositories.auth_repo import AuditLogRepository
@@ -59,6 +60,14 @@ router = APIRouter(prefix="/journal", tags=["journal"])
 # ---------------------------------------------------------------------------
 
 
+def _make_storage() -> StoragePort:
+    """Return S3Storage when S3_BUCKET is configured, else StubStorage for local dev."""
+    settings = get_settings()
+    if settings.s3_bucket:
+        return S3Storage(settings)
+    return StubStorage()
+
+
 async def get_journal_service(
     db: AsyncSession = Depends(get_db),
 ) -> JournalService:
@@ -69,7 +78,7 @@ async def get_journal_service(
     return JournalService(
         journal_repo=JournalRepository(db),
         audit_repo=AuditLogRepository(db),
-        storage=StubStorage(),
+        storage=_make_storage(),
         pnl_service=pnl_service,
     )
 
@@ -414,7 +423,7 @@ async def confirm_attachment(
         )
     except AttachmentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except AttachmentExpiredError as exc:
+    except (AttachmentExpiredError, AttachmentSizeLimitExceededError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     await db.commit()
     return AttachmentConfirmOut(

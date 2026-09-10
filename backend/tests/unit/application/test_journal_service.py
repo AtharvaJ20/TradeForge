@@ -496,6 +496,71 @@ class TestConfirmAttachment:
         assert view.download_url is not None
         assert "stub-s3.local" in view.download_url
 
+    async def test_raises_size_exceeded_when_content_length_too_large(self):
+        """D-20-4: post-upload ContentLength check must reject oversized uploads."""
+        storage = AsyncMock()
+        storage.head_object.return_value = {"ETag": '"etag"', "ContentLength": ATTACHMENT_MAX_BYTES + 1}
+        storage.delete_object.return_value = None
+        storage.presign_get.return_value = "https://stub/key"
+
+        journal_repo = AsyncMock(spec=JournalRepository)
+        audit_repo = AsyncMock(spec=AuditLogRepository)
+        svc = JournalService(journal_repo, audit_repo, storage=storage)
+        journal_repo.get_pending_attachment.return_value = _make_attachment(status="PENDING")
+
+        with pytest.raises(AttachmentSizeLimitExceededError):
+            await svc.confirm_attachment(_USER, _ATT)
+
+    async def test_delete_object_called_on_oversize_upload(self):
+        """D-20-4: the oversize object must be deleted from S3 before raising."""
+        att = _make_attachment(status="PENDING")
+
+        storage = AsyncMock()
+        storage.head_object.return_value = {"ETag": '"etag"', "ContentLength": ATTACHMENT_MAX_BYTES + 1}
+        storage.delete_object.return_value = None
+
+        journal_repo = AsyncMock(spec=JournalRepository)
+        audit_repo = AsyncMock(spec=AuditLogRepository)
+        svc = JournalService(journal_repo, audit_repo, storage=storage)
+        journal_repo.get_pending_attachment.return_value = att
+
+        with pytest.raises(AttachmentSizeLimitExceededError):
+            await svc.confirm_attachment(_USER, _ATT)
+
+        storage.delete_object.assert_awaited_once_with(att.s3_key)
+
+    async def test_confirmed_not_called_on_oversize_upload(self):
+        """D-20-4: update_attachment_status must NOT be called when size is exceeded."""
+        storage = AsyncMock()
+        storage.head_object.return_value = {"ETag": '"etag"', "ContentLength": ATTACHMENT_MAX_BYTES + 1}
+        storage.delete_object.return_value = None
+
+        journal_repo = AsyncMock(spec=JournalRepository)
+        audit_repo = AsyncMock(spec=AuditLogRepository)
+        svc = JournalService(journal_repo, audit_repo, storage=storage)
+        journal_repo.get_pending_attachment.return_value = _make_attachment(status="PENDING")
+
+        with pytest.raises(AttachmentSizeLimitExceededError):
+            await svc.confirm_attachment(_USER, _ATT)
+
+        journal_repo.update_attachment_status.assert_not_called()
+
+    async def test_confirms_when_content_length_exactly_at_limit(self):
+        """D-20-4: boundary — upload at exactly ATTACHMENT_MAX_BYTES must be confirmed."""
+        storage = AsyncMock()
+        storage.head_object.return_value = {"ETag": '"etag"', "ContentLength": ATTACHMENT_MAX_BYTES}
+        storage.presign_get.return_value = "https://stub/key"
+
+        journal_repo = AsyncMock(spec=JournalRepository)
+        audit_repo = AsyncMock(spec=AuditLogRepository)
+        svc = JournalService(journal_repo, audit_repo, storage=storage)
+        journal_repo.get_pending_attachment.return_value = _make_attachment(status="PENDING")
+
+        view = await svc.confirm_attachment(_USER, _ATT)
+
+        assert view.status == "CONFIRMED"
+        storage.delete_object.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # Attachment delete

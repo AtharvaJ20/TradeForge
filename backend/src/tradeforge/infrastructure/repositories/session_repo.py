@@ -9,7 +9,8 @@ Key schema:
   forced_reauth:{user_id}   → "1"  TTL=24h
   login_failures:{key}      → integer counter  TTL=15min (fixed window)
   login_attempts_ip:{ip}    → integer counter  TTL=60s (fixed window) — login only
-  auth_attempts_ip:{ip}     → integer counter  TTL=60s (fixed window) — register/verify-email/reset
+  auth_attempts_ip:{ip}     → integer counter  TTL=60s (fixed window) — register/verify-email
+  reset_attempts_ip:{ip}    → integer counter  TTL=60s (fixed window) — request_password_reset/confirm_password_reset
 """
 
 from __future__ import annotations
@@ -27,7 +28,8 @@ FORCED_REAUTH_TTL = 24 * 60 * 60  # 24 hours
 LOGIN_FAILURE_WINDOW = 15 * 60  # 15 minutes
 LOGIN_FAILURE_THRESHOLD = 5
 IP_ATTEMPT_WINDOW = 60  # 1 minute
-IP_ATTEMPT_THRESHOLD = 50
+IP_AUTH_THRESHOLD = 5   # register / verify-email per-IP limit
+IP_RESET_THRESHOLD = 3  # password-reset per-IP limit (tighter — resets are higher-value targets)
 
 
 @dataclass
@@ -183,12 +185,25 @@ class SessionRepository:
             raise RedisUnavailableError("Redis unavailable") from exc
 
     async def increment_auth_attempts_ip(self, ip: str) -> int:
-        """Increment per-IP rate-limit counter for register/verify-email/reset endpoints.
-
-        Uses a separate key from login attempts so the two windows don't bleed
-        into each other. Shares the same window and threshold as login IP limiting.
-        """
+        """Increment per-IP rate-limit counter for register/verify-email endpoints."""
         key = f"auth_attempts_ip:{ip}"
+        try:
+            async with self._r.pipeline(transaction=False) as pipe:
+                await pipe.incr(key)
+                await pipe.expire(key, IP_ATTEMPT_WINDOW, nx=True)
+                results = await pipe.execute()
+            return int(results[0])
+        except RedisError as exc:
+            raise RedisUnavailableError("Redis unavailable") from exc
+
+    async def increment_reset_attempts_ip(self, ip: str) -> int:
+        """Increment per-IP rate-limit counter for password-reset endpoints.
+
+        Uses a separate key from auth_attempts so reset and registration windows
+        are independent. Threshold is tighter (IP_RESET_THRESHOLD) because reset
+        emails are a higher-value target for abuse.
+        """
+        key = f"reset_attempts_ip:{ip}"
         try:
             async with self._r.pipeline(transaction=False) as pipe:
                 await pipe.incr(key)
