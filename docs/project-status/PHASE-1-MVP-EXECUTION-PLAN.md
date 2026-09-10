@@ -376,6 +376,7 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Malware scanning on attachments (Phase 2)
 - Penetration testing (Phase 2)
 
+**Execution plan:** `docs/project-status/STEP-20-EXECUTION-PLAN.md`  
 **Hanuman sign-off required before Step I-3.**
 
 ---
@@ -481,7 +482,7 @@ Phase 1 is DONE when all of the following are true simultaneously:
 - [x] Step 16 accepted by Yudhishthira ✅ 2026-09-08
 - [x] Step 17 accepted by Yudhishthira ✅ 2026-09-08
 - [x] Step 18 accepted by Yudhishthira ✅ 2026-09-09
-- [ ] Step 19 accepted by Yudhishthira
+- [x] Step 19 accepted by Yudhishthira ✅ 2026-09-09
 - [ ] Step 20 security hardening accepted by Hanuman
 - [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
 - [ ] Track QA E2E suite (J-1 through J-9) passing on staging
@@ -519,10 +520,9 @@ Phase 1 is DONE when all of the following are true simultaneously:
               I-3: Production Deploy
 ```
 
-**Current active work (as of 2026-09-09):**
-- Step 18 (Arjun + Bhima) — ✅ CLOSED, merged to `main` as PR #12 (2026-09-09)
-- Step 19 (Arjun + Bhima) — 🚧 READY TO IMPLEMENT on `feat/step-19-trade-list-detail`; plan fully approved (Mayasura + Ganesha + Sahadeva); 25 backend + 30 frontend tests specified; branch rebased on Step 18
-- Step 20 (Hanuman → Bhima) — can proceed in parallel at any time
+**Current active work (as of 2026-09-10):**
+- Step 19 (Arjun + Bhima) — ✅ CLOSED, merged to `main` as PR #13 (2026-09-09) — Yudhishthira ACCEPT
+- Step 20 (Hanuman → Bhima → Nakula) — 🚧 ACTIVE on `feat/step-20-security-hardening`; execution plan at `docs/project-status/STEP-20-EXECUTION-PLAN.md`; 4 implementation tasks + Hanuman sign-off gate
 
 **Steps blocked on Atharva's cloud/domain decisions:**
 - I-1 (Nakula) — nothing in the infrastructure track can begin
