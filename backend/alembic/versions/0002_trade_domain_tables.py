@@ -22,13 +22,12 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # ------------------------------------------------------------------
     # Pre-requisite: btree_gist extension.
-    # This extension is required by the lot_size_history EXCLUSION constraint
-    # (it enables GiST indexes over btree-comparable types such as UUID and DATE).
-    # It must be installed by a superuser BEFORE this migration runs.
-    # For local dev: docker/postgres/init.sql installs it at container init time.
-    # For production: the DBA/Nakula provisions it at RDS database setup time.
-    # The application user (tradeforge_app) cannot create extensions.
+    # Required for the lot_size_history EXCLUSION USING gist constraint.
+    # Railway's PGUSER is a superuser so CREATE EXTENSION works here.
+    # Local dev: also safe — docker/postgres/init.sql installs it first,
+    # and IF NOT EXISTS makes this a no-op.
     # ------------------------------------------------------------------
+    op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
 
     # ------------------------------------------------------------------
     # instruments
