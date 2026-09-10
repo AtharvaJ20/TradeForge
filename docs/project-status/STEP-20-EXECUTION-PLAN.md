@@ -2,10 +2,18 @@
 
 **Document:** `docs/project-status/STEP-20-EXECUTION-PLAN.md`  
 **Author:** Krishna (Project Manager)  
-**Date:** 2026-09-10  
+**Date:** 2026-09-10 (revised 2026-09-10 — Mayasura architectural review applied)  
 **Branch:** `feat/step-20-security-hardening` (base: `main` at `8d7ca66` — PR #13 merged)  
 **Phase 1 plan ref:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md` §Step 20  
 **Gate:** Hanuman sign-off required before Step I-3 (production deployment)
+
+---
+
+## Review Log
+
+| Date | Reviewer | Findings | Status |
+|------|----------|----------|--------|
+| 2026-09-10 | Mayasura (Architecture) | A-20-1 (BLOCKING), A-20-2 (BLOCKING), A-20-3 (REQUIRED), A-20-4 (REQUIRED), A-20-5 (REQUIRED) | ✅ All applied — plan revised |
 
 ---
 
@@ -32,17 +40,21 @@ This plan is grounded in a codebase audit conducted on 2026-09-10. Several scope
 
 Before writing the task breakdown, Krishna audited the actual codebase state. Hanuman must verify each finding.
 
-### Finding 1 — Rate limiting: infrastructure exists, threshold is too permissive
+### Finding 1 — Rate limiting: infrastructure exists, threshold is too permissive, and counter key sharing blocks different limits per group
 
-**Status: GAP — Bhima action required**
+**Status: GAP — Bhima action required (A-20-1 BLOCKING finding applied)**
 
-The existing implementation in `session_repo.py` uses a Redis-backed fixed-window counter with a 60-second TTL. The counter keys are:
-- `auth_attempts_ip:{ip}` — register, verify-email, password-reset (60s window)
+The existing implementation in `session_repo.py` uses a Redis-backed fixed-window counter with a 60-second TTL. The current key schema is:
+- `auth_attempts_ip:{ip}` — register, verify-email, **and** password-reset share this key (60s window)
 - `login_attempts_ip:{ip}` — login only (60s window)
 
 The threshold is `IP_ATTEMPT_THRESHOLD = 50` (`backend/src/tradeforge/infrastructure/repositories/session_repo.py:30`).
 
 **The Phase 1 requirement is 5 req/min for login/register and 3 req/min for password-reset.** The current threshold of 50 is 10× too permissive. This is a real gap.
+
+**Critical architecture constraint (A-20-1):** register, verify-email, and password-reset all increment `auth_attempts_ip:{ip}`. Because they share one counter, it is impossible to apply different threshold constants to different endpoints — all three endpoints see the same counter value. Setting two constants against the same counter has no effect. A normal user flow (register + verify-email = 2 increments on the shared key) would consume two-thirds of a 3/min budget, leaving only 1 slot for password-reset. This breaks legitimate use.
+
+**Resolution (decided, see S20-1):** introduce a dedicated `reset_attempts_ip:{ip}` key used exclusively by password-reset endpoints, with a separate repository method and threshold constant.
 
 **Note on `slowapi`:** The existing Redis-based approach is architecturally sound — it is durable across restarts and shared across instances, which is better than `slowapi`'s default in-memory counters. Hanuman should confirm whether lowering the existing threshold is sufficient or whether `slowapi` middleware is still required in addition.
 
@@ -91,39 +103,60 @@ Hanuman should perform a final sweep of the full repo (including git history) be
 
 ## Task Breakdown
 
-### S20-1 — Tighten rate-limit thresholds (Bhima)
+### S20-1 — Tighten rate-limit thresholds and split counter keys (Bhima)
 
-**File:** `backend/src/tradeforge/infrastructure/repositories/session_repo.py`
+**Files:**
+- `backend/src/tradeforge/infrastructure/repositories/session_repo.py`
+- `backend/src/tradeforge/application/auth/service.py`
 
-Change the constants to match Phase 1 requirements:
+**Architecture decision (A-20-1 resolution):** register, verify-email, and password-reset cannot all share `auth_attempts_ip:{ip}` if they have different limits. Bhima must introduce a dedicated counter key `reset_attempts_ip:{ip}` for password-reset endpoints. This requires: (1) a new repository method, (2) a new threshold constant, (3) updated service calls.
 
-| Endpoint group | Constant | Current | Target |
-|---|---|---|---|
-| register, verify-email | `IP_ATTEMPT_THRESHOLD` (auth_attempts_ip) | 50 | 5 |
-| login | (login_attempts_ip counter) | 50 | 5 |
-| password-reset/request, /confirm | (auth_attempts_ip counter, shared) | 50 | 3 |
+**Changes to `session_repo.py`:**
 
-**Problem:** The same `IP_ATTEMPT_THRESHOLD` constant is used for both auth_attempts (register/verify/reset) and login. Password-reset requires a stricter limit (3/min) than register/login (5/min). The two counter keys (`auth_attempts_ip` vs `login_attempts_ip`) suggest a separation of concerns exists — but both use the same threshold constant.
+| What | Change |
+|------|--------|
+| Rename `IP_ATTEMPT_THRESHOLD = 50` | → `IP_AUTH_THRESHOLD = 5` (register + verify-email) |
+| Add new constant | `IP_RESET_THRESHOLD = 3` (password-reset only) |
+| `login_attempts_ip:{ip}` threshold | Apply `IP_AUTH_THRESHOLD = 5` (login — uses existing `increment_ip_attempts`) |
+| `auth_attempts_ip:{ip}` threshold | Apply `IP_AUTH_THRESHOLD = 5` (register + verify-email only — no longer includes reset) |
+| New: `reset_attempts_ip:{ip}` key | New method `increment_reset_attempts_ip(ip)` — same pipeline pattern as `increment_auth_attempts_ip`, TTL = 60s |
 
-**Bhima must either:**
-- Introduce a separate `IP_RESET_ATTEMPT_THRESHOLD = 3` constant and apply it in `auth_service.py` for the `request_password_reset` and `confirm_password_reset` paths, OR
-- Accept a shared threshold of 3/min (stricter, simpler, no new constant)
+**Changes to `auth_service.py`:**
+- `register` and `verify_email` — continue calling `increment_auth_attempts_ip(ip)`, compare against `IP_AUTH_THRESHOLD`
+- `request_password_reset` and `confirm_password_reset` — switch to calling `increment_reset_attempts_ip(ip)`, compare against `IP_RESET_THRESHOLD`
+- Update the imported constant: replace `IP_ATTEMPT_THRESHOLD` with `IP_AUTH_THRESHOLD` and `IP_RESET_THRESHOLD`
 
-**Hanuman to confirm acceptable approach.** Default recommendation: introduce two constants (`IP_LOGIN_REGISTER_THRESHOLD = 5`, `IP_RESET_THRESHOLD = 3`), apply to the respective service methods.
+**Key schema after this change:**
+```
+login_attempts_ip:{ip}   → 60s window, threshold 5  — login
+auth_attempts_ip:{ip}    → 60s window, threshold 5  — register, verify-email
+reset_attempts_ip:{ip}   → 60s window, threshold 3  — password-reset/request, /confirm
+```
 
 **Tests required (Bhima):**
-- Unit tests verifying that the 6th request within the window raises `RateLimitedError` for login/register
-- Unit tests verifying that the 4th request within the window raises `RateLimitedError` for password-reset
+- Unit test: 6th `increment_auth_attempts_ip` call within window → `RateLimitedError` for register/verify-email paths
+- Unit test: 4th `increment_reset_attempts_ip` call within window → `RateLimitedError` for password-reset paths
+- Unit test: hitting reset limit does NOT affect register/verify-email counter, and vice versa (counter isolation)
+- Existing auth rate-limit tests must continue to pass; mock call sites for the renamed constant
 
 ### S20-2 — Implement S3Storage (Bhima)
 
-**File:** `backend/src/tradeforge/application/journal/storage.py` (add class), `backend/src/tradeforge/api/v1/journal.py` (wire via factory), `backend/src/tradeforge/settings.py` (add env vars)
+**Files:**
+- `backend/src/tradeforge/application/journal/storage.py` — add `S3Storage` class; correct `StoragePort.presign_put` docstring
+- `backend/src/tradeforge/api/v1/journal.py` — wire storage via factory
+- `backend/src/tradeforge/settings.py` — add S3 env vars
+- `backend/src/tradeforge/main.py` — add startup credential validation
+
+**boto3 vs aioboto3 decision (A-20-4 resolution):** `aioboto3` is NOT an existing project dependency — `pyproject.toml` declares `boto3>=1.35.0` only. `aioboto3` is a separate package. For Phase 1, presigning is a local CPU-bound signing operation (no network call). `head_object` makes one network call but is not on a latency-critical path. Bhima must use synchronous `boto3` wrapped in `asyncio.get_event_loop().run_in_executor(None, ...)` for all `S3Storage` methods. This requires no new production dependency and is the correct choice for low-frequency attachment operations. Do not add `aioboto3`.
+
+**presign_put spec correction (A-20-2 resolution):** S3 presigned PUT URLs (`generate_presigned_url('put_object')`) carry no embedded policy document and cannot enforce `content-length-range`. That condition is only available in S3 POST policies (multipart form upload). File size is already enforced at the application layer in `JournalService` (`ATTACHMENT_MAX_BYTES` check before `presign_put` is called). Bhima must NOT attempt to add content-length-range to the presigned PUT URL. Bhima must also correct the `StoragePort.presign_put` docstring (line 9 of `storage.py`) to remove the "Content-Type condition + content-length-range condition" claim — replace it with: "Content-Type is included in the signature; size enforcement is the application layer's responsibility."
 
 **Implementation requirements:**
-- New class `S3Storage` implementing `StoragePort` using `aioboto3` (already in the project for journal presign flows per the `storage.py` docstring)
-- `presign_put`: returns a pre-signed S3 PUT URL with `Content-Type` condition + `content-length-range` condition matching declared `byte_size`
-- `presign_get`: returns a pre-signed S3 GET URL with `Content-Disposition: attachment` and 1-hour TTL
-- `head_object`: returns S3 object metadata dict, or `None` if object does not exist
+- New class `S3Storage` implementing `StoragePort` using synchronous `boto3` via `run_in_executor`
+- `presign_put(key, content_type, byte_size, ttl_seconds)`: returns a pre-signed S3 PUT URL signed for the given `content_type`. Size is NOT enforced at the S3 layer.
+- `presign_get(key, filename, content_type, ttl_seconds)`: returns a pre-signed S3 GET URL with `ResponseContentDisposition: attachment; filename=<filename>` and the given TTL
+- `head_object(key)`: calls `S3.head_object` in the executor; returns the metadata dict or `None` if the object does not exist (catch `ClientError` with `Error.Code == '404'`)
+- `S3Storage.__init__` accepts `endpoint`, `bucket`, `access_key`, `secret_key`, `region` — all from `Settings`. Creates a `boto3.client('s3', ...)` once at construction time (not per-call).
 
 **Settings additions** (`settings.py`):
 ```python
@@ -136,18 +169,36 @@ s3_region: str = "auto"        # "auto" is correct for Cloudflare R2
 ```
 
 **Wire in journal router** (`api/v1/journal.py`):
-- Replace the hardcoded `StubStorage()` instantiation in `get_journal_service()` with a factory that reads `settings.s3_bucket`:
+- Replace the hardcoded `StubStorage()` in `get_journal_service()` with a factory that reads `settings.s3_bucket`:
   - If `s3_bucket` is empty → use `StubStorage` (local dev / CI)
-  - If `s3_bucket` is set → use `S3Storage` (production)
+  - If `s3_bucket` is set → use `S3Storage(settings)` (production)
+
+**Startup credential validation (A-20-3 resolution):** A deployment where `S3_BUCKET` is set but `S3_ACCESS_KEY` or `S3_SECRET_KEY` are absent will start successfully but fail silently at the first attachment request with a boto3 `NoCredentialsError`. Bhima must add a startup guard in `main.py` using FastAPI's lifespan context (or `@app.on_event("startup")`):
+
+```python
+if settings.s3_bucket and not (settings.s3_access_key and settings.s3_secret_key):
+    raise ValueError(
+        "S3_BUCKET is set but S3_ACCESS_KEY or S3_SECRET_KEY is missing. "
+        "All three must be set together, or all three must be empty."
+    )
+```
+
+This guard must run at application startup, not inside the dependency function.
 
 **Explicitly NOT in S20-2:**
 - S3 bucket policy configuration (Nakula owns in Step I-1)
 - S3 lifecycle rules for PENDING-tagged objects (Nakula owns in Step I-1)
+- Switching to S3 POST policy multipart upload (Phase 2 if ever needed)
 
 **Tests required (Bhima):**
-- Unit tests for `S3Storage` using `moto` or `pytest-mock` (mock the aioboto3 client)
-- Integration test confirming `StubStorage` is used when `s3_bucket` is empty
-- Integration test confirming `S3Storage` is instantiated when `s3_bucket` is set
+- Unit tests for `S3Storage` using `moto` (mocks the boto3 S3 client at the AWS API layer — preferred over manual mocking for S3)
+  - `presign_put` returns a URL; does NOT include a content-length-range condition
+  - `presign_get` returns a URL with correct `ResponseContentDisposition`
+  - `head_object` returns metadata dict when object exists; returns `None` on 404
+- Unit test: startup guard raises `ValueError` when `s3_bucket` is set but credentials are absent
+- Unit test: startup guard passes when `s3_bucket` is empty (StubStorage path)
+- Unit test: startup guard passes when all three S3 fields are non-empty
+- `moto` must be added to `[project.optional-dependencies] dev` in `pyproject.toml` if not already present
 
 ### S20-3 — Fix kms_key_arn required field (Bhima)
 
@@ -170,23 +221,33 @@ Also update the `.github/workflows/ci.yml` `KMS_KEY_ARN` env var — it is alrea
 
 ### S20-4 — Add pip-audit to GitHub Actions CI (Nakula)
 
-**File:** `.github/workflows/ci.yml`
+**Files:**
+- `.github/workflows/ci.yml`
+- `backend/pyproject.toml` (add `pip-audit` to dev dependencies)
 
-Add a new job (or a step in the `backend` job) that runs `pip-audit` after the dependency install step:
+**Step placement:** The audit step runs in the existing `backend` job, immediately after the `Install backend dependencies` step and before the lint steps. This ensures `pip-audit` itself is installed (via `pip install -e ".[dev]"`) before it is invoked.
+
+**Correct command (A-20-5 resolution):** The bare `pip-audit` command with no arguments scans the currently installed Python environment — which is exactly what we want after `pip install -e ".[dev]"`. Do not use `--requirement <(pip freeze)` (redundant, fragile) and do not include `--ignore-vuln` until an actual CVE exception is needed and Hanuman has approved it.
 
 ```yaml
 - name: Dependency audit (pip-audit)
   working-directory: backend
-  run: pip-audit --requirement <(pip freeze) --ignore-vuln GHSA-xxxx-xxxx-xxxx
-  # Fail on high/critical CVEs. Add ignore entries for accepted low/medium CVEs.
+  run: pip-audit
 ```
 
 **Specification:**
-- Fail the CI job on any HIGH or CRITICAL CVE
-- MEDIUM and LOW: report only, do not fail (configurable — Hanuman to confirm threshold)
-- Add `pip-audit` to `backend/pyproject.toml` dev dependencies so it is installed by `pip install -e ".[dev]"`
+- `pip-audit` exits non-zero on any finding by default — this is the correct behavior; it fails CI on any CVE regardless of severity
+- If a transitive dependency CVE has no upstream patch and must be accepted, Nakula adds `--ignore-vuln <GHSA-id>` with Hanuman's written approval for each entry. Do not add any `--ignore-vuln` entry at setup time.
+- Add `pip-audit` to `[project.optional-dependencies] dev` in `backend/pyproject.toml` so it is installed by the existing `pip install -e ".[dev]"` step
 
-**Note for Nakula:** `pip-audit` supports a `--format=json` flag for machine-readable output and `--ignore-vuln` for accepted exceptions. Start with fail-on-critical only to avoid blocking CI on irrelevant transitive dependency churn.
+**`pyproject.toml` change:**
+```toml
+[project.optional-dependencies]
+dev = [
+    ...
+    "pip-audit>=2.7.0",
+]
+```
 
 ### S20-5 — Hanuman security sweep and sign-off
 
@@ -199,7 +260,7 @@ Hanuman performs a final security review before Step I-3. This is not an impleme
 | Rate-limit thresholds (S20-1) | Confirm reduced thresholds are implemented and tested |
 | File upload allowlist | Confirm `ALLOWED_CONTENT_TYPES` values are tight (no `application/octet-stream` catch-all) |
 | Upload bypass paths | Confirm there is no router-layer bypass of `JournalService` validation |
-| S3Storage wiring (S20-2) | Confirm production does not fall back to `StubStorage` when env vars are set |
+| S3Storage wiring (S20-2) | Confirm production does not fall back to `StubStorage` when env vars are set; confirm startup guard fires on partial config |
 | Secret sourcing | Final repo sweep for hardcoded secrets (source + git history) |
 | CORS config | Confirm `ALLOWED_ORIGINS` has no wildcards in production |
 | Cookie flags | Confirm `SECURE_COOKIES=true` is enforced in production settings (cannot deploy with `false`) |
@@ -249,10 +310,10 @@ S20-5 is blocked on all of S20-1 through S20-4 complete.
 
 Step 20 is DONE when:
 
-- [ ] S20-1: Rate limits in `session_repo.py` are ≤5/min for login/register and ≤3/min for password-reset. New threshold unit tests pass. CI GREEN.
-- [ ] S20-2: `S3Storage` class implemented and wired. `StubStorage` used when `s3_bucket` is empty. `S3Storage` used when env vars are set. Unit tests pass using mocked aioboto3. CI GREEN.
-- [ ] S20-3: `kms_key_arn` has a default of `""`. CI no longer requires the `KMS_KEY_ARN` dummy env var to start the application. CI GREEN.
-- [ ] S20-4: `pip-audit` runs in GitHub Actions. No HIGH or CRITICAL CVEs in the current dependency set. CI GREEN.
+- [ ] S20-1: Three separate Redis counter keys exist — `login_attempts_ip`, `auth_attempts_ip`, `reset_attempts_ip` — with thresholds 5, 5, and 3 respectively. Counter isolation test passes (hitting reset limit does not affect auth counter and vice versa). All rate-limit unit tests pass. CI GREEN.
+- [ ] S20-2: `S3Storage` class implemented using `boto3` + `run_in_executor`. `presign_put` docstring corrected (no `content-length-range` claim). Startup guard in `main.py` raises `ValueError` on partial S3 config. `StubStorage` used when `s3_bucket` is empty. `S3Storage` used when all S3 env vars are set. `moto`-based unit tests pass. CI GREEN.
+- [ ] S20-3: `kms_key_arn` has a default of `""`. Application starts without `KMS_KEY_ARN` env var. CI GREEN.
+- [ ] S20-4: `pip-audit` in `pyproject.toml` dev deps. `pip-audit` step in `ci.yml` placed after `Install backend dependencies`. No CVEs in current dependency set. CI GREEN.
 - [ ] S20-5: Hanuman written sign-off with no open HIGH or CRITICAL findings.
 
 **Gate:** Hanuman sign-off → Nakula executes Step I-3 (production deployment).
@@ -263,10 +324,12 @@ Step 20 is DONE when:
 
 | # | Risk | Likelihood | Impact | Owner | Mitigation |
 |---|------|-----------|--------|-------|-----------|
-| R-20-1 | `aioboto3` not in `pyproject.toml` — `S3Storage` cannot import | Medium | Medium | Bhima | Check pyproject.toml before writing S3Storage; add if missing |
-| R-20-2 | pip-audit finds a CVE in a transitive dependency with no patch | Medium | Medium | Nakula | Use `--ignore-vuln` for accepted entries; Hanuman approves each exception |
-| R-20-3 | Tightening rate limits breaks a legitimate test that fires > 5 requests | Medium | Low | Bhima | Review test fixtures; mock the Redis counter in fast-firing tests |
+| ~~R-20-1~~ | ~~`aioboto3` not in `pyproject.toml`~~ | — | — | — | RETIRED — plan now uses `boto3` + `run_in_executor`; `boto3` is already a declared dependency |
+| R-20-2 | pip-audit finds a CVE in a transitive dependency with no patch | Medium | Medium | Nakula | Raise with Hanuman immediately; add `--ignore-vuln <GHSA-id>` only with Hanuman written approval |
+| R-20-3 | Tightening rate limits breaks a legitimate test that fires > 5 requests | Medium | Low | Bhima | Review test fixtures; mock `increment_auth_attempts_ip` / `increment_reset_attempts_ip` in fast-firing tests |
 | R-20-4 | Hanuman sign-off blocked waiting on S20-2 (S3Storage) | Low | High | Bhima | Prioritise S20-3 and S20-1 first; start S20-2 concurrently, not after |
+| R-20-5 | `moto` not in `pyproject.toml` dev deps — S3Storage unit tests cannot run | Medium | Medium | Bhima | Check `pyproject.toml` before writing tests; add `moto[s3]>=5.0.0` to dev deps if absent |
+| R-20-6 | `rename IP_ATTEMPT_THRESHOLD → IP_AUTH_THRESHOLD` breaks existing test imports | Medium | Low | Bhima | Grep for all `IP_ATTEMPT_THRESHOLD` usages in `tests/` before renaming; update all import sites |
 
 ---
 
