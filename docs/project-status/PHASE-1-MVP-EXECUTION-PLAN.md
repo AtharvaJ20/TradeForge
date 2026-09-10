@@ -417,6 +417,24 @@ This track runs in parallel with feature steps. It does not block most feature d
 
 **Deliverable:** Document service topology + env var list in `docs/infrastructure/RAILWAY-TOPOLOGY.md`.
 
+**Status:** ⚠️ **PARTIALLY COMPLETE — 2026-09-10** (Nakula: IaC committed at `a078ca9`. Blocked on Atharva provisioning Railway services, adding secrets, and creating Cloudflare R2 + Resend accounts. Full runbook in `docs/infrastructure/RAILWAY-TOPOLOGY.md`.)
+
+**IaC deliverables committed:**
+- `backend/Dockerfile` (multi-stage Python 3.12 + uvicorn; alembic on start)
+- `backend/railway.toml` (Dockerfile builder, /health healthcheck)
+- `frontend/Dockerfile` (multi-stage Node 20 + nginx 1.27; VITE_API_BASE_URL build arg)
+- `frontend/nginx.conf` (SPA routing, asset caching)
+- `frontend/railway.toml`
+- `docs/infrastructure/RAILWAY-TOPOLOGY.md` (full provisioning runbook)
+
+**Blocked on Atharva (manual — requires cloud credentials):**
+1. Create Railway project + services (backend, frontend, PostgreSQL plugin, Redis plugin)
+2. Set env vars in Railway dashboard (see RAILWAY-TOPOLOGY.md for full list)
+3. Generate Railway deploy hook URLs and add as GitHub secrets: `RAILWAY_STAGING_BACKEND_WEBHOOK`, `RAILWAY_STAGING_FRONTEND_WEBHOOK`
+4. Create Cloudflare R2 bucket (`tradeforge-staging-attachments`) + API token
+5. Create Resend account + API key; coordinate with Bhima on EmailService update
+6. Trigger first deploy; verify `/health` returns 200 and alembic migrations apply
+
 #### Step I-2 — CI/CD on GitHub Actions (GitHub-hosted runner)
 
 **Owner:** Nakula  
@@ -428,6 +446,8 @@ This track runs in parallel with feature steps. It does not block most feature d
 - Add `pip-audit` security scan step to CI pipeline
 - Alembic migration runs as part of Railway deploy (Railway start command: `alembic upgrade head && uvicorn ...`)
 - Staging environment: separate Railway project. CI deploys to staging first; production deploy is a manual trigger or tagged release.
+
+**Status:** ✅ **COMPLETE — 2026-09-10** (Nakula: CI already runs on `ubuntu-latest` (GitHub-hosted). `pip-audit` added in S20-4. `deploy-staging` job added at `a078ca9`: triggers Railway deploy hooks for backend + frontend after both CI jobs pass on push to `main`. Deploy hooks use secrets `RAILWAY_STAGING_BACKEND_WEBHOOK` / `RAILWAY_STAGING_FRONTEND_WEBHOOK` — Atharva must add these once Railway services exist.)
 
 #### Step I-3 — Production Deployment
 
