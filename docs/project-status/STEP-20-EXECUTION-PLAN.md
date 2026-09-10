@@ -2,7 +2,7 @@
 
 **Document:** `docs/project-status/STEP-20-EXECUTION-PLAN.md`  
 **Author:** Krishna (Project Manager)  
-**Date:** 2026-09-10 (revised 2026-09-10 — Mayasura architectural review applied)  
+**Date:** 2026-09-10 (revised 2026-09-10 — Mayasura architectural review applied; revised 2026-09-10 — Dhanvantari risk review applied)  
 **Branch:** `feat/step-20-security-hardening` (base: `main` at `8d7ca66` — PR #13 merged)  
 **Phase 1 plan ref:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md` §Step 20  
 **Gate:** Hanuman sign-off required before Step I-3 (production deployment)
@@ -14,6 +14,7 @@
 | Date | Reviewer | Findings | Status |
 |------|----------|----------|--------|
 | 2026-09-10 | Mayasura (Architecture) | A-20-1 (BLOCKING), A-20-2 (BLOCKING), A-20-3 (REQUIRED), A-20-4 (REQUIRED), A-20-5 (REQUIRED) | ✅ All applied — plan revised |
+| 2026-09-10 | Dhanvantari (Risk) | D-20-1 (BLOCKING), D-20-2 (REQUIRED), D-20-3 (REQUIRED), D-20-4 (REQUIRED) | ✅ All applied — plan revised |
 
 ---
 
@@ -123,8 +124,9 @@ Hanuman should perform a final sweep of the full repo (including git history) be
 
 **Changes to `auth_service.py`:**
 - `register` and `verify_email` — continue calling `increment_auth_attempts_ip(ip)`, compare against `IP_AUTH_THRESHOLD`
-- `request_password_reset` and `confirm_password_reset` — switch to calling `increment_reset_attempts_ip(ip)`, compare against `IP_RESET_THRESHOLD`
-- Update the imported constant: replace `IP_ATTEMPT_THRESHOLD` with `IP_AUTH_THRESHOLD` and `IP_RESET_THRESHOLD`
+- `request_password_reset` — **switch** the existing `increment_auth_attempts_ip(ip)` call to `increment_reset_attempts_ip(ip)` and compare against `IP_RESET_THRESHOLD` (replaces the existing call at `auth_service.py:323`)
+- `confirm_password_reset` — **add a new rate-limit call from scratch**. This function currently has NO rate limiting at all (`auth_service.py:356`). Bhima must add `increment_reset_attempts_ip(ip)` at the top of the function body, compare against `IP_RESET_THRESHOLD`, and raise `RateLimitedError` if exceeded. This is not a switch — it is a new addition.
+- Update the imported constant: replace `IP_ATTEMPT_THRESHOLD` with `IP_AUTH_THRESHOLD` and add `IP_RESET_THRESHOLD`
 
 **Key schema after this change:**
 ```
@@ -135,7 +137,8 @@ reset_attempts_ip:{ip}   → 60s window, threshold 3  — password-reset/request
 
 **Tests required (Bhima):**
 - Unit test: 6th `increment_auth_attempts_ip` call within window → `RateLimitedError` for register/verify-email paths
-- Unit test: 4th `increment_reset_attempts_ip` call within window → `RateLimitedError` for password-reset paths
+- Unit test: 4th `increment_reset_attempts_ip` call within window → `RateLimitedError` for `request_password_reset` path
+- Unit test: 4th `increment_reset_attempts_ip` call within window → `RateLimitedError` for `confirm_password_reset` path (D-20-1: this function had no rate limiting before S20-1; test proves the new call is present and effective)
 - Unit test: hitting reset limit does NOT affect register/verify-email counter, and vice versa (counter isolation)
 - Existing auth rate-limit tests must continue to pass; mock call sites for the renamed constant
 
@@ -147,7 +150,9 @@ reset_attempts_ip:{ip}   → 60s window, threshold 3  — password-reset/request
 - `backend/src/tradeforge/settings.py` — add S3 env vars
 - `backend/src/tradeforge/main.py` — add startup credential validation
 
-**boto3 vs aioboto3 decision (A-20-4 resolution):** `aioboto3` is NOT an existing project dependency — `pyproject.toml` declares `boto3>=1.35.0` only. `aioboto3` is a separate package. For Phase 1, presigning is a local CPU-bound signing operation (no network call). `head_object` makes one network call but is not on a latency-critical path. Bhima must use synchronous `boto3` wrapped in `asyncio.get_event_loop().run_in_executor(None, ...)` for all `S3Storage` methods. This requires no new production dependency and is the correct choice for low-frequency attachment operations. Do not add `aioboto3`.
+**boto3 vs aioboto3 decision (A-20-4 resolution):** `aioboto3` is NOT an existing project dependency — `pyproject.toml` declares `boto3>=1.35.0` only. `aioboto3` is a separate package. For Phase 1, presigning is a local CPU-bound signing operation (no network call). `head_object` makes one network call but is not on a latency-critical path. Bhima must use synchronous `boto3` wrapped in `asyncio.get_running_loop().run_in_executor(None, ...)` for all `S3Storage` methods. This requires no new production dependency and is the correct choice for low-frequency attachment operations. Do not add `aioboto3`.
+
+**asyncio API note (D-20-3):** The project requires `python >= 3.12`. `asyncio.get_event_loop()` is deprecated in Python 3.10+ when called in an async context. Bhima must use `asyncio.get_running_loop()` — it raises `RuntimeError` immediately if called outside a running event loop (correct fail-loud behaviour) and is the canonical API since Python 3.7. Do not use `get_event_loop()` anywhere in `S3Storage`.
 
 **presign_put spec correction (A-20-2 resolution):** S3 presigned PUT URLs (`generate_presigned_url('put_object')`) carry no embedded policy document and cannot enforce `content-length-range`. That condition is only available in S3 POST policies (multipart form upload). File size is already enforced at the application layer in `JournalService` (`ATTACHMENT_MAX_BYTES` check before `presign_put` is called). Bhima must NOT attempt to add content-length-range to the presigned PUT URL. Bhima must also correct the `StoragePort.presign_put` docstring (line 9 of `storage.py`) to remove the "Content-Type condition + content-length-range condition" claim — replace it with: "Content-Type is included in the signature; size enforcement is the application layer's responsibility."
 
@@ -156,6 +161,7 @@ reset_attempts_ip:{ip}   → 60s window, threshold 3  — password-reset/request
 - `presign_put(key, content_type, byte_size, ttl_seconds)`: returns a pre-signed S3 PUT URL signed for the given `content_type`. Size is NOT enforced at the S3 layer.
 - `presign_get(key, filename, content_type, ttl_seconds)`: returns a pre-signed S3 GET URL with `ResponseContentDisposition: attachment; filename=<filename>` and the given TTL
 - `head_object(key)`: calls `S3.head_object` in the executor; returns the metadata dict or `None` if the object does not exist (catch `ClientError` with `Error.Code == '404'`)
+- **Post-upload size validation (D-20-4):** S3 presigned PUT URLs carry no embedded size constraint — S3 will accept a PUT with any `Content-Length` on the issued URL. The confirm-upload flow in `JournalService` must call `head_object` and then assert `metadata["ContentLength"] <= ATTACHMENT_MAX_BYTES`. If the uploaded object exceeds the limit, `JournalService` must: (1) call `S3Storage.delete_object(key)` to remove the oversized object, and (2) raise `AttachmentSizeLimitError` (HTTP 422). This requires adding a `delete_object(key)` method to `StoragePort` and `S3Storage`. The `JournalService.ATTACHMENT_MAX_BYTES` check at presign time only validates the client-declared size; the post-upload check validates the actual uploaded bytes.
 - `S3Storage.__init__` accepts `endpoint`, `bucket`, `access_key`, `secret_key`, `region` — all from `Settings`. Creates a `boto3.client('s3', ...)` once at construction time (not per-call).
 
 **Settings additions** (`settings.py`):
@@ -195,6 +201,9 @@ This guard must run at application startup, not inside the dependency function.
   - `presign_put` returns a URL; does NOT include a content-length-range condition
   - `presign_get` returns a URL with correct `ResponseContentDisposition`
   - `head_object` returns metadata dict when object exists; returns `None` on 404
+  - `delete_object` removes the object from S3 (required for D-20-4 cleanup path)
+- Unit test (D-20-4): confirm-upload flow where `head_object` returns `ContentLength > ATTACHMENT_MAX_BYTES` → `delete_object` is called and `AttachmentSizeLimitError` is raised
+- Unit test (D-20-4): confirm-upload flow where `ContentLength <= ATTACHMENT_MAX_BYTES` → proceeds normally
 - Unit test: startup guard raises `ValueError` when `s3_bucket` is set but credentials are absent
 - Unit test: startup guard passes when `s3_bucket` is empty (StubStorage path)
 - Unit test: startup guard passes when all three S3 fields are non-empty
@@ -257,7 +266,8 @@ Hanuman performs a final security review before Step I-3. This is not an impleme
 
 | Item | Verification |
 |------|-------------|
-| Rate-limit thresholds (S20-1) | Confirm reduced thresholds are implemented and tested |
+| Rate-limit thresholds (S20-1) | Confirm reduced thresholds are implemented and tested; confirm `confirm_password_reset` now has a rate-limit call |
+| Fixed-window double-burst (R-20-7) | Explicitly acknowledge accepted risk: attacker can fire 2× threshold in ~1 second at window boundary; sliding-window deferred to Phase 2 |
 | File upload allowlist | Confirm `ALLOWED_CONTENT_TYPES` values are tight (no `application/octet-stream` catch-all) |
 | Upload bypass paths | Confirm there is no router-layer bypass of `JournalService` validation |
 | S3Storage wiring (S20-2) | Confirm production does not fall back to `StubStorage` when env vars are set; confirm startup guard fires on partial config |
@@ -310,8 +320,8 @@ S20-5 is blocked on all of S20-1 through S20-4 complete.
 
 Step 20 is DONE when:
 
-- [ ] S20-1: Three separate Redis counter keys exist — `login_attempts_ip`, `auth_attempts_ip`, `reset_attempts_ip` — with thresholds 5, 5, and 3 respectively. Counter isolation test passes (hitting reset limit does not affect auth counter and vice versa). All rate-limit unit tests pass. CI GREEN.
-- [ ] S20-2: `S3Storage` class implemented using `boto3` + `run_in_executor`. `presign_put` docstring corrected (no `content-length-range` claim). Startup guard in `main.py` raises `ValueError` on partial S3 config. `StubStorage` used when `s3_bucket` is empty. `S3Storage` used when all S3 env vars are set. `moto`-based unit tests pass. CI GREEN.
+- [ ] S20-1: Three separate Redis counter keys exist — `login_attempts_ip`, `auth_attempts_ip`, `reset_attempts_ip` — with thresholds 5, 5, and 3 respectively. `confirm_password_reset` has a rate-limit call (new addition — it had none before S20-1). Counter isolation test passes. Rate-limit test for `confirm_password_reset` path passes. All rate-limit unit tests pass. CI GREEN.
+- [ ] S20-2: `S3Storage` class implemented using `boto3` + `asyncio.get_running_loop().run_in_executor()`. `presign_put` docstring corrected (no `content-length-range` claim). `delete_object` method added to `StoragePort` and `S3Storage`. Post-upload confirm flow validates `ContentLength <= ATTACHMENT_MAX_BYTES`; calls `delete_object` and raises `AttachmentSizeLimitError` on violation. Startup guard in `main.py` raises `ValueError` on partial S3 config. `StubStorage` used when `s3_bucket` is empty. `S3Storage` used when all S3 env vars are set. `moto`-based unit tests pass (including oversized-upload case). CI GREEN.
 - [ ] S20-3: `kms_key_arn` has a default of `""`. Application starts without `KMS_KEY_ARN` env var. CI GREEN.
 - [ ] S20-4: `pip-audit` in `pyproject.toml` dev deps. `pip-audit` step in `ci.yml` placed after `Install backend dependencies`. No CVEs in current dependency set. CI GREEN.
 - [ ] S20-5: Hanuman written sign-off with no open HIGH or CRITICAL findings.
@@ -330,6 +340,7 @@ Step 20 is DONE when:
 | R-20-4 | Hanuman sign-off blocked waiting on S20-2 (S3Storage) | Low | High | Bhima | Prioritise S20-3 and S20-1 first; start S20-2 concurrently, not after |
 | R-20-5 | `moto` not in `pyproject.toml` dev deps — S3Storage unit tests cannot run | Medium | Medium | Bhima | Check `pyproject.toml` before writing tests; add `moto[s3]>=5.0.0` to dev deps if absent |
 | R-20-6 | `rename IP_ATTEMPT_THRESHOLD → IP_AUTH_THRESHOLD` breaks existing test imports | Medium | Low | Bhima | Grep for all `IP_ATTEMPT_THRESHOLD` usages in `tests/` before renaming; update all import sites |
+| R-20-7 | Fixed-window double-burst: attacker can fire up to 2× threshold in ~1 second by straddling the 60s window boundary (e.g. 5 requests at :59.9 + 5 at :00.1 = 10 in under 1 second) | Low | Medium | Bhima | Accepted for Phase 1. Sliding-window mitigation (Redis sorted sets) deferred. Hanuman must explicitly acknowledge this in S20-5 sign-off. Revisit if abuse pattern emerges post-launch. |
 
 ---
 
