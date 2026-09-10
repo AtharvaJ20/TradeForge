@@ -27,6 +27,24 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # ------------------------------------------------------------------
+    # Application roles — created here so all subsequent migrations can
+    # GRANT to them. IF NOT EXISTS makes this idempotent across envs.
+    # Railway's PGUSER is postgres (superuser) so CREATE ROLE works.
+    # ------------------------------------------------------------------
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tradeforge_app') THEN
+                CREATE ROLE tradeforge_app;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tradeforge_audit') THEN
+                CREATE ROLE tradeforge_audit;
+            END IF;
+        END $$;
+        """
+    )
+
+    # ------------------------------------------------------------------
     # users
     # ------------------------------------------------------------------
     op.create_table(
