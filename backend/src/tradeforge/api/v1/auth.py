@@ -259,6 +259,8 @@ async def password_reset_confirm(
         await auth.confirm_password_reset(
             raw_token=body.token, new_password=body.new_password, ip=ip
         )
+    except RateLimitedError:
+        raise HTTPException(status_code=429, detail="RATE_LIMITED")
     except InvalidTokenError:
         raise HTTPException(status_code=400, detail="INVALID_OR_EXPIRED_TOKEN")
     except PasswordPolicyViolationError as exc:

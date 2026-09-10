@@ -45,7 +45,8 @@ from tradeforge.infrastructure.repositories.auth_repo import (
     PendingVerificationRepository,
 )
 from tradeforge.infrastructure.repositories.session_repo import (
-    IP_ATTEMPT_THRESHOLD,
+    IP_AUTH_THRESHOLD,
+    IP_RESET_THRESHOLD,
     LOGIN_FAILURE_THRESHOLD,
     SessionRepository,
 )
@@ -104,7 +105,7 @@ class AuthService:
         """
         # Per-IP rate limit (BLOCKER-3): rejects credential-stuffing at the registration door.
         ip_count = await self._sessions.increment_auth_attempts_ip(ip)
-        if ip_count > IP_ATTEMPT_THRESHOLD:
+        if ip_count > IP_AUTH_THRESHOLD:
             raise RateLimitedError("Too many registration attempts from this IP.")
 
         await self._audit.log(
@@ -177,7 +178,7 @@ class AuthService:
     async def verify_email(self, raw_token: str, ip: str) -> None:
         # Per-IP rate limit (BLOCKER-3): prevents token-guessing brute force.
         ip_count = await self._sessions.increment_auth_attempts_ip(ip)
-        if ip_count > IP_ATTEMPT_THRESHOLD:
+        if ip_count > IP_AUTH_THRESHOLD:
             raise RateLimitedError("Too many requests from this IP.")
 
         token_hash = sha256_hex(raw_token)
@@ -217,7 +218,7 @@ class AuthService:
         """
         # 1. Per-IP rate limit
         ip_count = await self._sessions.increment_ip_attempts(ip)
-        if ip_count > IP_ATTEMPT_THRESHOLD:
+        if ip_count > IP_AUTH_THRESHOLD:
             raise RateLimitedError("Too many login attempts from this IP.")
 
         # 2. Load user
@@ -318,9 +319,9 @@ class AuthService:
 
     async def request_password_reset(self, email: str, ip: str) -> None:
         """Always returns None — enumeration prevention (SR-AUTH-004)."""
-        # Per-IP rate limit (BLOCKER-3): prevents reset-email flooding.
-        ip_count = await self._sessions.increment_auth_attempts_ip(ip)
-        if ip_count > IP_ATTEMPT_THRESHOLD:
+        # Per-IP rate limit (S20-1): separate reset counter; tighter threshold.
+        ip_count = await self._sessions.increment_reset_attempts_ip(ip)
+        if ip_count > IP_RESET_THRESHOLD:
             raise RateLimitedError("Too many requests from this IP.")
 
         await self._audit.log(
@@ -354,6 +355,11 @@ class AuthService:
         )
 
     async def confirm_password_reset(self, raw_token: str, new_password: str, ip: str) -> None:
+        # Per-IP rate limit (S20-1): guards confirm path against token-spray attacks.
+        ip_count = await self._sessions.increment_reset_attempts_ip(ip)
+        if ip_count > IP_RESET_THRESHOLD:
+            raise RateLimitedError("Too many requests from this IP.")
+
         token_hash = sha256_hex(raw_token)
         row = await self._resets.find_by_token_hash(token_hash)
         now = datetime.now(UTC)

@@ -13,6 +13,13 @@ from tradeforge.settings import get_settings
 def create_app() -> FastAPI:
     settings = get_settings()
 
+    # S20-2: Startup guard — partial S3 config is an operational error, not a runtime one.
+    if settings.s3_bucket and not (settings.s3_access_key and settings.s3_secret_key):
+        raise ValueError(
+            "S3_BUCKET is set but S3_ACCESS_KEY or S3_SECRET_KEY is missing. "
+            "All three must be set together, or all three must be empty."
+        )
+
     app = FastAPI(
         title="TradeForge API",
         version="0.1.0",
