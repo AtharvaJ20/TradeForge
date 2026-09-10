@@ -377,7 +377,11 @@ Steps are ordered by dependency. Parallel workstreams are identified where possi
 - Penetration testing (Phase 2)
 
 **Execution plan:** `docs/project-status/STEP-20-EXECUTION-PLAN.md`  
-**Hanuman sign-off required before Step I-3.**
+**Gate:** Hanuman sign-off → Nakula CI GREEN → Yudhishthira ACCEPT  
+**Status:** ✅ **ACCEPTED — 2026-09-10** (Hanuman GO [no HIGH/CRITICAL; Low: /docs unauthenticated — Bhima pre-launch; Informational: SECURE_COOKIES prod check] · Sahadeva GO [66/66 S20 tests, 667 total pass] · Nakula CI GREEN [667 passed, 85.58% coverage, pip-audit clean] · Yudhishthira ACCEPT)  
+**Test totals:** 667 backend tests (85.58% coverage)  
+**Branch:** `feat/step-20-security-hardening` → merge to `main`  
+**Open items (non-blocking):** (1) Bhima to gate `/docs` `/redoc` `/openapi.json` behind auth before public URL is shared (Hanuman Low advisory). (2) Nakula to verify `SECURE_COOKIES=true` in Railway production env before Step I-3 (Hanuman Informational advisory). (3) Step QA-1 (Sahadeva E2E gate) still required before Step I-3.
 
 ---
 

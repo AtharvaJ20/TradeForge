@@ -324,11 +324,11 @@ S20-5 is blocked on all of S20-1 through S20-4 complete.
 
 Step 20 is DONE when:
 
-- [ ] S20-1: Three separate Redis counter keys exist — `login_attempts_ip`, `auth_attempts_ip`, `reset_attempts_ip` — with thresholds 5, 5, and 3 respectively. `confirm_password_reset` has a rate-limit call (new addition — it had none before S20-1). Counter isolation test passes. Rate-limit test for `confirm_password_reset` path passes. All rate-limit unit tests pass. CI GREEN.
-- [ ] S20-2: `S3Storage` class implemented using `boto3` + `asyncio.get_running_loop().run_in_executor()`. `presign_put` docstring corrected (no `content-length-range` claim). `delete_object(key) -> None` added to `StoragePort`, `S3Storage` (calls S3 delete in executor), and `StubStorage` (no-op). `AttachmentSizeLimitError` defined in journal domain errors module. Post-upload confirm flow validates `ContentLength <= ATTACHMENT_MAX_BYTES`; calls `delete_object` and raises `AttachmentSizeLimitError` on violation. Startup guard in `main.py` raises `ValueError` on partial S3 config. `StubStorage` used when `s3_bucket` is empty. `S3Storage` used when all S3 env vars are set. `moto`-based unit tests pass (including oversized-upload case). mypy strict passes. CI GREEN.
-- [ ] S20-3: `kms_key_arn` has a default of `""`. Application starts without `KMS_KEY_ARN` env var. CI GREEN.
-- [ ] S20-4: `pip-audit` in `pyproject.toml` dev deps. `pip-audit` step in `ci.yml` placed after `Install backend dependencies`. No CVEs in current dependency set. CI GREEN.
-- [ ] S20-5: Hanuman written sign-off with no open HIGH or CRITICAL findings.
+- [x] S20-1: Three separate Redis counter keys exist — `login_attempts_ip`, `auth_attempts_ip`, `reset_attempts_ip` — with thresholds 5, 5, and 3 respectively. `confirm_password_reset` has a rate-limit call (new addition — it had none before S20-1). Counter isolation test passes. Rate-limit test for `confirm_password_reset` path passes. All rate-limit unit tests pass. CI GREEN. ✅ 2026-09-10
+- [x] S20-2: `S3Storage` class implemented using `boto3` + `asyncio.get_running_loop().run_in_executor()`. `presign_put` docstring corrected (no `content-length-range` claim). `delete_object(key) -> None` added to `StoragePort`, `S3Storage` (calls S3 delete in executor), and `StubStorage` (no-op). `AttachmentSizeLimitError` defined in journal domain errors module. Post-upload confirm flow validates `ContentLength <= ATTACHMENT_MAX_BYTES`; calls `delete_object` and raises `AttachmentSizeLimitError` on violation. Startup guard in `main.py` raises `ValueError` on partial S3 config. `StubStorage` used when `s3_bucket` is empty. `S3Storage` used when all S3 env vars are set. `moto`-based unit tests pass (including oversized-upload case). mypy strict passes. CI GREEN. ✅ 2026-09-10
+- [x] S20-3: `kms_key_arn` has a default of `""`. Application starts without `KMS_KEY_ARN` env var. CI GREEN. ✅ 2026-09-10
+- [x] S20-4: `pip-audit` in `pyproject.toml` dev deps. `pip-audit` step in `ci.yml` placed after `Install backend dependencies`. No CVEs in current dependency set. CI GREEN. ✅ 2026-09-10
+- [x] S20-5: Hanuman written sign-off with no open HIGH or CRITICAL findings. ✅ 2026-09-10 — GO
 
 **Gate:** Hanuman sign-off → Nakula executes Step I-3 (production deployment).
 
