@@ -114,7 +114,7 @@ class S3Storage:
     URL and leave s3_region as "auto" for R2 deployments.
     """
 
-    def __init__(self, settings: "Settings") -> None:
+    def __init__(self, settings: Settings) -> None:
         kwargs: dict[str, Any] = {
             "aws_access_key_id": settings.s3_access_key,
             "aws_secret_access_key": settings.s3_secret_key,

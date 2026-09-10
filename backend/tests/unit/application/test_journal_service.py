@@ -499,7 +499,10 @@ class TestConfirmAttachment:
     async def test_raises_size_exceeded_when_content_length_too_large(self):
         """D-20-4: post-upload ContentLength check must reject oversized uploads."""
         storage = AsyncMock()
-        storage.head_object.return_value = {"ETag": '"etag"', "ContentLength": ATTACHMENT_MAX_BYTES + 1}
+        storage.head_object.return_value = {
+            "ETag": '"etag"',
+            "ContentLength": ATTACHMENT_MAX_BYTES + 1,
+        }
         storage.delete_object.return_value = None
         storage.presign_get.return_value = "https://stub/key"
 
@@ -516,7 +519,10 @@ class TestConfirmAttachment:
         att = _make_attachment(status="PENDING")
 
         storage = AsyncMock()
-        storage.head_object.return_value = {"ETag": '"etag"', "ContentLength": ATTACHMENT_MAX_BYTES + 1}
+        storage.head_object.return_value = {
+            "ETag": '"etag"',
+            "ContentLength": ATTACHMENT_MAX_BYTES + 1,
+        }
         storage.delete_object.return_value = None
 
         journal_repo = AsyncMock(spec=JournalRepository)
@@ -532,7 +538,10 @@ class TestConfirmAttachment:
     async def test_confirmed_not_called_on_oversize_upload(self):
         """D-20-4: update_attachment_status must NOT be called when size is exceeded."""
         storage = AsyncMock()
-        storage.head_object.return_value = {"ETag": '"etag"', "ContentLength": ATTACHMENT_MAX_BYTES + 1}
+        storage.head_object.return_value = {
+            "ETag": '"etag"',
+            "ContentLength": ATTACHMENT_MAX_BYTES + 1,
+        }
         storage.delete_object.return_value = None
 
         journal_repo = AsyncMock(spec=JournalRepository)

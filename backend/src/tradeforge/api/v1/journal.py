@@ -44,13 +44,13 @@ from tradeforge.domain.journal.types import (
     MistakeType,
 )
 from tradeforge.infrastructure.db import get_db
-from tradeforge.settings import get_settings
 from tradeforge.infrastructure.models.journal import JournalEntry
 from tradeforge.infrastructure.models.trade_domain import Instrument, Trade
 from tradeforge.infrastructure.repositories.auth_repo import AuditLogRepository
 from tradeforge.infrastructure.repositories.charge_schedule_repo import ChargeScheduleRepository
 from tradeforge.infrastructure.repositories.journal_repo import JournalRepository
 from tradeforge.infrastructure.repositories.pnl_repo import PnlRepository
+from tradeforge.settings import get_settings
 
 router = APIRouter(prefix="/journal", tags=["journal"])
 

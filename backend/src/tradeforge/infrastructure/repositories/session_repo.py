@@ -10,7 +10,7 @@ Key schema:
   login_failures:{key}      → integer counter  TTL=15min (fixed window)
   login_attempts_ip:{ip}    → integer counter  TTL=60s (fixed window) — login only
   auth_attempts_ip:{ip}     → integer counter  TTL=60s (fixed window) — register/verify-email
-  reset_attempts_ip:{ip}    → integer counter  TTL=60s (fixed window) — request_password_reset/confirm_password_reset
+  reset_attempts_ip:{ip}    → integer counter  TTL=60s (fixed window) — password reset (req/confirm)
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ FORCED_REAUTH_TTL = 24 * 60 * 60  # 24 hours
 LOGIN_FAILURE_WINDOW = 15 * 60  # 15 minutes
 LOGIN_FAILURE_THRESHOLD = 5
 IP_ATTEMPT_WINDOW = 60  # 1 minute
-IP_AUTH_THRESHOLD = 5   # register / verify-email per-IP limit
+IP_AUTH_THRESHOLD = 5  # register / verify-email per-IP limit
 IP_RESET_THRESHOLD = 3  # password-reset per-IP limit (tighter — resets are higher-value targets)
 
 

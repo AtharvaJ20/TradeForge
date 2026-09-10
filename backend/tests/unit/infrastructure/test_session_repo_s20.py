@@ -9,8 +9,6 @@ Verifies:
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from tradeforge.infrastructure.repositories.session_repo import (
     IP_AUTH_THRESHOLD,
     IP_RESET_THRESHOLD,
