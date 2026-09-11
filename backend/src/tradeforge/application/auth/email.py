@@ -1,7 +1,7 @@
 """Email sender abstraction.
 
 Local dev → SmtpEmailSender (Mailpit on port 1025).
-Production → ResendEmailSender (Phase 2, not yet implemented).
+Staging / Production → ResendEmailSender (Resend API via httpx).
 
 EmailSender is a structural Protocol so tests can inject any callable duck-type.
 """
@@ -11,6 +11,7 @@ from email.mime.text import MIMEText
 from typing import Protocol
 
 import aiosmtplib
+import httpx
 
 
 class EmailSender(Protocol):
@@ -36,6 +37,24 @@ class SmtpEmailSender:
         )
 
 
+class ResendEmailSender:
+    """Send transactional email via the Resend API (https://resend.com)."""
+
+    def __init__(self, api_key: str, from_address: str) -> None:
+        self._api_key = api_key
+        self._from = from_address
+
+    async def send(self, to: str, subject: str, html_body: str) -> None:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                json={"from": self._from, "to": [to], "subject": subject, "html": html_body},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+
+
 def get_email_sender() -> EmailSender:
     """Factory: return the correct EmailSender for the current transport setting."""
     from tradeforge.settings import get_settings
@@ -50,5 +69,11 @@ def get_email_sender() -> EmailSender:
             port=settings.smtp_port,
             from_address=from_addr,
         )
-    # Phase 2: return ResendEmailSender(...)
+    if transport == "resend":
+        if not settings.resend_api_key:
+            raise ValueError("RESEND_API_KEY must be set when EMAIL_TRANSPORT=resend")
+        return ResendEmailSender(
+            api_key=settings.resend_api_key,
+            from_address=from_addr,
+        )
     raise ValueError(f"Unsupported EMAIL_TRANSPORT: {transport!r}")
