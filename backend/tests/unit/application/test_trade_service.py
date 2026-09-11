@@ -489,8 +489,18 @@ async def test_create_trade_calls_backfill_when_trade_immediately_closed() -> No
         instrument_type="EQ",
         product_type="MIS",
         fills=[
-            {"side": "BUY", "quantity": Decimal("5"), "price": Decimal("1800.00"), "fill_timestamp": buy_ts},
-            {"side": "SELL", "quantity": Decimal("5"), "price": Decimal("1850.00"), "fill_timestamp": sell_ts},
+            {
+                "side": "BUY",
+                "quantity": Decimal("5"),
+                "price": Decimal("1800.00"),
+                "fill_timestamp": buy_ts,
+            },
+            {
+                "side": "SELL",
+                "quantity": Decimal("5"),
+                "price": Decimal("1850.00"),
+                "fill_timestamp": sell_ts,
+            },
         ],
     )
 
