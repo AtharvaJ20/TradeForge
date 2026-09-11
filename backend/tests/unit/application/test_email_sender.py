@@ -16,7 +16,6 @@ import pytest
 
 from tradeforge.application.auth.email import ResendEmailSender, get_email_sender
 
-
 # ---------------------------------------------------------------------------
 # ResendEmailSender — happy path
 # ---------------------------------------------------------------------------
