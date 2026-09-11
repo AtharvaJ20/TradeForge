@@ -51,6 +51,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const next = params.get('next')
     const userData = await authApi.login(email, password)
     setUser(userData)
+    // Mark hydration complete so that (a) RequireAuth can render immediately
+    // and (b) any 401 from the still-in-flight initial me() call does not
+    // redirect back to /login. The in-flight me() will settle harmlessly.
+    hydratedRef.current = true
+    setIsLoading(false)
     navigate(next ?? '/analytics', { replace: true })
   }
 
