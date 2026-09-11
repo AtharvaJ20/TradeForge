@@ -147,7 +147,8 @@ class AuthService:
                     to=email,
                     subject="TradeForge: registration attempt on your account",
                     html_body=(
-                        "<p>Someone tried to create a TradeForge account with your email address.</p>"
+                        "<p>Someone tried to create a TradeForge account "
+                        "with your email address.</p>"
                         "<p>If this was you, you already have an account — "
                         '<a href="#">log in here</a>.</p>'
                         "<p>If this was not you, no action is needed.</p>"
@@ -297,6 +298,11 @@ class AuthService:
             ip=ip,
             ua_hash=_ua_hash(user_agent),
         )
+
+        # 9. Clear any forced-reauth flag set by a prior password reset (SR-AUTH-010).
+        #    The user has just proven their identity with valid credentials — the
+        #    re-authentication requirement is satisfied.
+        await self._sessions.clear_forced_reauth(str(user.id))
 
         await self._audit.log(
             AuditEventType.LOGIN_SUCCESS,

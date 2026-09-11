@@ -208,8 +208,8 @@ class TradeService:
             # the router surface this as 404 ACCOUNT_NOT_FOUND per the plan.
             raise AccountNotFoundError(account_id)
 
-        # Step 3: resolve instrument.
-        instrument_id = await self._instrument_repo.find_for_fill(
+        # Step 3: resolve instrument, creating it on first encounter.
+        instrument_id = await self._instrument_repo.get_or_create(
             session,
             symbol=instrument_symbol,
             exchange_segment=exchange_segment,
@@ -217,8 +217,6 @@ class TradeService:
             expiry_date=expiry_date,
             strike_price=strike_price,
         )
-        if instrument_id is None:
-            raise InstrumentNotFoundError(instrument_symbol, exchange_segment, instrument_type)
 
         # Step 4: insert each fill.
         for fill_dict in fills:
