@@ -25,6 +25,7 @@ from tradeforge.application.auth.email import EmailSender
 from tradeforge.application.auth.hibp import HibpServiceError, is_password_pwned
 from tradeforge.domain.auth.errors import (
     AccountLockedError,
+    EmailDeliveryError,
     EmailNotVerifiedError,
     InvalidCredentialsError,
     InvalidTokenError,
@@ -138,17 +139,22 @@ class AuthService:
 
         existing = await self._users.find_by_email(email)
         if existing is not None:
-            # Notify real owner without revealing this to the caller
-            await self._email.send(
-                to=email,
-                subject="TradeForge: registration attempt on your account",
-                html_body=(
-                    "<p>Someone tried to create a TradeForge account with your email address.</p>"
-                    "<p>If this was you, you already have an account — "
-                    '<a href="#">log in here</a>.</p>'
-                    "<p>If this was not you, no action is needed.</p>"
-                ),
-            )
+            # Notify real owner without revealing this to the caller.
+            # Swallow EmailDeliveryError so the response stays identical to the
+            # new-user path — leaking a 503 here would reveal that the address exists.
+            try:
+                await self._email.send(
+                    to=email,
+                    subject="TradeForge: registration attempt on your account",
+                    html_body=(
+                        "<p>Someone tried to create a TradeForge account with your email address.</p>"
+                        "<p>If this was you, you already have an account — "
+                        '<a href="#">log in here</a>.</p>'
+                        "<p>If this was not you, no action is needed.</p>"
+                    ),
+                )
+            except EmailDeliveryError:
+                pass  # enumeration-safe: caller must not learn the address is registered
             return  # identical response to successful registration
 
         password_hash = _ph.hash(password)

@@ -37,3 +37,7 @@ class PasswordPolicyViolationError(AuthError):
 
 class RedisUnavailableError(AuthError):
     """Redis is unreachable; fail closed per SR-AUTH-021 Rule D."""
+
+
+class EmailDeliveryError(AuthError):
+    """Transactional email could not be delivered — transient provider or network failure."""

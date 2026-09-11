@@ -25,16 +25,21 @@ class SmtpEmailSender:
         self._from = from_address
 
     async def send(self, to: str, subject: str, html_body: str) -> None:
+        from tradeforge.domain.auth.errors import EmailDeliveryError
+
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = self._from
         msg["To"] = to
         msg.attach(MIMEText(html_body, "html"))
-        await aiosmtplib.send(
-            msg,
-            hostname=self._host,
-            port=self._port,
-        )
+        try:
+            await aiosmtplib.send(
+                msg,
+                hostname=self._host,
+                port=self._port,
+            )
+        except Exception as exc:
+            raise EmailDeliveryError(f"SMTP delivery failed: {exc}") from exc
 
 
 class ResendEmailSender:
@@ -45,14 +50,19 @@ class ResendEmailSender:
         self._from = from_address
 
     async def send(self, to: str, subject: str, html_body: str) -> None:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {self._api_key}"},
-                json={"from": self._from, "to": [to], "subject": subject, "html": html_body},
-                timeout=10.0,
-            )
-            response.raise_for_status()
+        from tradeforge.domain.auth.errors import EmailDeliveryError
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.resend.com/emails",
+                    headers={"Authorization": f"Bearer {self._api_key}"},
+                    json={"from": self._from, "to": [to], "subject": subject, "html": html_body},
+                    timeout=10.0,
+                )
+                response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            raise EmailDeliveryError(f"Resend API error: {exc}") from exc
 
 
 def get_email_sender() -> EmailSender:
