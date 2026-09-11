@@ -437,6 +437,68 @@ async def test_add_fill_ownership_query_does_not_filter_on_account_status() -> N
 
 
 # ---------------------------------------------------------------------------
+# DEF-J4-001: create_trade() calls backfill_all_closed when reconstruction
+#              closes a trade in the same call (BUY+SELL submitted together)
+# ---------------------------------------------------------------------------
+
+
+async def test_create_trade_calls_backfill_when_trade_immediately_closed() -> None:
+    """DEF-J4-001: backfill_all_closed must be called when create_trade() closes a trade.
+
+    When both BUY and SELL fills are submitted in one create_trade() call, the
+    reconstruction engine opens and closes the trade in a single run(). The engine
+    sets trades_closed=1 in the result. Step 9 in create_trade() must call
+    backfill_all_closed(user_id) so that P&L is computed — without it, net_pnl
+    remains NULL.
+
+    Root cause: the MANUAL broker had no charge schedule rows, so calculate_and_store
+    raised ChargeScheduleNotFoundError (silently swallowed). This regression test
+    verifies the step-9 guard condition: trades_closed > 0 → backfill is called.
+    """
+    svc = _make_service()
+
+    account = _make_account()
+    svc._account_svc.get_active = AsyncMock(return_value=account)
+    svc._instrument_repo.get_or_create = AsyncMock(return_value=_INSTRUMENT_ID)
+    svc._fill_repo.insert_normalized_fill = AsyncMock(return_value=None)
+    svc._session.flush = AsyncMock()
+
+    # Reconstruction opens and immediately closes the trade (BUY+SELL together)
+    rr = ReconstructionResult(
+        trades_opened=1,
+        trades_closed=1,
+        fills_processed=2,
+        affected_trade_id=_TRADE_ID,
+    )
+    svc._engine.run = AsyncMock(return_value=rr)
+
+    trade_orm = _make_trade_orm(status="CLOSED")
+    svc._session.get = AsyncMock(return_value=trade_orm)
+    svc._session.refresh = AsyncMock()
+    svc._pnl_service.backfill_all_closed = AsyncMock(return_value=(1, 0))
+    svc._trade_repo.update_trade = AsyncMock()
+
+    buy_ts = datetime(2026, 9, 7, 4, 0, 0, tzinfo=UTC)
+    sell_ts = datetime(2026, 9, 7, 9, 0, 0, tzinfo=UTC)
+
+    await svc.create_trade(
+        user_id=_USER_ID,
+        account_id=_ACCOUNT_ID,
+        instrument_symbol="INFY",
+        exchange_segment="NSE_EQ",
+        instrument_type="EQ",
+        product_type="MIS",
+        fills=[
+            {"side": "BUY", "quantity": Decimal("5"), "price": Decimal("1800.00"), "fill_timestamp": buy_ts},
+            {"side": "SELL", "quantity": Decimal("5"), "price": Decimal("1850.00"), "fill_timestamp": sell_ts},
+        ],
+    )
+
+    # Step 9: backfill must be called because trades_closed=1
+    svc._pnl_service.backfill_all_closed.assert_awaited_once_with(_USER_ID)
+
+
+# ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
 
