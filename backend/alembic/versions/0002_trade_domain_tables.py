@@ -21,14 +21,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # ------------------------------------------------------------------
-    # Pre-requisite: btree_gist extension.
-    # This extension is required by the lot_size_history EXCLUSION constraint
-    # (it enables GiST indexes over btree-comparable types such as UUID and DATE).
-    # It must be installed by a superuser BEFORE this migration runs.
-    # For local dev: docker/postgres/init.sql installs it at container init time.
-    # For production: the DBA/Nakula provisions it at RDS database setup time.
-    # The application user (tradeforge_app) cannot create extensions.
+    # Pre-requisites: extension + application roles.
+    # btree_gist is required for the lot_size_history EXCLUSION constraint.
+    # tradeforge_app / tradeforge_audit may not exist on fresh managed-PG
+    # instances (e.g. Railway) where init.sql never ran. All ops are
+    # idempotent — IF NOT EXISTS / DO $$ guards make them safe to re-run.
     # ------------------------------------------------------------------
+    op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tradeforge_app') THEN
+                CREATE ROLE tradeforge_app;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tradeforge_audit') THEN
+                CREATE ROLE tradeforge_audit;
+            END IF;
+        END $$;
+        """
+    )
 
     # ------------------------------------------------------------------
     # instruments
