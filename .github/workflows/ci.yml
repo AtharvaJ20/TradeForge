@@ -161,9 +161,14 @@ jobs:
     needs: [backend, frontend]
     # Only on push to main — not PRs
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     steps:
-      - name: Trigger backend staging deploy
-        run: curl --fail --silent -X POST "${{ secrets.RAILWAY_STAGING_BACKEND_WEBHOOK }}"
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
-      - name: Trigger frontend staging deploy
-        run: curl --fail --silent -X POST "${{ secrets.RAILWAY_STAGING_FRONTEND_WEBHOOK }}"
+      - name: Redeploy backend (intuitive-education)
+        run: railway redeploy --service intuitive-education --yes
+
+      - name: Redeploy frontend (distinguished-creativity)
+        run: railway redeploy --service distinguished-creativity --yes
