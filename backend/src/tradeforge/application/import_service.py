@@ -17,7 +17,8 @@ Idempotency:
 
 Error handling:
   - Adapter-level parse errors: collected in AdapterParseResult.errors; import continues.
-  - Instrument not found: collected as InvalidFillError; fill is skipped.
+  - Instrument auto-created on first encounter; InstrumentNotFoundError only for malformed
+    fills (e.g. FUT fill missing expiry_date) — counted as row_errors, fill skipped.
   - Import does NOT abort on fill-level errors — it proceeds and reports in the summary.
 """
 
@@ -265,12 +266,13 @@ class ImportService:
         session: AsyncSession,
         fill: NormalizedFill,
     ) -> uuid.UUID:
-        """Resolve a NormalizedFill to an instruments.id.
+        """Resolve a NormalizedFill to an instruments.id, creating the row if absent.
 
         Raises:
-            InstrumentNotFoundError: no matching instrument found.
+            InstrumentNotFoundError: only for malformed fills where instrument_type
+                requires expiry_date or strike_price that are not present.
         """
-        instrument_id = await self._instruments.find_for_fill(
+        return await self._instruments.get_or_create(
             session,
             symbol=fill.symbol_raw,
             exchange_segment=fill.exchange_segment,
@@ -278,8 +280,3 @@ class ImportService:
             expiry_date=fill.expiry_date,
             strike_price=fill.strike_price,
         )
-        if instrument_id is None:
-            raise InstrumentNotFoundError(
-                fill.symbol_raw, fill.exchange_segment, fill.instrument_type
-            )
-        return instrument_id
