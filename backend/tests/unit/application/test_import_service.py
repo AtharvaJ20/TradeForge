@@ -96,7 +96,7 @@ def _make_service(
     import_record_repo.create = AsyncMock(return_value=uuid.uuid4())
 
     instrument_repo = MagicMock()
-    instrument_repo.find_for_fill = AsyncMock(return_value=instr_id)
+    instrument_repo.get_or_create = AsyncMock(return_value=instr_id)
 
     fill_repo = MagicMock()
     fill_repo.fill_exists = AsyncMock(return_value=fill_already_exists)
@@ -263,15 +263,33 @@ class TestFillLevelDedup:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Instrument resolution
+# Instrument resolution (auto-create)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestInstrumentResolution:
     @pytest.mark.asyncio
-    async def test_instrument_not_found_increments_row_errors(self):
+    async def test_new_instrument_is_auto_created_and_fill_ingested(self):
+        """get_or_create returns an ID — fill is ingested, row_errors stays 0."""
+        instr_id = uuid.uuid4()
         svc = _make_service(parse_result=AdapterParseResult(fills=[_fill()]))
-        svc._instruments.find_for_fill = AsyncMock(return_value=None)
+        svc._instruments.get_or_create = AsyncMock(return_value=instr_id)
+        session = AsyncMock()
+        session.flush = AsyncMock()
+        summary = await svc.import_fills(session, _USER_ID, _ACCOUNT_ID, _FILE)
+        assert summary.fills_ingested == 1
+        assert summary.row_errors == 0
+        svc._instruments.get_or_create.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_malformed_instrument_data_increments_row_errors(self):
+        """get_or_create raising InstrumentNotFoundError counts as a row error."""
+        from tradeforge.domain.import_domain.errors import InstrumentNotFoundError
+
+        svc = _make_service(parse_result=AdapterParseResult(fills=[_fill()]))
+        svc._instruments.get_or_create = AsyncMock(
+            side_effect=InstrumentNotFoundError("X", "NSE_FO", "FUT")
+        )
         session = AsyncMock()
         session.flush = AsyncMock()
         summary = await svc.import_fills(session, _USER_ID, _ACCOUNT_ID, _FILE)
@@ -279,13 +297,17 @@ class TestInstrumentResolution:
         assert summary.row_errors == 1
 
     @pytest.mark.asyncio
-    async def test_instrument_not_found_does_not_abort_other_fills(self):
+    async def test_instrument_error_does_not_abort_other_fills(self):
+        """A row error on one fill does not abort processing of subsequent fills."""
+        from tradeforge.domain.import_domain.errors import InstrumentNotFoundError
+
         f1 = _fill("T001")
         f2 = _fill("T002")
-        svc = _make_service(parse_result=AdapterParseResult(fills=[f1, f2]))
         instr_id = uuid.uuid4()
-        # f1 fails, f2 succeeds
-        svc._instruments.find_for_fill = AsyncMock(side_effect=[None, instr_id])
+        svc = _make_service(parse_result=AdapterParseResult(fills=[f1, f2]))
+        svc._instruments.get_or_create = AsyncMock(
+            side_effect=[InstrumentNotFoundError("X", "NSE_FO", "FUT"), instr_id]
+        )
         session = AsyncMock()
         session.flush = AsyncMock()
         summary = await svc.import_fills(session, _USER_ID, _ACCOUNT_ID, _FILE)
@@ -362,7 +384,7 @@ class TestReconstructionAndPnl:
 
         svc = _make_service(parse_result=AdapterParseResult(fills=[f1, f2]))
         # Both fills map to different instruments
-        svc._instruments.find_for_fill = AsyncMock(side_effect=[instr_a, instr_b])
+        svc._instruments.get_or_create = AsyncMock(side_effect=[instr_a, instr_b])
         session = AsyncMock()
         session.flush = AsyncMock()
         await svc.import_fills(session, _USER_ID, _ACCOUNT_ID, _FILE)
@@ -375,7 +397,7 @@ class TestReconstructionAndPnl:
         f2 = _fill("T002")
 
         svc = _make_service(parse_result=AdapterParseResult(fills=[f1, f2]))
-        svc._instruments.find_for_fill = AsyncMock(return_value=instr_id)
+        svc._instruments.get_or_create = AsyncMock(return_value=instr_id)
         session = AsyncMock()
         session.flush = AsyncMock()
         await svc.import_fills(session, _USER_ID, _ACCOUNT_ID, _FILE)

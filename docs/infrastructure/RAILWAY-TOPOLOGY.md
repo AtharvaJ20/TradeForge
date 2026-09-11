@@ -11,16 +11,24 @@
 
 ### Staging Environment
 
-| Service | Type | Build source | Railway service name |
-|---------|------|-------------|---------------------|
-| Backend API | Dockerfile (Python 3.12 / uvicorn) | `backend/Dockerfile` | `tradeforge-backend` |
-| Frontend | Dockerfile (Node 20 / nginx 1.27) | `frontend/Dockerfile` | `tradeforge-frontend` |
-| PostgreSQL | Railway managed plugin | — | `tradeforge-postgres` |
-| Redis | Railway managed plugin | — | `tradeforge-redis` |
+| Service | Type | Build source | Railway service name (display) | Railway service ID (CLI) |
+|---------|------|-------------|-------------------------------|--------------------------|
+| Backend API | Dockerfile (Python 3.12 / uvicorn) | `backend/Dockerfile` | (see Railway dashboard) | `intuitive-education` |
+| Frontend | Dockerfile (Node 20 / nginx 1.27) | `frontend/Dockerfile` | (see Railway dashboard) | `distinguished-creativity` |
+| PostgreSQL | Railway managed plugin | — | (see Railway dashboard) | — |
+| Redis | Railway managed plugin | — | (see Railway dashboard) | — |
 
-**Target URL (after provisioning):**
-- Backend: `https://tradeforge-backend-staging.up.railway.app`
-- Frontend: `https://tradeforge-frontend-staging.up.railway.app`
+> **Service IDs** (`intuitive-education`, `distinguished-creativity`) are Railway's auto-generated identifiers used by the CLI (`railway redeploy --service`). The **display name** is what you set in the Railway dashboard UI.
+
+**Staging URLs — find from Railway dashboard:**
+
+Railway auto-generates a domain when "Public Networking" is enabled for a service. The URL is **not** known until Atharva opens the Railway dashboard:
+
+1. Railway dashboard → staging project → select **intuitive-education** service → **Settings** → **Networking** → copy the auto-generated domain (e.g. `https://intuitive-education-production-xxxx.up.railway.app`)
+2. Set that URL as the **`RAILWAY_BACKEND_URL`** GitHub secret (repo → Settings → Secrets → Actions)
+3. The CI `deploy-staging` job will then verify the backend is healthy after each deploy
+
+> **Note:** `tradeforge-backend-staging.up.railway.app` was the _planned_ URL documented before provisioning. If Railway generated a different domain, that URL will return `{"status":"error","code":404,"message":"Application not found"}` (Railway CDN 404). Use the URL from the Railway dashboard.
 
 ### Production Environment (Step I-3 — not yet provisioned)
 
@@ -145,14 +153,27 @@ curl -X POST $RAILWAY_STAGING_BACKEND_WEBHOOK
 curl -X POST $RAILWAY_STAGING_FRONTEND_WEBHOOK
 ```
 
+### 7a. Find and record the actual staging URLs
+
+After the Railway deploy completes, the service domains may differ from what was originally planned:
+
+1. Railway dashboard → staging project → **intuitive-education** (backend) → **Settings** → **Networking** — copy the public domain
+2. Railway dashboard → staging project → **distinguished-creativity** (frontend) → **Settings** → **Networking** — copy the public domain
+3. Update this document with the confirmed URLs (replace the placeholder lines below)
+4. Set `RAILWAY_BACKEND_URL` as a GitHub secret: repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+
+**Confirmed staging URLs** *(update once verified from Railway dashboard)*:
+- Backend: `[to be confirmed from Railway dashboard — intuitive-education service]`
+- Frontend: `[to be confirmed from Railway dashboard — distinguished-creativity service]`
+
 ### 8. Verify the staging environment
 
-After the first Railway deploy completes (check Railway dashboard logs):
-- `https://tradeforge-backend-staging.up.railway.app/health` → `{"status": "ok"}`
-- `https://tradeforge-frontend-staging.up.railway.app` → TradeForge login page loads
-- Railway logs should show `alembic upgrade head` completing cleanly (15 revisions applied)
+After the Railway deploy completes (check Railway dashboard logs — select service → Deployments → latest → View Logs):
+- `<BACKEND_URL>/health` → `{"status": "ok"}`
+- `<FRONTEND_URL>` → TradeForge login page loads
+- Railway logs should show `alembic upgrade head` completing cleanly (migrations applied)
 
-Report the staging URLs to Sahadeva to begin the QA-1 manual walkthrough.
+Report the confirmed staging URLs to Sahadeva to begin the QA-1 manual walkthrough.
 
 ---
 

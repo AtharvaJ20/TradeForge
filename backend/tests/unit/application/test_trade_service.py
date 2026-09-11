@@ -145,8 +145,8 @@ async def test_create_trade_calls_repos_and_engine() -> None:
     account = _make_account()
     svc._account_svc.get_active = AsyncMock(return_value=account)
 
-    # Instrument repo mock — returns a valid instrument_id
-    svc._instrument_repo.find_for_fill = AsyncMock(return_value=_INSTRUMENT_ID)
+    # Instrument repo mock — returns a valid instrument_id (auto-create path)
+    svc._instrument_repo.get_or_create = AsyncMock(return_value=_INSTRUMENT_ID)
 
     # Fill repo mock — insert succeeds (returns None)
     svc._fill_repo.insert_normalized_fill = AsyncMock(return_value=None)
@@ -191,8 +191,8 @@ async def test_create_trade_calls_repos_and_engine() -> None:
         ],
     )
 
-    # Instrument was resolved
-    svc._instrument_repo.find_for_fill.assert_awaited_once()
+    # Instrument was resolved (auto-created if absent)
+    svc._instrument_repo.get_or_create.assert_awaited_once()
 
     # Fill was inserted (one fill)
     svc._fill_repo.insert_normalized_fill.assert_awaited_once()
