@@ -23,8 +23,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     let detail = `HTTP ${res.status}`
     try {
-      const body = (await res.json()) as { detail?: string }
-      if (body.detail) detail = body.detail
+      const body = (await res.json()) as { detail?: unknown }
+      if (typeof body.detail === 'string') {
+        detail = body.detail
+      } else if (Array.isArray(body.detail) && body.detail.length > 0) {
+        // FastAPI 422 validation errors: [{loc, msg, type, ...}]
+        const first = body.detail[0] as { msg?: unknown }
+        if (typeof first.msg === 'string') detail = first.msg
+      }
     } catch {
       // non-JSON error body; keep default
     }

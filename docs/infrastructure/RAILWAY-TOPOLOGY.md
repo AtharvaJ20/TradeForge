@@ -54,8 +54,8 @@ Separate Railway project (or separate environments within the same project). Pro
 | `S3_ACCESS_KEY` | Cloudflare R2 | R2 API token — Access Key ID |
 | `S3_SECRET_KEY` | Cloudflare R2 | R2 API token — Secret Access Key |
 | `EMAIL_TRANSPORT` | Manual | `resend` (when Bhima wires Resend into EmailService) |
-| `EMAIL_API_KEY` | Resend dashboard | Resend API key |
-| `EMAIL_FROM` | Manual | `noreply@tradeforge.up.railway.app` |
+| `RESEND_API_KEY` | Resend dashboard | Resend API key |
+| `FROM_ADDRESS` | Manual | Verified sender address (e.g. `noreply@yourdomain.com` — must be a domain verified in Resend dashboard) |
 | `KMS_KEY_ARN` | Manual | Leave empty (`""`) — deferred to Phase 2 per Krishna/Hanuman ruling |
 
 ### Frontend service (set as Railway build variables)

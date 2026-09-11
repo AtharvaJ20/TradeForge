@@ -16,6 +16,7 @@ from httpx import AsyncClient
 from tradeforge.application.auth.service import AuthService
 from tradeforge.domain.auth.errors import (
     AccountLockedError,
+    EmailDeliveryError,
     EmailNotVerifiedError,
     InvalidCredentialsError,
     InvalidTokenError,
@@ -93,6 +94,19 @@ async def test_register_rejects_invalid_email(
     )
     assert response.status_code == 422
     mock_auth.register.assert_not_called()
+
+
+async def test_register_returns_503_on_email_delivery_error(
+    http_client: AsyncClient, mock_auth: AsyncMock
+) -> None:
+    """DEF-J1-002 regression: Resend API failure must map to 503, not 500."""
+    mock_auth.register.side_effect = EmailDeliveryError("Resend API error: 401 Unauthorized")
+    response = await http_client.post(
+        "/v1/auth/register",
+        json={"email": "new@example.com", "password": "StrongPass123!"},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "SERVICE_UNAVAILABLE"
 
 
 # ------------------------------------------------------------------
@@ -302,6 +316,19 @@ async def test_password_reset_response_body_is_enumeration_safe(
     # Must not reveal whether email is registered
     detail = body.get("message", "")
     assert "if" in detail.lower()
+
+
+async def test_password_reset_request_returns_503_on_email_delivery_error(
+    http_client: AsyncClient, mock_auth: AsyncMock
+) -> None:
+    """DEF-J1-002 regression: Resend API failure must map to 503, not 500."""
+    mock_auth.request_password_reset.side_effect = EmailDeliveryError("Resend API error: timeout")
+    response = await http_client.post(
+        "/v1/auth/password-reset/request",
+        json={"email": "user@example.com"},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "SERVICE_UNAVAILABLE"
 
 
 # ------------------------------------------------------------------

@@ -2,8 +2,8 @@
 
 Covers:
   - ResendEmailSender sends correct payload to Resend API
-  - ResendEmailSender raises on non-2xx Resend API response
-  - ResendEmailSender raises on network failure
+  - ResendEmailSender wraps non-2xx Resend API response as EmailDeliveryError
+  - ResendEmailSender wraps network failure as EmailDeliveryError
   - get_email_sender() returns ResendEmailSender when EMAIL_TRANSPORT=resend
   - get_email_sender() raises ValueError when EMAIL_TRANSPORT=resend but RESEND_API_KEY is empty
   - get_email_sender() raises ValueError for unknown transport
@@ -15,6 +15,7 @@ import httpx
 import pytest
 
 from tradeforge.application.auth.email import ResendEmailSender, get_email_sender
+from tradeforge.domain.auth.errors import EmailDeliveryError
 
 # ---------------------------------------------------------------------------
 # ResendEmailSender — happy path
@@ -55,13 +56,13 @@ async def test_resend_sender_posts_correct_payload() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_resend_sender_raises_on_api_error() -> None:
+async def test_resend_sender_wraps_api_error_as_email_delivery_error() -> None:
     sender = ResendEmailSender(api_key="re_test_key", from_address="onboarding@resend.dev")
 
     mock_response = MagicMock()
     mock_response.raise_for_status = MagicMock(
         side_effect=httpx.HTTPStatusError(
-            "422 Unprocessable Entity",
+            "401 Unauthorized",
             request=MagicMock(),
             response=MagicMock(),
         )
@@ -74,11 +75,11 @@ async def test_resend_sender_raises_on_api_error() -> None:
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_cls.return_value = mock_client
 
-        with pytest.raises(httpx.HTTPStatusError):
+        with pytest.raises(EmailDeliveryError):
             await sender.send("user@example.com", "Subject", "<p>Body</p>")
 
 
-async def test_resend_sender_raises_on_network_failure() -> None:
+async def test_resend_sender_wraps_network_failure_as_email_delivery_error() -> None:
     sender = ResendEmailSender(api_key="re_test_key", from_address="onboarding@resend.dev")
 
     with patch("httpx.AsyncClient") as mock_cls:
@@ -88,7 +89,7 @@ async def test_resend_sender_raises_on_network_failure() -> None:
         mock_client.post = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
         mock_cls.return_value = mock_client
 
-        with pytest.raises(httpx.ConnectError):
+        with pytest.raises(EmailDeliveryError):
             await sender.send("user@example.com", "Subject", "<p>Body</p>")
 
 

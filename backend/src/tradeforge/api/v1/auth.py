@@ -21,6 +21,7 @@ from tradeforge.api.v1.deps import (
 from tradeforge.application.auth.service import AuthService
 from tradeforge.domain.auth.errors import (
     AccountLockedError,
+    EmailDeliveryError,
     EmailNotVerifiedError,
     InvalidCredentialsError,
     InvalidTokenError,
@@ -128,7 +129,7 @@ async def register(
         raise HTTPException(status_code=429, detail="RATE_LIMITED")
     except PasswordPolicyViolationError as exc:
         raise HTTPException(status_code=422, detail=exc.message)
-    except RedisUnavailableError:
+    except (RedisUnavailableError, EmailDeliveryError):
         raise HTTPException(status_code=503, detail="SERVICE_UNAVAILABLE")
     await db.commit()
     # Enumeration-safe message (SR-AUTH-004)
@@ -238,7 +239,7 @@ async def password_reset_request(
         await auth.request_password_reset(email=body.email, ip=ip)
     except RateLimitedError:
         raise HTTPException(status_code=429, detail="RATE_LIMITED")
-    except RedisUnavailableError:
+    except (RedisUnavailableError, EmailDeliveryError):
         raise HTTPException(status_code=503, detail="SERVICE_UNAVAILABLE")
     await db.commit()
     # Enumeration-safe message (SR-AUTH-004)
