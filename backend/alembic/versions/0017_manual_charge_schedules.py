@@ -17,7 +17,7 @@ Seed data:
 All rows use brokerage_type='ZERO' and all rates = 0, effective from
 2020-01-01 to cover all historical manual trades.
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: a9b8c7d6e5f4
 Revises: f0a1b2c3d4e5
 Create Date: 2026-09-12
 """
@@ -26,7 +26,7 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "a1b2c3d4e5f6"
+revision: str = "a9b8c7d6e5f4"
 down_revision: Union[str, None] = "f0a1b2c3d4e5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
