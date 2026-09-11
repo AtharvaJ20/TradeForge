@@ -162,8 +162,8 @@ After the Railway deploy completes, the service domains may differ from what was
 3. Update this document with the confirmed URLs (replace the placeholder lines below)
 4. Set `RAILWAY_BACKEND_URL` as a GitHub secret: repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
-**Confirmed staging URLs** *(update once verified from Railway dashboard)*:
-- Backend: `[to be confirmed from Railway dashboard — intuitive-education service]`
+**Confirmed staging URLs** *(verified 2026-09-11 from Railway dashboard)*:
+- Backend: `https://intuitive-education-staging.up.railway.app` (Port 8080, confirmed `/health` → `{"status":"ok"}`)
 - Frontend: `[to be confirmed from Railway dashboard — distinguished-creativity service]`
 
 ### 8. Verify the staging environment
