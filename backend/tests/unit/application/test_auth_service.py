@@ -16,7 +16,6 @@ import pytest
 from tradeforge.application.auth.service import AuthService
 from tradeforge.domain.auth.errors import InvalidCredentialsError
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
