@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { authApi } from '../api'
 import type { User } from '../types'
@@ -17,6 +17,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
   const location = useLocation()
+  // Tracks whether initial hydration is complete. The auth:session-expired
+  // event must be ignored until then — the in-flight me() call started before
+  // login will return 401 and would otherwise kick the user back to /login
+  // even after a successful sign-in.
+  const hydratedRef = useRef(false)
 
   // Hydrate auth state on mount
   useEffect(() => {
@@ -24,12 +29,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .me()
       .then(setUser)
       .catch(() => setUser(null))
-      .finally(() => setIsLoading(false))
+      .finally(() => {
+        hydratedRef.current = true
+        setIsLoading(false)
+      })
   }, [])
 
   // Session-expired event: any 401 from api-client dispatches this
   useEffect(() => {
     function handleExpired() {
+      if (!hydratedRef.current) return
       setUser(null)
       navigate('/login?expired=1', { replace: true })
     }
