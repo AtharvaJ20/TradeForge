@@ -299,6 +299,11 @@ class AuthService:
             ua_hash=_ua_hash(user_agent),
         )
 
+        # 9. Clear any forced-reauth flag set by a prior password reset (SR-AUTH-010).
+        #    The user has just proven their identity with valid credentials — the
+        #    re-authentication requirement is satisfied.
+        await self._sessions.clear_forced_reauth(str(user.id))
+
         await self._audit.log(
             AuditEventType.LOGIN_SUCCESS,
             ip_address=ip,
