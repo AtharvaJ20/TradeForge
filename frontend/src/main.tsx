@@ -27,8 +27,8 @@ createRoot(root).render(
         <AuthProvider>
           <App />
         </AuthProvider>
+        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
       </QueryClientProvider>
     </BrowserRouter>
-    {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
   </StrictMode>,
 )
