@@ -147,7 +147,8 @@ class AuthService:
                     to=email,
                     subject="TradeForge: registration attempt on your account",
                     html_body=(
-                        "<p>Someone tried to create a TradeForge account with your email address.</p>"
+                        "<p>Someone tried to create a TradeForge account "
+                        "with your email address.</p>"
                         "<p>If this was you, you already have an account — "
                         '<a href="#">log in here</a>.</p>'
                         "<p>If this was not you, no action is needed.</p>"
