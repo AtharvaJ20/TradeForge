@@ -41,19 +41,26 @@ SESSION_MAX_AGE = 30 * 24 * 60 * 60  # 30 days in seconds
 
 def _set_session_cookie(response: Response, token: str) -> None:
     secure = get_settings().secure_cookies
+    # SameSite=None is required for cross-origin Railway deployments (HTTPS only).
+    # up.railway.app is in the Public Suffix List, so frontend and backend subdomains
+    # are cross-site — Strict causes the browser to drop the cookie on every fetch.
+    # CSRF protection is maintained by the Origin-header check in csrf_middleware.
+    samesite: str = "none" if secure else "strict"
     response.set_cookie(
         key=SESSION_COOKIE,
         value=token,
         max_age=SESSION_MAX_AGE,
         httponly=True,
-        samesite="strict",
+        samesite=samesite,
         secure=secure,
         path="/",
     )
 
 
 def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE, path="/", samesite="strict")
+    secure = get_settings().secure_cookies
+    samesite: str = "none" if secure else "strict"
+    response.delete_cookie(key=SESSION_COOKIE, path="/", samesite=samesite)
 
 
 # ------------------------------------------------------------------
