@@ -172,3 +172,30 @@ jobs:
 
       - name: Redeploy frontend (distinguished-creativity)
         run: railway redeploy --service distinguished-creativity --yes
+
+      # Polls /health until 200 or times out (3 min).
+      # Requires RAILWAY_BACKEND_URL secret — skipped if not set.
+      # Find the URL: Railway dashboard → intuitive-education service → Settings → Networking → Domain.
+      - name: Verify backend health after deploy
+        env:
+          RAILWAY_BACKEND_URL: ${{ secrets.RAILWAY_BACKEND_URL }}
+        run: |
+          if [ -z "$RAILWAY_BACKEND_URL" ]; then
+            echo "WARNING: RAILWAY_BACKEND_URL secret not set — skipping post-deploy health check."
+            echo "Add RAILWAY_BACKEND_URL to GitHub repo secrets (Settings → Secrets → Actions)."
+            echo "Value: copy the domain from Railway dashboard → intuitive-education → Settings → Networking."
+            exit 0
+          fi
+          echo "Polling ${RAILWAY_BACKEND_URL}/health (18 attempts × 10s = 3 min max)..."
+          for i in $(seq 1 18); do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" "${RAILWAY_BACKEND_URL}/health" 2>/dev/null || echo "000")
+            if [ "$HTTP" = "200" ]; then
+              echo "Backend healthy on attempt ${i} — deploy verified."
+              exit 0
+            fi
+            echo "Attempt ${i}/18: HTTP ${HTTP} — waiting 10s..."
+            sleep 10
+          done
+          echo "ERROR: Backend did not return HTTP 200 within 3 minutes at ${RAILWAY_BACKEND_URL}/health"
+          echo "Check Railway logs: dashboard → intuitive-education → Deployments → latest → View Logs"
+          exit 1
