@@ -157,7 +157,8 @@ class AuthService:
                     html_body=(
                         "<p>Someone tried to create a TradeForge account "
                         "with your email address.</p>"
-                        f'<p>If this was you, you already have an account — <a href="{login_url}">log in here</a>.</p>'
+                        f"<p>If this was you, you already have an account — "
+                        f'<a href="{login_url}">log in here</a>.</p>'
                         "<p>If this was not you, no action is needed.</p>"
                     ),
                 )
@@ -187,8 +188,8 @@ class AuthService:
                     "<p>Click the link below to verify your email address:</p>"
                     f'<p><a href="{verify_url}">Verify Email Address</a></p>'
                     f"<p>Or copy this link into your browser:<br>{verify_url}</p>"
-                    "<p>This link expires in 24 hours. "
-                    "If you did not create a TradeForge account, you can safely ignore this email.</p>"
+                    "<p>This link expires in 24 hours. If you did not create a "
+                    "TradeForge account, you can safely ignore this email.</p>"
                 ),
             )
         except EmailDeliveryError:
