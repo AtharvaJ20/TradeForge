@@ -303,4 +303,32 @@ describe('DashboardPage', () => {
     expect(journalSection.querySelector('[role="alert"]')).toBeInTheDocument()
     expect(journalSection).toHaveTextContent('Failed to load recent journal entries.')
   })
+
+  it('F-18-21: shows loading skeletons in all three data sections while accounts are loading', () => {
+    // Simulate AccountContext mid-load: no account selected yet
+    mockUseAccount.mockReturnValue({
+      selectedAccount: null,
+      accounts: [],
+      isLoading: true,
+      selectAccount: vi.fn(),
+      refetchAccounts: vi.fn(),
+    })
+    // Hooks return idle-with-no-data (queries disabled when accountId is '')
+    mockUseDashboardSummary.mockReturnValue(makeLoading())
+    mockUseRecentTrades.mockReturnValue(makeLoading())
+    mockUseRecentJournal.mockReturnValue(makeLoading())
+
+    renderDashboard()
+
+    // Account Overview: role=status skeleton
+    expect(screen.getByRole('status', { name: 'Loading dashboard' })).toBeInTheDocument()
+
+    // Recent Trades: aria-busy skeleton
+    const tradesSection = screen.getByRole('region', { name: 'Recent Trades' })
+    expect(tradesSection.querySelector('[aria-busy="true"]')).toBeInTheDocument()
+
+    // Recent Journal: aria-busy skeleton
+    const journalSection = screen.getByRole('region', { name: 'Recent Journal' })
+    expect(journalSection.querySelector('[aria-busy="true"]')).toBeInTheDocument()
+  })
 })
