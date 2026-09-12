@@ -149,3 +149,73 @@ async def test_login_does_not_clear_forced_reauth_on_wrong_password() -> None:
             )
 
     session_repo.clear_forced_reauth.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# SKIP_EMAIL_VERIFICATION — DEF-DASH-005 staging flag regression
+# ---------------------------------------------------------------------------
+
+
+def _make_service_skip_email() -> AuthService:
+    """Return AuthService with skip_email_verification=True and all I/O mocked."""
+    user_repo = AsyncMock()
+    audit_repo = AsyncMock()
+    verification_repo = AsyncMock()
+    reset_repo = AsyncMock()
+    session_repo = AsyncMock()
+    email_sender = AsyncMock()
+
+    return AuthService(
+        user_repo=user_repo,
+        audit_repo=audit_repo,
+        verification_repo=verification_repo,
+        reset_repo=reset_repo,
+        session_repo=session_repo,
+        email_sender=email_sender,
+        skip_email_verification=True,
+    )
+
+
+async def test_register_auto_verifies_user_when_flag_enabled() -> None:
+    """SKIP_EMAIL_VERIFICATION=True must call set_email_verified after user creation."""
+    svc = _make_service_skip_email()
+    user_id = uuid.uuid4()
+    new_user = MagicMock()
+    new_user.id = user_id
+
+    svc._users.find_by_email = AsyncMock(return_value=None)  # new user
+    svc._users.create = AsyncMock(return_value=new_user)
+    svc._users.set_email_verified = AsyncMock()
+    svc._sessions.increment_auth_attempts_ip = AsyncMock(return_value=1)
+    svc._audit.log = AsyncMock()
+
+    with (
+        patch("tradeforge.application.auth.service._ph") as mock_ph,
+        patch("tradeforge.application.auth.service.is_password_pwned", return_value=False),
+    ):
+        mock_ph.hash.return_value = "hashed"
+        await svc.register(email="new@example.com", password="Str0ng!Pass123", ip="1.2.3.4")
+
+    svc._users.set_email_verified.assert_awaited_once_with(user_id)
+
+
+async def test_register_skips_email_send_when_flag_enabled() -> None:
+    """SKIP_EMAIL_VERIFICATION=True must not call email_sender.send for new users."""
+    svc = _make_service_skip_email()
+    new_user = MagicMock()
+    new_user.id = uuid.uuid4()
+
+    svc._users.find_by_email = AsyncMock(return_value=None)
+    svc._users.create = AsyncMock(return_value=new_user)
+    svc._users.set_email_verified = AsyncMock()
+    svc._sessions.increment_auth_attempts_ip = AsyncMock(return_value=1)
+    svc._audit.log = AsyncMock()
+
+    with (
+        patch("tradeforge.application.auth.service._ph") as mock_ph,
+        patch("tradeforge.application.auth.service.is_password_pwned", return_value=False),
+    ):
+        mock_ph.hash.return_value = "hashed"
+        await svc.register(email="new@example.com", password="Str0ng!Pass123", ip="1.2.3.4")
+
+    svc._email.send.assert_not_awaited()

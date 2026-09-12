@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     # Cookie security: True in production (HTTPS), False for local HTTP dev
     secure_cookies: bool = True
 
+    # Staging-only: auto-verify new users and skip email — never enable in production
+    skip_email_verification: bool = False
+
     # Comma-separated IPs/CIDRs of trusted reverse proxies (e.g. load balancers).
     # Only these peers are allowed to supply an X-Forwarded-For header that is
     # trusted for client-IP extraction (BLOCKER-2). Empty = no trusted proxies
