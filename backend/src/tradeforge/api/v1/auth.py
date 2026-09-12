@@ -108,6 +108,7 @@ class PasswordResetConfirmRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+    auto_verified: bool = False
 
 
 class UserResponse(BaseModel):
@@ -139,9 +140,10 @@ async def register(
     except (RedisUnavailableError, EmailDeliveryError):
         raise HTTPException(status_code=503, detail="SERVICE_UNAVAILABLE")
     await db.commit()
-    # Enumeration-safe message (SR-AUTH-004)
+    skip = get_settings().skip_email_verification
     return MessageResponse(
-        message="If this email address is new, a verification link has been sent."
+        message="If this email address is new, a verification link has been sent.",
+        auto_verified=skip,
     )
 
 

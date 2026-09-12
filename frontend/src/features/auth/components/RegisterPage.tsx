@@ -64,7 +64,10 @@ export function RegisterPage() {
     setConfirmError(null)
     register.mutate(
       { email, password },
-      { onSuccess: () => navigate('/register-success') },
+      {
+        onSuccess: (data) =>
+          data.auto_verified ? navigate('/login?verified=1') : navigate('/register-success'),
+      },
     )
   }
 
