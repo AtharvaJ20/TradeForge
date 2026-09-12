@@ -164,7 +164,7 @@ After the Railway deploy completes, the service domains may differ from what was
 
 **Confirmed staging URLs** *(verified 2026-09-11 from Railway dashboard)*:
 - Backend: `https://intuitive-education-staging.up.railway.app` (Port 8080, confirmed `/health` → `{"status":"ok"}`)
-- Frontend: `[to be confirmed from Railway dashboard — distinguished-creativity service]`
+- Frontend: `https://distinguished-creativity-staging.up.railway.app` (confirmed 2026-09-12 — TradeForge login page loads)
 
 ### 8. Verify the staging environment
 
