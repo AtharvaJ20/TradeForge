@@ -102,6 +102,7 @@ async def get_auth_service(
         session_repo=SessionRepository(redis),
         email_sender=get_email_sender(),
         skip_email_verification=get_settings().skip_email_verification,
+        frontend_url=get_settings().frontend_url,
     )
 
 

@@ -90,6 +90,7 @@ class AuthService:
         session_repo: SessionRepository,
         email_sender: EmailSender,
         skip_email_verification: bool = False,
+        frontend_url: str = "http://localhost:5173",
     ) -> None:
         self._users = user_repo
         self._audit = audit_repo
@@ -98,6 +99,7 @@ class AuthService:
         self._sessions = session_repo
         self._email = email_sender
         self._skip_email_verification = skip_email_verification
+        self._frontend_url = frontend_url.rstrip("/")
 
     # ------------------------------------------------------------------
     # Registration
@@ -148,14 +150,15 @@ class AuthService:
             # Swallow EmailDeliveryError so the response stays identical to the
             # new-user path — leaking a 503 here would reveal that the address exists.
             try:
+                login_url = f"{self._frontend_url}/login"
                 await self._email.send(
                     to=email,
                     subject="TradeForge: registration attempt on your account",
                     html_body=(
                         "<p>Someone tried to create a TradeForge account "
                         "with your email address.</p>"
-                        "<p>If this was you, you already have an account — "
-                        '<a href="#">log in here</a>.</p>'
+                        f"<p>If this was you, you already have an account — "
+                        f'<a href="{login_url}">log in here</a>.</p>'
                         "<p>If this was not you, no action is needed.</p>"
                     ),
                 )
@@ -175,14 +178,18 @@ class AuthService:
         expires_at = datetime.now(UTC) + EMAIL_VERIFICATION_TTL
         await self._verifications.create(email=email, token_hash=token_hash, expires_at=expires_at)
 
+        verify_url = f"{self._frontend_url}/verify-email?token={raw_token}"
         try:
             await self._email.send(
                 to=email,
                 subject="Verify your TradeForge email address",
                 html_body=(
-                    f"<p>Welcome to TradeForge!</p>"
-                    f"<p>Verify your email: <strong>{raw_token}</strong></p>"
-                    f"<p>This link expires in 24 hours.</p>"
+                    "<p>Welcome to TradeForge!</p>"
+                    "<p>Click the link below to verify your email address:</p>"
+                    f'<p><a href="{verify_url}">Verify Email Address</a></p>'
+                    f"<p>Or copy this link into your browser:<br>{verify_url}</p>"
+                    "<p>This link expires in 24 hours. If you did not create a "
+                    "TradeForge account, you can safely ignore this email.</p>"
                 ),
             )
         except EmailDeliveryError:
@@ -370,14 +377,17 @@ class AuthService:
 
         await self._resets.create(email=email, token_hash=token_hash, expires_at=expires_at)
 
+        reset_url = f"{self._frontend_url}/reset-password?token={raw_token}"
         await self._email.send(
             to=email,
             subject="TradeForge: password reset request",
             html_body=(
-                f"<p>We received a password reset request for your account.</p>"
-                f"<p>Reset token: <strong>{raw_token}</strong></p>"
-                "<p>This token expires in 1 hour. "
-                "If you did not request this, ignore this email.</p>"
+                "<p>We received a password reset request for your TradeForge account.</p>"
+                "<p>Click the link below to reset your password:</p>"
+                f'<p><a href="{reset_url}">Reset Password</a></p>'
+                f"<p>Or copy this link into your browser:<br>{reset_url}</p>"
+                "<p>This link expires in 1 hour. "
+                "If you did not request this, you can safely ignore this email.</p>"
             ),
         )
 
