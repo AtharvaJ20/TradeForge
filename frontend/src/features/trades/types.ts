@@ -44,8 +44,8 @@ export interface TradeListItemOut {
   status: string
   trade_date: string
   last_fill_at: string | null
-  net_pnl: number | null
-  r_multiple: number | null
+  net_pnl: string | null
+  r_multiple: string | null
 }
 
 export interface FillItemOut {

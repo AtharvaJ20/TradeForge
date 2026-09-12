@@ -13,6 +13,7 @@ import { TradeDetailPage } from './features/trades/TradeDetailPage'
 import { AccountProvider } from './features/accounts/context/AccountContext'
 import { AppShell } from './layout/AppShell'
 import { RequireAuth } from './components/RequireAuth'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { PlaceholderPage } from './components/PlaceholderPage'
 import { ImportTradesPage } from './features/imports/ImportTradesPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
@@ -32,9 +33,11 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route
           element={
-            <AccountProvider>
-              <AppShell />
-            </AccountProvider>
+            <ErrorBoundary>
+              <AccountProvider>
+                <AppShell />
+              </AccountProvider>
+            </ErrorBoundary>
           }
         >
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

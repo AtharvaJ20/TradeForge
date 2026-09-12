@@ -932,11 +932,11 @@ const ACCOUNT_ID_0001 = '00000000-0000-0000-0000-000000000001'
 export const DASHBOARD_SUMMARY = {
   account_id: ACCOUNT_ID_0001,
   as_of_date: '2026-09-08',
-  all_time_net_pnl: 27500,
-  mtd_net_pnl: 5000,
-  wtd_net_pnl: 1500,
-  starting_capital: 500000,
-  realized_equity: 527500,
+  all_time_net_pnl: '27500.00',
+  mtd_net_pnl: '5000.00',
+  wtd_net_pnl: '1500.00',
+  starting_capital: '500000.00',
+  realized_equity: '527500.00',
   total_closed_trades: 30,
   open_trade_count: 2,
 }
@@ -944,9 +944,9 @@ export const DASHBOARD_SUMMARY = {
 export const DASHBOARD_SUMMARY_EMPTY = {
   account_id: ACCOUNT_ID_0001,
   as_of_date: '2026-09-08',
-  all_time_net_pnl: 0,
-  mtd_net_pnl: 0,
-  wtd_net_pnl: 0,
+  all_time_net_pnl: '0.00',
+  mtd_net_pnl: '0.00',
+  wtd_net_pnl: '0.00',
   starting_capital: null,
   realized_equity: null,
   total_closed_trades: 0,
@@ -962,8 +962,8 @@ const TRADES_LIST_ITEMS = Array.from({ length: 10 }, (_, i) => ({
   status: 'CLOSED',
   trade_date: '2026-09-01',
   last_fill_at: `2026-09-0${(i % 7) + 1}T10:00:00Z`,
-  net_pnl: i % 3 === 0 ? -(i + 1) * 100 : (i + 1) * 200,
-  r_multiple: i % 3 === 0 ? -1.0 : 1.5,
+  net_pnl: i % 3 === 0 ? String(-(i + 1) * 100) : String((i + 1) * 200),
+  r_multiple: i % 3 === 0 ? '-1.00' : '1.50',
 }))
 
 export const TRADES_LIST = {
