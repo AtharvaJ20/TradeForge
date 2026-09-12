@@ -1,9 +1,9 @@
 import type { PlannedRR } from '../types'
-import { formatDecimal, formatPctFraction } from '../formatters'
+import { formatDecimal, formatPctDirect } from '../formatters'
 
 export function PlannedRRCard({ plannedRR }: { plannedRR: PlannedRR }) {
   const displayRR = formatDecimal(plannedRR.avg_planned_rr)
-  const coveragePct = formatPctFraction(plannedRR.coverage_pct)
+  const coveragePct = formatPctDirect(plannedRR.coverage_pct)
 
   return (
     <section
