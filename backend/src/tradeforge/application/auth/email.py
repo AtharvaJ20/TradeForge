@@ -35,7 +35,7 @@ class SmtpEmailSender:
         self._port = port
         self._from = from_address
         self._username = username
-        self._password = password
+        self._password = password.replace(" ", "")
 
     async def send(self, to: str, subject: str, html_body: str) -> None:
         from tradeforge.domain.auth.errors import EmailDeliveryError
@@ -55,6 +55,7 @@ class SmtpEmailSender:
                 start_tls=use_starttls,
                 username=self._username or None,
                 password=self._password or None,
+                timeout=30,
             )
         except Exception as exc:
             raise EmailDeliveryError(f"SMTP delivery failed: {exc}") from exc
