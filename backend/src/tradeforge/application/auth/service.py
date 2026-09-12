@@ -15,6 +15,7 @@ NEVER include passwords, tokens, or session data in log output or API responses.
 """
 
 import hashlib
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -55,6 +56,8 @@ from tradeforge.infrastructure.repositories.session_repo import (
 # Re-export for callers that need the threshold value (e.g. test assertions).
 __all__ = ["AuthService"]
 from tradeforge.infrastructure.repositories.user_repo import UserRepository
+
+_log = logging.getLogger(__name__)
 
 # Argon2id parameters — SR-AUTH-001
 _ph = PasswordHasher(memory_cost=65536, time_cost=3, parallelism=2)
@@ -172,15 +175,21 @@ class AuthService:
         expires_at = datetime.now(UTC) + EMAIL_VERIFICATION_TTL
         await self._verifications.create(email=email, token_hash=token_hash, expires_at=expires_at)
 
-        await self._email.send(
-            to=email,
-            subject="Verify your TradeForge email address",
-            html_body=(
-                f"<p>Welcome to TradeForge!</p>"
-                f"<p>Verify your email: <strong>{raw_token}</strong></p>"
-                f"<p>This link expires in 24 hours.</p>"
-            ),
-        )
+        try:
+            await self._email.send(
+                to=email,
+                subject="Verify your TradeForge email address",
+                html_body=(
+                    f"<p>Welcome to TradeForge!</p>"
+                    f"<p>Verify your email: <strong>{raw_token}</strong></p>"
+                    f"<p>This link expires in 24 hours.</p>"
+                ),
+            )
+        except EmailDeliveryError:
+            _log.error(
+                "Verification email delivery failed for new user (email send error); "
+                "user created, token stored — user must request resend"
+            )
         # Prevent session creation before email is verified — user.is_email_verified stays False
         _ = user  # user stored; verification required before login is allowed
 
