@@ -1,6 +1,6 @@
 import { useHoldDuration } from '../hooks/useHoldDuration'
 import type { AnalyticsFilterParams, HoldDuration } from '../types'
-import { formatINR, formatPctFraction } from '../formatters'
+import { formatINR, formatPctDirect } from '../formatters'
 
 // ---------------------------------------------------------------------------
 // Display (pure)
@@ -33,7 +33,7 @@ function HoldDurationDisplay({ data }: { data: HoldDuration }) {
                   {row.count}
                 </td>
                 <td className="py-2 pr-4 text-right tabular-nums text-text-primary">
-                  {formatPctFraction(row.win_rate)}
+                  {formatPctDirect(row.win_rate)}
                 </td>
                 <td className={`py-2 text-right tabular-nums ${
                   parseFloat(row.avg_net_pnl) >= 0 ? 'text-success-emphasis' : 'text-danger-emphasis'

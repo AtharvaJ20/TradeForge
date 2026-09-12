@@ -147,8 +147,8 @@ describe('DashboardPage', () => {
 
   it('F-18-05: renders win rate, expectancy, and profit factor from analytics summary', () => {
     renderDashboard()
-    // win_rate: '0.67' → 67.0%
-    expect(screen.getByText('67.0%')).toBeInTheDocument()
+    // win_rate: '67.00' → 67.00%
+    expect(screen.getByText('67.00%')).toBeInTheDocument()
     // expectancy_r: '1.25'
     expect(screen.getByText('1.25')).toBeInTheDocument()
     // profit_factor: '3.14'

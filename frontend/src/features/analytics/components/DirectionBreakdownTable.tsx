@@ -1,5 +1,5 @@
 import type { DirectionPerformance } from '../types'
-import { formatPctFraction, formatINR, formatSigned } from '../formatters'
+import { formatPctDirect, formatINR, formatSigned } from '../formatters'
 
 export function DirectionBreakdownTable({ rows }: { rows: DirectionPerformance[] }) {
   if (rows.length === 0) {
@@ -73,7 +73,7 @@ export function DirectionBreakdownTable({ rows }: { rows: DirectionPerformance[]
                   {row.trade_count}
                 </td>
                 <td className="py-2 text-right tabular-nums text-success-emphasis">
-                  {formatPctFraction(row.win_rate)}
+                  {formatPctDirect(row.win_rate)}
                 </td>
                 <td className="py-2 text-right tabular-nums text-text-primary">
                   {formatINR(row.avg_net_pnl)}
