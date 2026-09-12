@@ -14,7 +14,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from tradeforge.application.auth.email import ConsoleEmailSender, ResendEmailSender, get_email_sender
+from tradeforge.application.auth.email import (
+    ConsoleEmailSender,
+    ResendEmailSender,
+    get_email_sender,
+)
 from tradeforge.domain.auth.errors import EmailDeliveryError
 
 # ---------------------------------------------------------------------------
