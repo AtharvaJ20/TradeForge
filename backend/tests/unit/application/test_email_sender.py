@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from tradeforge.application.auth.email import ResendEmailSender, get_email_sender
+from tradeforge.application.auth.email import ConsoleEmailSender, ResendEmailSender, get_email_sender
 from tradeforge.domain.auth.errors import EmailDeliveryError
 
 # ---------------------------------------------------------------------------
@@ -91,6 +91,35 @@ async def test_resend_sender_wraps_network_failure_as_email_delivery_error() -> 
 
         with pytest.raises(EmailDeliveryError):
             await sender.send("user@example.com", "Subject", "<p>Body</p>")
+
+
+# ---------------------------------------------------------------------------
+# ConsoleEmailSender — DEF-DASH-005 regression
+# ---------------------------------------------------------------------------
+
+
+async def test_console_sender_completes_without_error() -> None:
+    sender = ConsoleEmailSender()
+    # Must not raise — no external call, just logs to stdout
+    await sender.send("user@example.com", "Verify your email", "<p>Token: ABC123</p>")
+
+
+# ---------------------------------------------------------------------------
+# get_email_sender() factory — console transport (DEF-DASH-005)
+# ---------------------------------------------------------------------------
+
+
+def test_get_email_sender_returns_console_sender_when_configured() -> None:
+    env = {
+        "DATABASE_URL": "postgresql+asyncpg://x:x@localhost/x",
+        "REDIS_URL": "redis://localhost",
+        "EMAIL_TRANSPORT": "console",
+        "ALLOWED_ORIGINS": "http://localhost:5173",
+        "SECRET_KEY": "test-secret",
+    }
+    with patch.dict("os.environ", env, clear=True):
+        sender = get_email_sender()
+        assert isinstance(sender, ConsoleEmailSender)
 
 
 # ---------------------------------------------------------------------------

@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     s3_region: str = "auto"  # "auto" is correct for Cloudflare R2
 
     # Transactional email
-    email_transport: str  # "smtp" | "resend"
+    email_transport: str  # "smtp" | "console" | "resend"
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     resend_api_key: str = ""
