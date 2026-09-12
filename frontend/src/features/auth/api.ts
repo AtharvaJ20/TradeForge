@@ -9,7 +9,7 @@ export const authApi = {
     apiClient.post<User>('/v1/auth/login', { email, password }),
   logout: () => apiClient.post<{ message: string }>('/v1/auth/logout'),
   register: (email: string, password: string) =>
-    apiClient.post<{ message: string }>('/v1/auth/register', { email, password }),
+    apiClient.post<{ message: string; auto_verified?: boolean }>('/v1/auth/register', { email, password }),
   verifyEmail: (token: string) =>
     apiClient.post<{ message: string }>('/v1/auth/verify-email', { token }),
   requestPasswordReset: (email: string) =>
