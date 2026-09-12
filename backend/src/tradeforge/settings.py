@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     # Cookie security: True in production (HTTPS), False for local HTTP dev
     secure_cookies: bool = True
 
+    # Frontend origin used in email links (e.g. verify-email, reset-password).
+    # Local dev default; set FRONTEND_URL in Railway/production environment variables.
+    frontend_url: str = "http://localhost:5173"
+
     # Staging-only: auto-verify new users and skip email — never enable in production
     skip_email_verification: bool = False
 

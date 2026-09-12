@@ -8,6 +8,7 @@ EmailSender is a structural Protocol so tests can inject any callable duck-type.
 """
 
 import logging
+import re
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Protocol
@@ -16,6 +17,17 @@ import aiosmtplib
 import httpx
 
 _log = logging.getLogger(__name__)
+
+
+def _html_to_text(html: str) -> str:
+    """Strip HTML tags to produce a plain-text fallback for MIME multipart emails."""
+    text = re.sub(r"<br\s*/?>", "\n", html, flags=re.IGNORECASE)
+    text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    import html as html_module
+
+    text = html_module.unescape(text)
+    return "\n".join(line.strip() for line in text.splitlines() if line.strip())
 
 
 class EmailSender(Protocol):
@@ -44,6 +56,7 @@ class SmtpEmailSender:
         msg["Subject"] = subject
         msg["From"] = self._from
         msg["To"] = to
+        msg.attach(MIMEText(_html_to_text(html_body), "plain"))
         msg.attach(MIMEText(html_body, "html"))
 
         use_starttls = bool(self._username)
