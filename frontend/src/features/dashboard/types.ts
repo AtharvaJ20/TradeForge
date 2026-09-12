@@ -1,11 +1,11 @@
 export interface DashboardSummaryOut {
   account_id: string
   as_of_date: string
-  all_time_net_pnl: number
-  mtd_net_pnl: number
-  wtd_net_pnl: number
-  starting_capital: number | null
-  realized_equity: number | null
+  all_time_net_pnl: string
+  mtd_net_pnl: string
+  wtd_net_pnl: string
+  starting_capital: string | null
+  realized_equity: string | null
   total_closed_trades: number
   open_trade_count: number
 }
@@ -18,8 +18,8 @@ export interface TradeListItemOut {
   status: string
   trade_date: string
   last_fill_at: string | null
-  net_pnl: number | null
-  r_multiple: number | null
+  net_pnl: string | null
+  r_multiple: string | null
 }
 
 export interface RecentJournalItemOut {

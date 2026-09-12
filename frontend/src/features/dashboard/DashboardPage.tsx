@@ -17,21 +17,25 @@ function thousands(n: number): string {
     .replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
-function formatPnl(value: number): string {
-  const abs = thousands(value)
-  if (value > 0) return `+₹${abs}`
-  if (value < 0) return `-₹${abs}`
+function formatPnl(value: number | string): string {
+  const n = parseFloat(String(value))
+  if (isNaN(n)) return '—'
+  const abs = thousands(n)
+  if (n > 0) return `+₹${abs}`
+  if (n < 0) return `-₹${abs}`
   return '₹0'
 }
 
-function pnlClass(value: number): string {
-  if (value > 0) return 'text-success-emphasis'
-  if (value < 0) return 'text-danger-emphasis'
+function pnlClass(value: number | string): string {
+  const n = parseFloat(String(value))
+  if (n > 0) return 'text-success-emphasis'
+  if (n < 0) return 'text-danger-emphasis'
   return 'text-text-primary'
 }
 
-function formatCapital(value: number): string {
-  return `₹${thousands(value)}`
+function formatCapital(value: number | string): string {
+  const n = parseFloat(String(value))
+  return isNaN(n) ? '—' : `₹${thousands(n)}`
 }
 
 function formatDate(iso: string | null): string {
@@ -39,10 +43,12 @@ function formatDate(iso: string | null): string {
   return iso.slice(0, 10)
 }
 
-function formatR(value: number | null): string {
+function formatR(value: number | string | null): string {
   if (value === null) return '—'
-  const sign = value > 0 ? '+' : ''
-  return `${sign}${value.toFixed(2)}R`
+  const n = parseFloat(String(value))
+  if (isNaN(n)) return '—'
+  const sign = n > 0 ? '+' : ''
+  return `${sign}${n.toFixed(2)}R`
 }
 
 function formatPct(fraction: string): string {
@@ -284,12 +290,17 @@ export function DashboardPage() {
             <div className="h-5 w-2/5 animate-pulse rounded bg-surface-subtle" />
           </div>
         )}
-        {summaryError && !summaryLoading && !accountLoading && (
+        {!accountLoading && !selectedAccount && (
+          <p className="text-sm text-text-secondary">No account selected.</p>
+        )}
+        {summaryError && !summaryLoading && !accountLoading && selectedAccount && (
           <p role="alert" className="text-sm text-danger-emphasis">
             Failed to load account overview.
           </p>
         )}
-        {summary && !summaryLoading && !accountLoading && <AccountOverviewContent data={summary} />}
+        {summary && !summaryLoading && !accountLoading && selectedAccount && (
+          <AccountOverviewContent data={summary} />
+        )}
       </section>
 
       {/* Section 2 — Performance */}
@@ -345,15 +356,18 @@ export function DashboardPage() {
             ))}
           </div>
         )}
-        {tradesError && !tradesLoading && !accountLoading && (
+        {!accountLoading && !selectedAccount && (
+          <p className="text-sm text-text-secondary">No account selected.</p>
+        )}
+        {tradesError && !tradesLoading && !accountLoading && selectedAccount && (
           <p role="alert" className="text-sm text-danger-emphasis">
             Failed to load recent trades.
           </p>
         )}
-        {!tradesLoading && !tradesError && !accountLoading && trades !== undefined && trades.length === 0 && (
+        {!tradesLoading && !tradesError && !accountLoading && selectedAccount && trades !== undefined && trades.length === 0 && (
           <p className="text-sm text-text-secondary">No closed trades yet.</p>
         )}
-        {!tradesLoading && !tradesError && !accountLoading && trades && trades.length > 0 && (
+        {!tradesLoading && !tradesError && !accountLoading && selectedAccount && trades && trades.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -398,15 +412,18 @@ export function DashboardPage() {
             ))}
           </div>
         )}
-        {journalError && !journalLoading && !accountLoading && (
+        {!accountLoading && !selectedAccount && (
+          <p className="text-sm text-text-secondary">No account selected.</p>
+        )}
+        {journalError && !journalLoading && !accountLoading && selectedAccount && (
           <p role="alert" className="text-sm text-danger-emphasis">
             Failed to load recent journal entries.
           </p>
         )}
-        {!journalLoading && !journalError && !accountLoading && journal !== undefined && journal.length === 0 && (
+        {!journalLoading && !journalError && !accountLoading && selectedAccount && journal !== undefined && journal.length === 0 && (
           <p className="text-sm text-text-secondary">No journal entries yet.</p>
         )}
-        {!journalLoading && !journalError && !accountLoading && journal && journal.length > 0 && (
+        {!journalLoading && !journalError && !accountLoading && selectedAccount && journal && journal.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>

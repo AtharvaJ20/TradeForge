@@ -304,6 +304,44 @@ describe('DashboardPage', () => {
     expect(journalSection).toHaveTextContent('Failed to load recent journal entries.')
   })
 
+  it('F-18-22: shows "No account selected" in all three sections when account loaded but selectedAccount is null', () => {
+    mockUseAccount.mockReturnValue({
+      selectedAccount: null,
+      accounts: [],
+      isLoading: false,
+      selectAccount: vi.fn(),
+      refetchAccounts: vi.fn(),
+    })
+    mockUseDashboardSummary.mockReturnValue({ data: undefined, isLoading: false, isError: false })
+    mockUseRecentTrades.mockReturnValue({ data: undefined, isLoading: false, isError: false })
+    mockUseRecentJournal.mockReturnValue({ data: undefined, isLoading: false, isError: false })
+
+    renderDashboard()
+
+    const overviewSection = screen.getByRole('region', { name: 'Account Overview' })
+    const tradesSection = screen.getByRole('region', { name: 'Recent Trades' })
+    const journalSection = screen.getByRole('region', { name: 'Recent Journal' })
+
+    expect(overviewSection).toHaveTextContent('No account selected.')
+    expect(tradesSection).toHaveTextContent('No account selected.')
+    expect(journalSection).toHaveTextContent('No account selected.')
+  })
+
+  it('F-18-23: formatR does not throw when r_multiple is a Decimal string from the API', () => {
+    const stringRMultiple = TRADES_LIST.items.map(t => ({ ...t, r_multiple: '1.50' }))
+    mockUseRecentTrades.mockReturnValue({ data: stringRMultiple, isLoading: false, isError: false })
+
+    expect(() => renderDashboard()).not.toThrow()
+
+    const tradesSection = screen.getByRole('region', { name: 'Recent Trades' })
+    expect(tradesSection).toHaveTextContent('+1.50R')
+  })
+
+  it('F-18-24: dashboard renders without crash when all summary fields are Decimal strings', () => {
+    expect(() => renderDashboard()).not.toThrow()
+    expect(screen.getByText('+₹27,500')).toBeInTheDocument()
+  })
+
   it('F-18-21: shows loading skeletons in all three data sections while accounts are loading', () => {
     // Simulate AccountContext mid-load: no account selected yet
     mockUseAccount.mockReturnValue({

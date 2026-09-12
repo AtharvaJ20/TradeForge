@@ -14,16 +14,19 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })
 }
 
-function formatPnl(value: number): string {
-  const abs = Math.round(Math.abs(value)).toLocaleString('en-IN')
-  if (value > 0) return `+₹${abs}`
-  if (value < 0) return `-₹${abs}`
+function formatPnl(value: number | string): string {
+  const n = parseFloat(String(value))
+  if (isNaN(n)) return '—'
+  const abs = Math.round(Math.abs(n)).toLocaleString('en-IN')
+  if (n > 0) return `+₹${abs}`
+  if (n < 0) return `-₹${abs}`
   return '₹0'
 }
 
-function pnlClass(value: number): string {
-  if (value > 0) return 'text-success-emphasis'
-  if (value < 0) return 'text-danger-emphasis'
+function pnlClass(value: number | string): string {
+  const n = parseFloat(String(value))
+  if (n > 0) return 'text-success-emphasis'
+  if (n < 0) return 'text-danger-emphasis'
   return 'text-text-primary'
 }
 
@@ -108,7 +111,7 @@ function TradeRow({ trade, onClick }: { trade: TradeListItemOut; onClick: () => 
         {trade.net_pnl !== null ? formatPnl(trade.net_pnl) : '—'}
       </td>
       <td className="px-3 py-3 text-sm tabular-nums text-text-secondary">
-        {trade.r_multiple !== null ? `${trade.r_multiple.toFixed(2)}R` : '—'}
+        {trade.r_multiple !== null ? `${parseFloat(String(trade.r_multiple)).toFixed(2)}R` : '—'}
       </td>
     </tr>
   )
