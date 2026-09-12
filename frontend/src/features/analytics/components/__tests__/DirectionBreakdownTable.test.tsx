@@ -8,7 +8,7 @@ describe('DirectionBreakdownTable', () => {
     render(<DirectionBreakdownTable rows={F.direction} />)
     expect(screen.getByRole('table')).toBeInTheDocument()
     expect(screen.getByText('LONG')).toBeInTheDocument()
-    expect(screen.getByText('67.0%')).toBeInTheDocument()
+    expect(screen.getByText('67.00%')).toBeInTheDocument()
     expect(screen.getByText('₹917')).toBeInTheDocument()
   })
 

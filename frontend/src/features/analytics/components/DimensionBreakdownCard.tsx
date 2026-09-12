@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useDimensionBreakdown } from '../hooks/useDimensionBreakdown'
 import type { AnalyticsFilterParams, DimensionGroup } from '../types'
-import { formatINR, formatPctFraction, formatSigned, formatDecimal } from '../formatters'
+import { formatINR, formatPctDirect, formatSigned, formatDecimal } from '../formatters'
 
 // ---------------------------------------------------------------------------
 // Dimension config
@@ -136,7 +136,7 @@ function BreakdownTable({
                 {row.win_count}
               </td>
               <td className="py-2 text-right tabular-nums text-success-emphasis">
-                {formatPctFraction(row.win_rate)}
+                {formatPctDirect(row.win_rate)}
               </td>
               <td className="py-2 text-right tabular-nums text-text-primary">
                 {formatINR(row.total_net_pnl)}

@@ -1,5 +1,5 @@
 import type { OutcomeDistribution } from '../types'
-import { formatPctFraction } from '../formatters'
+import { formatPctDirect } from '../formatters'
 
 export function OutcomeCard({ outcome }: { outcome: OutcomeDistribution }) {
   return (
@@ -17,9 +17,9 @@ export function OutcomeCard({ outcome }: { outcome: OutcomeDistribution }) {
           </dt>
           <dd
             className="text-2xl font-bold tabular-nums text-success-emphasis"
-            aria-label={`Win rate: ${formatPctFraction(outcome.win_rate)}`}
+            aria-label={`Win rate: ${formatPctDirect(outcome.win_rate)}`}
           >
-            {formatPctFraction(outcome.win_rate)}
+            {formatPctDirect(outcome.win_rate)}
           </dd>
           <p className="text-xs text-text-muted">{outcome.win_count} wins</p>
         </div>
@@ -29,9 +29,9 @@ export function OutcomeCard({ outcome }: { outcome: OutcomeDistribution }) {
           </dt>
           <dd
             className="text-2xl font-bold tabular-nums text-danger-emphasis"
-            aria-label={`Loss rate: ${formatPctFraction(outcome.loss_rate)}`}
+            aria-label={`Loss rate: ${formatPctDirect(outcome.loss_rate)}`}
           >
-            {formatPctFraction(outcome.loss_rate)}
+            {formatPctDirect(outcome.loss_rate)}
           </dd>
           <p className="text-xs text-text-muted">{outcome.loss_count} losses</p>
         </div>
@@ -41,9 +41,9 @@ export function OutcomeCard({ outcome }: { outcome: OutcomeDistribution }) {
           </dt>
           <dd
             className="text-2xl font-bold tabular-nums text-text-primary"
-            aria-label={`Breakeven rate: ${formatPctFraction(outcome.breakeven_rate)}`}
+            aria-label={`Breakeven rate: ${formatPctDirect(outcome.breakeven_rate)}`}
           >
-            {formatPctFraction(outcome.breakeven_rate)}
+            {formatPctDirect(outcome.breakeven_rate)}
           </dd>
           <p className="text-xs text-text-muted">{outcome.breakeven_count} trades</p>
         </div>

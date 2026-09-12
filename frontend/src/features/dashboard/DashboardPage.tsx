@@ -51,9 +51,9 @@ function formatR(value: number | string | null): string {
   return `${sign}${n.toFixed(2)}R`
 }
 
-function formatPct(fraction: string): string {
-  const n = parseFloat(fraction)
-  return isNaN(n) ? '—' : `${(n * 100).toFixed(1)}%`
+function formatPct(value: string): string {
+  const n = parseFloat(value)
+  return isNaN(n) ? '—' : `${n.toFixed(2)}%`
 }
 
 function formatDecStr(value: string | null): string {

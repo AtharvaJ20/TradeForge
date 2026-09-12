@@ -1,6 +1,6 @@
 import { useExitTypes } from '../hooks/useExitTypes'
 import type { AnalyticsFilterParams, ExitTypeRow, ExitTypes } from '../types'
-import { formatINR, formatPctFraction, formatDecimal } from '../formatters'
+import { formatINR, formatPctDirect, formatDecimal } from '../formatters'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,7 +67,7 @@ function ExitTypeDisplay({ rows }: { rows: ExitTypes }) {
                   {row.trade_count}
                 </td>
                 <td className="py-2 pr-4 text-right tabular-nums text-text-primary">
-                  {formatPctFraction(row.win_rate)}
+                  {formatPctDirect(row.win_rate)}
                 </td>
                 <td className={`py-2 pr-4 text-right tabular-nums ${
                   parseFloat(row.avg_net_pnl) >= 0 ? 'text-success-emphasis' : 'text-danger-emphasis'
