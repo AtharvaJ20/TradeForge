@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 import type { ExpectancyResult } from '../types'
-import { formatSigned, formatPctFraction } from '../formatters'
+import { formatSigned, formatPctDirect } from '../formatters'
 
 export function ExpectancyCard({ expectancy }: { expectancy: ExpectancyResult }) {
   const displayR = expectancy.insufficient_sample ? '—' : formatSigned(expectancy.expectancy_r)
@@ -38,7 +38,7 @@ export function ExpectancyCard({ expectancy }: { expectancy: ExpectancyResult })
             </p>
           ) : (
             <p className="text-xs text-text-muted">
-              R coverage: {formatPctFraction(expectancy.r_coverage_pct)}
+              R coverage: {formatPctDirect(expectancy.r_coverage_pct)}
             </p>
           )}
         </div>

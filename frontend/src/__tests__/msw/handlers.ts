@@ -10,11 +10,11 @@ export const ANALYTICS_SUMMARY_FIXTURE = {
   pnl: { total_trades: 30, gross_pnl: '29000.00', net_pnl: '27500.00', total_charges: '1500.00' },
   outcome: {
     win_count: 20, loss_count: 10, breakeven_count: 0, total_n: 30,
-    win_rate: '0.67', loss_rate: '0.33', breakeven_rate: '0.00',
+    win_rate: '67.00', loss_rate: '33.00', breakeven_rate: '0.00',
   },
   expectancy: {
     expectancy_r: '1.25', avg_r_win: '2.00', avg_r_loss: '-1.50',
-    r_coverage_count: 30, total_count: 30, r_coverage_pct: '1.00',
+    r_coverage_count: 30, total_count: 30, r_coverage_pct: '100.00',
     insufficient_sample: false,
   },
   profit_factor: { profit_factor: '3.14', gross_profit: '19000.00', gross_loss: '-6050.00' },
@@ -25,7 +25,7 @@ export const ANALYTICS_SUMMARY_FIXTURE = {
   },
   direction: [{
     direction: 'LONG', trade_count: 30, win_count: 20, loss_count: 10,
-    breakeven_count: 0, win_rate: '0.67', avg_net_pnl: '916.67',
+    breakeven_count: 0, win_rate: '67.00', avg_net_pnl: '916.67',
     total_net_pnl: '27500.00', avg_r_multiple: '0.75',
   }],
   charges: {
@@ -147,7 +147,7 @@ export const R_DISTRIBUTION_FIXTURE = {
   p75_r: '1.25',
   coverage_count: 20,
   total_count: 22,
-  coverage_pct: '0.91',
+  coverage_pct: '91.00',
   insufficient_sample: false,
   buckets: [
     { label: '< −2R', lower: null, upper: '-2', count: 2 },
@@ -167,7 +167,7 @@ export const R_DISTRIBUTION_INSUFFICIENT_FIXTURE = {
   p75_r: null,
   coverage_count: 3,
   total_count: 5,
-  coverage_pct: '0.60',
+  coverage_pct: '60.00',
   insufficient_sample: true,
   buckets: [
     { label: '< −2R', lower: null, upper: '-2', count: 0 },
@@ -190,7 +190,7 @@ export const DIMENSION_BREAKDOWN_DIRECTION_FIXTURE = {
       label: 'LONG',
       trade_count: 18,
       win_count: 12,
-      win_rate: '0.67',
+      win_rate: '67.00',
       total_net_pnl: '22500.00',
       avg_net_pnl: '1250.00',
       avg_r_multiple: '0.85',
@@ -200,7 +200,7 @@ export const DIMENSION_BREAKDOWN_DIRECTION_FIXTURE = {
       label: 'SHORT',
       trade_count: 8,
       win_count: 4,
-      win_rate: '0.50',
+      win_rate: '50.00',
       total_net_pnl: '5000.00',
       avg_net_pnl: '625.00',
       avg_r_multiple: null,
@@ -216,7 +216,7 @@ export const DIMENSION_BREAKDOWN_SETUP_FIXTURE = {
       label: 'Breakout',
       trade_count: 10,
       win_count: 7,
-      win_rate: '0.70',
+      win_rate: '70.00',
       total_net_pnl: '15000.00',
       avg_net_pnl: '1500.00',
       avg_r_multiple: '1.20',
@@ -226,7 +226,7 @@ export const DIMENSION_BREAKDOWN_SETUP_FIXTURE = {
       label: '(no setup)',
       trade_count: 5,
       win_count: 2,
-      win_rate: '0.40',
+      win_rate: '40.00',
       total_net_pnl: '-2000.00',
       avg_net_pnl: '-400.00',
       avg_r_multiple: null,
@@ -369,11 +369,11 @@ export const STREAKS_EMPTY_FIXTURE = {
 
 export const HOLD_DURATION_FIXTURE = {
   buckets: [
-    { bucket: '< 15 min', bucket_order: 1, count: 5, avg_net_pnl: '450.00', win_rate: '0.60' },
-    { bucket: '15 min – 1 hr', bucket_order: 2, count: 12, avg_net_pnl: '820.00', win_rate: '0.75' },
-    { bucket: '1 – 4 hr', bucket_order: 3, count: 8, avg_net_pnl: '-120.00', win_rate: '0.38' },
-    { bucket: '4 – 24 hr', bucket_order: 4, count: 3, avg_net_pnl: '200.00', win_rate: '0.67' },
-    { bucket: '> 7 days', bucket_order: 6, count: 2, avg_net_pnl: '1500.00', win_rate: '1.00' },
+    { bucket: '< 15 min', bucket_order: 1, count: 5, avg_net_pnl: '450.00', win_rate: '60.00' },
+    { bucket: '15 min – 1 hr', bucket_order: 2, count: 12, avg_net_pnl: '820.00', win_rate: '75.00' },
+    { bucket: '1 – 4 hr', bucket_order: 3, count: 8, avg_net_pnl: '-120.00', win_rate: '38.00' },
+    { bucket: '4 – 24 hr', bucket_order: 4, count: 3, avg_net_pnl: '200.00', win_rate: '67.00' },
+    { bucket: '> 7 days', bucket_order: 6, count: 2, avg_net_pnl: '1500.00', win_rate: '100.00' },
   ],
   avg_duration_minutes: '82.50',
   median_duration_minutes: '45.00',
@@ -386,16 +386,16 @@ export const HOLD_DURATION_EMPTY_FIXTURE = {
 }
 
 export const EXIT_TYPES_FIXTURE = [
-  { exit_type: 'TARGET_HIT', trade_count: 12, win_rate: '1.00', avg_net_pnl: '950.00', avg_r_multiple: '2.10' },
+  { exit_type: 'TARGET_HIT', trade_count: 12, win_rate: '100.00', avg_net_pnl: '950.00', avg_r_multiple: '2.10' },
   { exit_type: 'STOP_HIT', trade_count: 10, win_rate: '0.00', avg_net_pnl: '-480.00', avg_r_multiple: '-1.00' },
-  { exit_type: 'DISCRETIONARY', trade_count: 5, win_rate: '0.60', avg_net_pnl: '120.00', avg_r_multiple: '0.40' },
-  { exit_type: null, trade_count: 3, win_rate: '0.33', avg_net_pnl: '-200.00', avg_r_multiple: null },
+  { exit_type: 'DISCRETIONARY', trade_count: 5, win_rate: '60.00', avg_net_pnl: '120.00', avg_r_multiple: '0.40' },
+  { exit_type: null, trade_count: 3, win_rate: '33.00', avg_net_pnl: '-200.00', avg_r_multiple: null },
 ]
 
 /** Variant: NULL exit_type > 20% of total — triggers data quality alert. */
 export const EXIT_TYPES_HIGH_UNTAGGED_FIXTURE = [
-  { exit_type: 'TARGET_HIT', trade_count: 3, win_rate: '1.00', avg_net_pnl: '900.00', avg_r_multiple: '2.00' },
-  { exit_type: null, trade_count: 7, win_rate: '0.43', avg_net_pnl: '-100.00', avg_r_multiple: null },
+  { exit_type: 'TARGET_HIT', trade_count: 3, win_rate: '100.00', avg_net_pnl: '900.00', avg_r_multiple: '2.00' },
+  { exit_type: null, trade_count: 7, win_rate: '43.00', avg_net_pnl: '-100.00', avg_r_multiple: null },
 ]
 
 // ---------------------------------------------------------------------------

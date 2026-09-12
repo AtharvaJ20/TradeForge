@@ -7,7 +7,7 @@ describe('ExpectancyCard', () => {
   it('renders positive expectancy R with coverage info when sufficient data', () => {
     render(<ExpectancyCard expectancy={F.expectancy} />)
     expect(screen.getByText('+1.25')).toBeInTheDocument()
-    expect(screen.getByText(/R coverage: 100\.0%/i)).toBeInTheDocument()
+    expect(screen.getByText(/R coverage: 100\.00%/i)).toBeInTheDocument()
   })
 
   it('renders avg win and avg loss R values', () => {
