@@ -2,7 +2,7 @@ import { apiClient } from '@/lib/api-client'
 import type { User, UpdateProfileBody } from './types'
 
 export const authApi = {
-  me: () => apiClient.get<User>('/v1/auth/me'),
+  me: (signal?: AbortSignal) => apiClient.get<User>('/v1/auth/me', signal),
   getProfile: () => apiClient.get<User>('/v1/users/me'),
   updateProfile: (body: UpdateProfileBody) => apiClient.patch<User>('/v1/users/me', body),
   login: (email: string, password: string) =>

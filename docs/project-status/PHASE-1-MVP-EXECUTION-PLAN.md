@@ -2,10 +2,10 @@
 
 **Document:** `docs/project-status/PHASE-1-MVP-EXECUTION-PLAN.md`  
 **Author:** Krishna (Project Manager)  
-**Date:** 2026-09-05  
-**Base state:** Steps 1–15 complete, CI GREEN, branch `main` (after `feat/step-15-profile-account-management` merged as PR #9); Step 16 in progress on `feat/step-16-manual-trade-entry`  
+**Date:** 2026-09-05 (last updated 2026-09-11)  
+**Base state:** Steps 1–20 complete, QA-1 complete (all J-1–J-9 PASS on staging), staging live at `https://intuitive-education-staging.up.railway.app`. One item remaining: I-3 production deployment.  
 **Source of truth for scope:** `docs/requirements/REQUIREMENTS.md` v1.1 §38  
-**Status:** ACTIVE — update as steps close
+**Status:** ACTIVE — awaiting I-3 (production deploy)
 
 ---
 
@@ -422,7 +422,7 @@ This track runs in parallel with feature steps. It does not block most feature d
 
 **Deliverable:** Document service topology + env var list in `docs/infrastructure/RAILWAY-TOPOLOGY.md`.
 
-**Status:** ⚠️ **PARTIALLY COMPLETE — 2026-09-10** (Nakula: IaC committed at `a078ca9`. Blocked on Atharva provisioning Railway services, adding secrets, and creating Cloudflare R2 + Resend accounts. Full runbook in `docs/infrastructure/RAILWAY-TOPOLOGY.md`.)
+**Status:** ✅ **COMPLETE — 2026-09-11** (Staging environment fully provisioned and operational. Backend: `https://intuitive-education-staging.up.railway.app` (Port 8080). All migrations applied through 0017. Health check confirmed. QA-1 completed successfully against this environment.)
 
 **IaC deliverables committed:**
 - `backend/Dockerfile` (multi-stage Python 3.12 + uvicorn; alembic on start)
@@ -492,6 +492,22 @@ This track runs in parallel with feature steps. It does not block most feature d
 **E2E tooling:** Playwright (preferred — consistent with Vite + React; Sahadeva decides).  
 **Test environment:** Staging environment (Step I-1).
 
+**Status:** ✅ **COMPLETE — 2026-09-11** (Sahadeva **GO** — all J-1 through J-9 PASS on staging `https://intuitive-education-staging.up.railway.app`)
+
+| Journey | Result | Notes |
+|---------|--------|-------|
+| J-1 | ✅ PASS | Register → verify email → log in |
+| J-2 | ✅ PASS | Create trading account |
+| J-3 | ✅ PASS | Import Zerodha CSV → trade list populated |
+| J-4 | ✅ PASS | Manual BUY+SELL → net_pnl=250.00, charges=0 (DEF-J4-001 fixed, verified 2026-09-11) |
+| J-5 | ✅ PASS | Journal a trade (emotion + discipline + attachment + audit history) |
+| J-6 | ✅ PASS | Analytics dashboard → all 9 metric cards render with data |
+| J-7 | ✅ PASS | Filter (Direction: Long) → analytics update |
+| J-8 | ✅ PASS | Trade detail page → all sections present |
+| J-9 | ✅ PASS | Log out → session invalidated → protected routes redirect to login |
+
+Defects found during QA-1: DEF-J1-001, DEF-J1-002, DEF-J3-001, DEF-J4-001, DEF-AUTH-001, DEF-ENV-001 — all resolved and verified closed before final GO.
+
 ---
 
 ## Phase 1 MVP Completion Criteria
@@ -507,10 +523,12 @@ Phase 1 is DONE when all of the following are true simultaneously:
 - [x] Step 17 accepted by Yudhishthira ✅ 2026-09-08
 - [x] Step 18 accepted by Yudhishthira ✅ 2026-09-09
 - [x] Step 19 accepted by Yudhishthira ✅ 2026-09-09
-- [ ] Step 20 security hardening accepted by Hanuman
-- [ ] Track I (I-1, I-2, I-3) complete — product live on production infrastructure
-- [ ] Track QA E2E suite (J-1 through J-9) passing on staging
-- [ ] No open HIGH or CRITICAL security findings from Hanuman
+- [x] Step 20 security hardening accepted by Hanuman ✅ 2026-09-10
+- [x] Track QA E2E suite (J-1 through J-9) passing on staging ✅ 2026-09-11 — Sahadeva GO
+- [x] No open HIGH or CRITICAL security findings from Hanuman ✅ 2026-09-10 (Hanuman GO — no HIGH/CRITICAL)
+- [x] I-1 staging infrastructure live ✅ 2026-09-11
+- [x] I-2 CI/CD on GitHub Actions ✅ 2026-09-10
+- [ ] **I-3: Production deployment — LAST REMAINING ITEM**
 - [ ] Nakula: production deployment GREEN, no critical errors in first 24h monitoring
 
 ---
@@ -544,12 +562,10 @@ Phase 1 is DONE when all of the following are true simultaneously:
               I-3: Production Deploy
 ```
 
-**Current active work (as of 2026-09-10):**
-- Step 19 (Arjun + Bhima) — ✅ CLOSED, merged to `main` as PR #13 (2026-09-09) — Yudhishthira ACCEPT
-- Step 20 (Hanuman → Bhima → Nakula) — 🚧 ACTIVE on `feat/step-20-security-hardening`; execution plan at `docs/project-status/STEP-20-EXECUTION-PLAN.md`; 4 implementation tasks + Hanuman sign-off gate
+**Current active work (as of 2026-09-11):**
+- **I-3 Production deployment (Nakula)** — 🚧 LAST REMAINING ITEM. All gates cleared: Step 20 ✅, QA-1 ✅, no open HIGH/CRITICAL security findings ✅. Nakula to trigger production Railway deploy, confirm migrations applied cleanly, run smoke tests, and monitor for 24h.
 
-**Steps blocked on Atharva's cloud/domain decisions:**
-- I-1 (Nakula) — nothing in the infrastructure track can begin
+**All other items closed:** Steps 12.6–20 accepted. I-1 staging live. I-2 CI/CD operational. QA-1 GO.
 
 ---
 

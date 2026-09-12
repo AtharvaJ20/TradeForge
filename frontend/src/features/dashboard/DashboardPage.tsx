@@ -249,7 +249,7 @@ function JournalRow({ entry }: { entry: RecentJournalItemOut }) {
 // ---------------------------------------------------------------------------
 
 export function DashboardPage() {
-  const { selectedAccount } = useAccount()
+  const { selectedAccount, isLoading: accountLoading } = useAccount()
   const accountId = selectedAccount?.id ?? ''
   const filterParams = accountId ? { account_ids: [accountId] } : {}
 
@@ -273,7 +273,7 @@ export function DashboardPage() {
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-secondary">
           Account Overview
         </h2>
-        {summaryLoading && (
+        {(summaryLoading || accountLoading) && (
           <div
             role="status"
             aria-label="Loading dashboard"
@@ -284,12 +284,12 @@ export function DashboardPage() {
             <div className="h-5 w-2/5 animate-pulse rounded bg-surface-subtle" />
           </div>
         )}
-        {summaryError && !summaryLoading && (
+        {summaryError && !summaryLoading && !accountLoading && (
           <p role="alert" className="text-sm text-danger-emphasis">
             Failed to load account overview.
           </p>
         )}
-        {summary && !summaryLoading && <AccountOverviewContent data={summary} />}
+        {summary && !summaryLoading && !accountLoading && <AccountOverviewContent data={summary} />}
       </section>
 
       {/* Section 2 — Performance */}
@@ -338,22 +338,22 @@ export function DashboardPage() {
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-secondary">
           Recent Trades
         </h2>
-        {tradesLoading && (
+        {(tradesLoading || accountLoading) && (
           <div aria-busy="true" className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <SkeletonRow key={i} />
             ))}
           </div>
         )}
-        {tradesError && !tradesLoading && (
+        {tradesError && !tradesLoading && !accountLoading && (
           <p role="alert" className="text-sm text-danger-emphasis">
             Failed to load recent trades.
           </p>
         )}
-        {!tradesLoading && !tradesError && trades !== undefined && trades.length === 0 && (
+        {!tradesLoading && !tradesError && !accountLoading && trades !== undefined && trades.length === 0 && (
           <p className="text-sm text-text-secondary">No closed trades yet.</p>
         )}
-        {!tradesLoading && !tradesError && trades && trades.length > 0 && (
+        {!tradesLoading && !tradesError && !accountLoading && trades && trades.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -391,22 +391,22 @@ export function DashboardPage() {
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-secondary">
           Recent Journal
         </h2>
-        {journalLoading && (
+        {(journalLoading || accountLoading) && (
           <div aria-busy="true" className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
               <SkeletonRow key={i} />
             ))}
           </div>
         )}
-        {journalError && !journalLoading && (
+        {journalError && !journalLoading && !accountLoading && (
           <p role="alert" className="text-sm text-danger-emphasis">
             Failed to load recent journal entries.
           </p>
         )}
-        {!journalLoading && !journalError && journal !== undefined && journal.length === 0 && (
+        {!journalLoading && !journalError && !accountLoading && journal !== undefined && journal.length === 0 && (
           <p className="text-sm text-text-secondary">No journal entries yet.</p>
         )}
-        {!journalLoading && !journalError && journal && journal.length > 0 && (
+        {!journalLoading && !journalError && !accountLoading && journal && journal.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>

@@ -22,17 +22,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // login will return 401 and would otherwise kick the user back to /login
   // even after a successful sign-in.
   const hydratedRef = useRef(false)
+  // Holds the AbortController for the initial me() fetch so login() can cancel
+  // it before it returns a 401, preventing handleExpired from firing post-login.
+  const meControllerRef = useRef<AbortController | null>(null)
 
   // Hydrate auth state on mount
   useEffect(() => {
+    const controller = new AbortController()
+    meControllerRef.current = controller
+
     authApi
-      .me()
+      .me(controller.signal)
       .then(setUser)
-      .catch(() => setUser(null))
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return
+        setUser(null)
+      })
       .finally(() => {
+        if (controller.signal.aborted) return
         hydratedRef.current = true
         setIsLoading(false)
       })
+
+    return () => controller.abort()
   }, [])
 
   // Session-expired event: any 401 from api-client dispatches this
@@ -47,13 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [navigate])
 
   async function login(email: string, password: string): Promise<void> {
+    // Cancel the initial me() fetch before credentials are submitted. If me()
+    // is still in-flight (cold Railway start), aborting it prevents the 401
+    // it would eventually return from passing through handleExpired and kicking
+    // the user back to /login immediately after a successful sign-in.
+    meControllerRef.current?.abort()
     const params = new URLSearchParams(location.search)
     const next = params.get('next')
     const userData = await authApi.login(email, password)
     setUser(userData)
-    // Mark hydration complete so that (a) RequireAuth can render immediately
-    // and (b) any 401 from the still-in-flight initial me() call does not
-    // redirect back to /login. The in-flight me() will settle harmlessly.
+    // Mark hydration complete so RequireAuth can render the protected route
+    // immediately and any future 401s are handled by handleExpired.
     hydratedRef.current = true
     setIsLoading(false)
     navigate(next ?? '/analytics', { replace: true })
