@@ -86,6 +86,7 @@ class AuthService:
         reset_repo: PendingResetRepository,
         session_repo: SessionRepository,
         email_sender: EmailSender,
+        skip_email_verification: bool = False,
     ) -> None:
         self._users = user_repo
         self._audit = audit_repo
@@ -93,6 +94,7 @@ class AuthService:
         self._resets = reset_repo
         self._sessions = session_repo
         self._email = email_sender
+        self._skip_email_verification = skip_email_verification
 
     # ------------------------------------------------------------------
     # Registration
@@ -160,6 +162,10 @@ class AuthService:
 
         password_hash = _ph.hash(password)
         user = await self._users.create(email=email, password_hash=password_hash)
+
+        if self._skip_email_verification:
+            await self._users.set_email_verified(user.id)
+            return
 
         raw_token = generate_verification_token()
         token_hash = sha256_hex(raw_token)
