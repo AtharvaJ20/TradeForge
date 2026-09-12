@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     email_transport: str  # "smtp" | "console" | "resend"
     smtp_host: str = "localhost"
     smtp_port: int = 1025
+    smtp_user: str = ""  # leave empty for unauthenticated local SMTP (Mailpit)
+    smtp_password: str = ""  # Gmail App Password when smtp_user is set
     resend_api_key: str = ""
     from_address: str = ""
 

@@ -1,12 +1,17 @@
 """Unit tests for email sender implementations.
 
 Covers:
+  - SmtpEmailSender without credentials (Mailpit) — no STARTTLS, no auth
+  - SmtpEmailSender with credentials (Gmail) — STARTTLS enabled, auth passed
+  - SmtpEmailSender wraps SMTP failure as EmailDeliveryError
   - ResendEmailSender sends correct payload to Resend API
   - ResendEmailSender wraps non-2xx Resend API response as EmailDeliveryError
   - ResendEmailSender wraps network failure as EmailDeliveryError
   - get_email_sender() returns ResendEmailSender when EMAIL_TRANSPORT=resend
   - get_email_sender() raises ValueError when EMAIL_TRANSPORT=resend but RESEND_API_KEY is empty
   - get_email_sender() raises ValueError for unknown transport
+  - get_email_sender() returns SmtpEmailSender when EMAIL_TRANSPORT=smtp
+  - get_email_sender() raises ValueError when SMTP_USER set without SMTP_PASSWORD
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,9 +22,111 @@ import pytest
 from tradeforge.application.auth.email import (
     ConsoleEmailSender,
     ResendEmailSender,
+    SmtpEmailSender,
     get_email_sender,
 )
 from tradeforge.domain.auth.errors import EmailDeliveryError
+
+# ---------------------------------------------------------------------------
+# SmtpEmailSender — unauthenticated (Mailpit local dev)
+# ---------------------------------------------------------------------------
+
+
+async def test_smtp_sender_no_auth_sends_without_starttls() -> None:
+    sender = SmtpEmailSender(host="localhost", port=1025, from_address="test@local")
+
+    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+        await sender.send("user@example.com", "Hello", "<p>Hi</p>")
+
+        mock_send.assert_awaited_once()
+        _, kwargs = mock_send.call_args
+        assert kwargs["hostname"] == "localhost"
+        assert kwargs["port"] == 1025
+        assert kwargs["start_tls"] is False
+        assert kwargs["username"] is None
+        assert kwargs["password"] is None
+
+
+# ---------------------------------------------------------------------------
+# SmtpEmailSender — authenticated (Gmail SMTP)
+# ---------------------------------------------------------------------------
+
+
+async def test_smtp_sender_with_auth_enables_starttls_and_passes_credentials() -> None:
+    sender = SmtpEmailSender(
+        host="smtp.gmail.com",
+        port=587,
+        from_address="jadhavatharva20@gmail.com",
+        username="jadhavatharva20@gmail.com",
+        password="app-password-here",
+    )
+
+    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+        await sender.send("recipient@example.com", "Reset your password", "<p>Link</p>")
+
+        mock_send.assert_awaited_once()
+        _, kwargs = mock_send.call_args
+        assert kwargs["hostname"] == "smtp.gmail.com"
+        assert kwargs["port"] == 587
+        assert kwargs["start_tls"] is True
+        assert kwargs["username"] == "jadhavatharva20@gmail.com"
+        assert kwargs["password"] == "app-password-here"
+
+
+async def test_smtp_sender_wraps_failure_as_email_delivery_error() -> None:
+    sender = SmtpEmailSender(
+        host="smtp.gmail.com",
+        port=587,
+        from_address="from@gmail.com",
+        username="from@gmail.com",
+        password="bad-password",
+    )
+
+    with patch("aiosmtplib.send", new_callable=AsyncMock, side_effect=Exception("auth failed")):
+        with pytest.raises(EmailDeliveryError, match="SMTP delivery failed"):
+            await sender.send("to@example.com", "Subject", "<p>Body</p>")
+
+
+# ---------------------------------------------------------------------------
+# get_email_sender() factory — smtp transport
+# ---------------------------------------------------------------------------
+
+
+def test_get_email_sender_returns_smtp_sender_when_configured() -> None:
+    env = {
+        "DATABASE_URL": "postgresql+asyncpg://x:x@localhost/x",
+        "REDIS_URL": "redis://localhost",
+        "EMAIL_TRANSPORT": "smtp",
+        "SMTP_HOST": "smtp.gmail.com",
+        "SMTP_PORT": "587",
+        "SMTP_USER": "jadhavatharva20@gmail.com",
+        "SMTP_PASSWORD": "my-app-password",
+        "FROM_ADDRESS": "jadhavatharva20@gmail.com",
+        "ALLOWED_ORIGINS": "http://localhost:5173",
+        "SECRET_KEY": "test-secret",
+    }
+    with patch.dict("os.environ", env, clear=True):
+        sender = get_email_sender()
+        assert isinstance(sender, SmtpEmailSender)
+
+
+def test_get_email_sender_raises_when_smtp_user_set_without_password() -> None:
+    env = {
+        "DATABASE_URL": "postgresql+asyncpg://x:x@localhost/x",
+        "REDIS_URL": "redis://localhost",
+        "EMAIL_TRANSPORT": "smtp",
+        "SMTP_HOST": "smtp.gmail.com",
+        "SMTP_PORT": "587",
+        "SMTP_USER": "jadhavatharva20@gmail.com",
+        "SMTP_PASSWORD": "",
+        "FROM_ADDRESS": "jadhavatharva20@gmail.com",
+        "ALLOWED_ORIGINS": "http://localhost:5173",
+        "SECRET_KEY": "test-secret",
+    }
+    with patch.dict("os.environ", env, clear=True):
+        with pytest.raises(ValueError, match="SMTP_PASSWORD"):
+            get_email_sender()
+
 
 # ---------------------------------------------------------------------------
 # ResendEmailSender — happy path
