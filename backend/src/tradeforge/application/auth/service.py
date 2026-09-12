@@ -186,8 +186,10 @@ class AuthService:
                 ),
             )
         except EmailDeliveryError:
-            _log.error("Verification email delivery failed for new user (email send error); "
-                       "user created, token stored — user must request resend")
+            _log.error(
+                "Verification email delivery failed for new user (email send error); "
+                "user created, token stored — user must request resend"
+            )
         # Prevent session creation before email is verified — user.is_email_verified stays False
         _ = user  # user stored; verification required before login is allowed
 
