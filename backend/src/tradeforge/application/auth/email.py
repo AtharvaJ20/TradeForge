@@ -23,10 +23,19 @@ class EmailSender(Protocol):
 
 
 class SmtpEmailSender:
-    def __init__(self, host: str, port: int, from_address: str) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        from_address: str,
+        username: str = "",
+        password: str = "",
+    ) -> None:
         self._host = host
         self._port = port
         self._from = from_address
+        self._username = username
+        self._password = password
 
     async def send(self, to: str, subject: str, html_body: str) -> None:
         from tradeforge.domain.auth.errors import EmailDeliveryError
@@ -36,11 +45,16 @@ class SmtpEmailSender:
         msg["From"] = self._from
         msg["To"] = to
         msg.attach(MIMEText(html_body, "html"))
+
+        use_starttls = bool(self._username)
         try:
             await aiosmtplib.send(
                 msg,
                 hostname=self._host,
                 port=self._port,
+                start_tls=use_starttls,
+                username=self._username or None,
+                password=self._password or None,
             )
         except Exception as exc:
             raise EmailDeliveryError(f"SMTP delivery failed: {exc}") from exc
@@ -96,10 +110,14 @@ def get_email_sender() -> EmailSender:
     from_addr = settings.from_address or "noreply@tradeforge.local"
 
     if transport == "smtp":
+        if settings.smtp_user and not settings.smtp_password:
+            raise ValueError("SMTP_PASSWORD must be set when SMTP_USER is provided")
         return SmtpEmailSender(
             host=settings.smtp_host,
             port=settings.smtp_port,
             from_address=from_addr,
+            username=settings.smtp_user,
+            password=settings.smtp_password,
         )
     if transport == "console":
         return ConsoleEmailSender()
