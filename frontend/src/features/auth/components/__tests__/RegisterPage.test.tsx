@@ -150,6 +150,22 @@ describe('RegisterPage — F-14-14: API error renders alert', () => {
 })
 
 // ---------------------------------------------------------------------------
+// DEF-DASH-005: 503 service-unavailable shows email-delivery message
+// ---------------------------------------------------------------------------
+
+describe('RegisterPage — DEF-DASH-005: 503 shows email delivery error', () => {
+  it('shows email delivery error message for 503 responses', () => {
+    mockUseRegister.mockReturnValue(
+      makeRegister({ error: new ApiError(503, 'SERVICE_UNAVAILABLE'), isError: true }),
+    )
+    renderRegister()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /couldn't send your verification email/i,
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
 // plan F-14-13: 422 policy message rendered verbatim
 // ---------------------------------------------------------------------------
 

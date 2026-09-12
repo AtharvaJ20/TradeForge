@@ -42,6 +42,7 @@ function mapRegisterError(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 429) return 'Too many registration attempts. Please wait.'
     if (err.status === 422) return err.detail
+    if (err.status === 503) return "We couldn't send your verification email. Please try again in a moment."
   }
   return 'Something went wrong. Please try again.'
 }

@@ -1,17 +1,21 @@
 """Email sender abstraction.
 
 Local dev → SmtpEmailSender (Mailpit on port 1025).
-Staging / Production → ResendEmailSender (Resend API via httpx).
+Staging (no SMTP) → ConsoleEmailSender (prints to stdout; visible in Railway logs).
+Production → ResendEmailSender (Resend API via httpx).
 
 EmailSender is a structural Protocol so tests can inject any callable duck-type.
 """
 
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Protocol
 
 import aiosmtplib
 import httpx
+
+_log = logging.getLogger(__name__)
 
 
 class EmailSender(Protocol):
@@ -42,6 +46,18 @@ class SmtpEmailSender:
             raise EmailDeliveryError(f"SMTP delivery failed: {exc}") from exc
 
 
+class ConsoleEmailSender:
+    """Logs email to stdout — use on staging where no SMTP/API is configured."""
+
+    async def send(self, to: str, subject: str, html_body: str) -> None:
+        _log.info(
+            "[ConsoleEmailSender] To: %s | Subject: %s | Body: %s",
+            to,
+            subject,
+            html_body,
+        )
+
+
 class ResendEmailSender:
     """Send transactional email via the Resend API (https://resend.com)."""
 
@@ -66,7 +82,13 @@ class ResendEmailSender:
 
 
 def get_email_sender() -> EmailSender:
-    """Factory: return the correct EmailSender for the current transport setting."""
+    """Factory: return the correct EmailSender for the current transport setting.
+
+    Supported values for EMAIL_TRANSPORT:
+      smtp    — local dev (Mailpit on port 1025)
+      console — staging (logs to stdout; no external service needed)
+      resend  — production (Resend API)
+    """
     from tradeforge.settings import get_settings
 
     settings = get_settings()
@@ -79,6 +101,8 @@ def get_email_sender() -> EmailSender:
             port=settings.smtp_port,
             from_address=from_addr,
         )
+    if transport == "console":
+        return ConsoleEmailSender()
     if transport == "resend":
         if not settings.resend_api_key:
             raise ValueError("RESEND_API_KEY must be set when EMAIL_TRANSPORT=resend")
