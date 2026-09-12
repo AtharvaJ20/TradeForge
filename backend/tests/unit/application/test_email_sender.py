@@ -73,6 +73,50 @@ async def test_smtp_sender_with_auth_enables_starttls_and_passes_credentials() -
         assert kwargs["password"] == "app-password-here"
 
 
+async def test_smtp_sender_strips_spaces_from_app_password() -> None:
+    """Regression: Gmail App Passwords are displayed with spaces (e.g. 'abcd efgh ijkl mnop').
+    The spaces must be stripped before passing to aiosmtplib — otherwise SMTP auth fails."""
+    sender = SmtpEmailSender(
+        host="smtp.gmail.com",
+        port=587,
+        from_address="sender@gmail.com",
+        username="sender@gmail.com",
+        password="abcd efgh ijkl mnop",
+    )
+
+    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+        await sender.send("to@example.com", "Subject", "<p>Body</p>")
+
+        _, kwargs = mock_send.call_args
+        assert kwargs["password"] == "abcdefghijklmnop"
+
+
+async def test_smtp_sender_attaches_plain_text_and_html_parts() -> None:
+    """SMTP messages must include a text/plain alternative alongside HTML.
+    HTML-only emails are flagged by spam filters and silently dropped by Gmail."""
+    sender = SmtpEmailSender(host="localhost", port=1025, from_address="test@local")
+
+    captured: list = []
+
+    async def capture_send(msg, **kwargs):  # type: ignore[no-untyped-def]
+        captured.append(msg)
+
+    with patch("aiosmtplib.send", new_callable=AsyncMock, side_effect=capture_send):
+        await sender.send("user@example.com", "Subject", "<p>Hello <strong>world</strong></p>")
+
+    assert len(captured) == 1
+    msg = captured[0]
+    content_types = [part.get_content_type() for part in msg.walk()]
+    assert "text/plain" in content_types, "Missing text/plain MIME part"
+    assert "text/html" in content_types, "Missing text/html MIME part"
+
+    plain_part = next(p for p in msg.walk() if p.get_content_type() == "text/plain")
+    plain_text = plain_part.get_payload(decode=True).decode()
+    assert "Hello" in plain_text
+    assert "world" in plain_text
+    assert "<p>" not in plain_text, "Plain text part must not contain HTML tags"
+
+
 async def test_smtp_sender_wraps_failure_as_email_delivery_error() -> None:
     sender = SmtpEmailSender(
         host="smtp.gmail.com",
