@@ -54,7 +54,10 @@ function renderPage() {
 
 async function waitForPageReady() {
   await waitFor(() => {
-    expect(screen.getByLabelText(/account/i)).toBeInTheDocument()
+    const select = screen.getByLabelText(/account/i)
+    const options = Array.from(select.querySelectorAll('option'))
+    // Wait until MSW has responded and account options are populated
+    expect(options.some((o) => o.value !== '')).toBe(true)
   })
 }
 
