@@ -13,6 +13,14 @@ vi.mock('@/features/auth/context/AuthContext', () => ({
   useAuth: vi.fn(),
 }))
 
+// ---------------------------------------------------------------------------
+// Mock useTheme — AppShell renders a theme toggle; stub it for unit tests
+// ---------------------------------------------------------------------------
+
+vi.mock('@/shared/hooks/useTheme', () => ({
+  useTheme: () => ({ theme: 'light' as const, toggle: vi.fn() }),
+}))
+
 import { useAuth as _useAuth } from '@/features/auth/context/AuthContext'
 
 const mockUseAuth = vi.mocked(_useAuth)
