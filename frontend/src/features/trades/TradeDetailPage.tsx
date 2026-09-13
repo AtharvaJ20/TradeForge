@@ -55,8 +55,8 @@ function formatExchangeSegment(raw: string): string {
 function DirectionChip({ direction }: { direction: string }) {
   const cls =
     direction === 'LONG'
-      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+      ? 'bg-surface-success text-success-emphasis'
+      : 'bg-surface-danger text-danger-emphasis'
   return (
     <span className={`inline-block rounded px-2 py-0.5 text-sm font-medium ${cls}`}>
       {direction === 'LONG' ? 'Long' : 'Short'}
@@ -66,8 +66,8 @@ function DirectionChip({ direction }: { direction: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    OPEN: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    PARTIAL: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+    OPEN: 'bg-surface-info text-info',
+    PARTIAL: 'bg-surface-warning text-warning-emphasis',
     CLOSED: 'bg-surface-subtle text-text-secondary',
   }
   const cls = map[status] ?? 'bg-surface-subtle text-text-secondary'
@@ -82,8 +82,8 @@ function StatusBadge({ status }: { status: string }) {
 function SideChip({ side }: { side: string }) {
   const cls =
     side === 'BUY'
-      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+      ? 'bg-surface-success text-success-emphasis'
+      : 'bg-surface-danger text-danger-emphasis'
   return (
     <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${cls}`}>{side}</span>
   )
