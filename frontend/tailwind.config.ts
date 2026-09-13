@@ -29,6 +29,14 @@ const config: Config = {
         'border-focus': 'var(--color-border-focus)',
         primary: 'var(--color-primary)',
         'primary-emphasis': 'var(--color-primary-emphasis)',
+        brand: 'var(--color-brand)',
+        'brand-emphasis': 'var(--color-brand-emphasis)',
+        'toggle-sun': 'var(--color-toggle-sun)',
+        'toggle-moon': 'var(--color-toggle-moon)',
+      },
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       keyframes: {
         shimmer: {
