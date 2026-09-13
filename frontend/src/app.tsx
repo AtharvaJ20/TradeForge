@@ -1,10 +1,11 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import { LoginPage } from './features/auth/components/LoginPage'
 import { RegisterPage } from './features/auth/components/RegisterPage'
 import { RegisterSuccessPage } from './features/auth/components/RegisterSuccessPage'
 import { VerifyEmailPage } from './features/auth/components/VerifyEmailPage'
 import { ForgotPasswordPage } from './features/auth/components/ForgotPasswordPage'
 import { ResetPasswordPage } from './features/auth/components/ResetPasswordPage'
+import { LandingPage } from './features/landing/LandingPage'
 import { AnalyticsPage } from './features/analytics/AnalyticsPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { AddTradePage } from './features/trades/AddTradePage'
@@ -12,6 +13,7 @@ import { TradeListPage } from './features/trades/TradeListPage'
 import { TradeDetailPage } from './features/trades/TradeDetailPage'
 import { AccountProvider } from './features/accounts/context/AccountContext'
 import { AppShell } from './layout/AppShell'
+import { AuthShell } from './layout/AuthShell'
 import { RequireAuth } from './components/RequireAuth'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PlaceholderPage } from './components/PlaceholderPage'
@@ -21,13 +23,18 @@ import { DashboardPage } from './features/dashboard/DashboardPage'
 export function App() {
   return (
     <Routes>
-      {/* Public auth routes */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/register-success" element={<RegisterSuccessPage />} />
-      <Route path="/verify-email" element={<VerifyEmailPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      {/* Public landing page */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Public auth routes — wrapped in AuthShell two-column layout */}
+      <Route element={<AuthShell />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register-success" element={<RegisterSuccessPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+      </Route>
 
       {/* Protected routes — gated by auth, wrapped in AppShell */}
       <Route element={<RequireAuth />}>
@@ -40,7 +47,6 @@ export function App() {
             </ErrorBoundary>
           }
         >
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/risk" element={<PlaceholderPage title="Risk" />} />

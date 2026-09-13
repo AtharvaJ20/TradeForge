@@ -1,0 +1,485 @@
+<title>TF-REDESIGN-001 Scope Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg:#F0F2F6; --surf:#fff; --surf2:#F8F9FB;
+  --bd:#DDE1EA; --bd2:#C4CBD9;
+  --t1:#0F1623; --t2:#4A5568; --t3:#8896AD;
+  --blue:#2563EB; --blue-bg:#EEF4FF; --blue-bd:#BFCFFD;
+  --green:#16A34A; --green-bg:#F0FDF4; --green-bd:#BBF7D0;
+  --amber:#D97706; --amber-bg:#FFFBEB; --amber-bd:#FDE68A;
+  --red:#DC2626; --red-bg:#FEF2F2; --red-bd:#FECACA;
+  --violet:#7C3AED; --violet-bg:#F5F3FF; --violet-bd:#DDD6FE;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0B0F1A; --surf:#111827; --surf2:#1A2236;
+  --bd:#1E2D42; --bd2:#2A3D55;
+  --t1:#E8EDF5; --t2:#8896AD; --t3:#4A5C76;
+  --blue:#60A5FA; --blue-bg:#0C1A3A; --blue-bd:#1E3A6E;
+  --green:#4ADE80; --green-bg:#052E16; --green-bd:#166534;
+  --amber:#FBB93B; --amber-bg:#1C1408; --amber-bd:#78530A;
+  --red:#F87171; --red-bg:#1C0606; --red-bd:#7F1D1D;
+  --violet:#A78BFA; --violet-bg:#1A0F3A; --violet-bd:#4C1D95;
+}}
+:root[data-theme=dark]{
+  --bg:#0B0F1A; --surf:#111827; --surf2:#1A2236;
+  --bd:#1E2D42; --bd2:#2A3D55;
+  --t1:#E8EDF5; --t2:#8896AD; --t3:#4A5C76;
+  --blue:#60A5FA; --blue-bg:#0C1A3A; --blue-bd:#1E3A6E;
+  --green:#4ADE80; --green-bg:#052E16; --green-bd:#166534;
+  --amber:#FBB93B; --amber-bg:#1C1408; --amber-bd:#78530A;
+  --red:#F87171; --red-bg:#1C0606; --red-bd:#7F1D1D;
+  --violet:#A78BFA; --violet-bg:#1A0F3A; --violet-bd:#4C1D95;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14.5px;line-height:1.65;padding:2rem 1rem 5rem}
+.doc{max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:2rem}
+
+/* ── Header ── */
+.hdr{background:var(--surf);border:1px solid var(--bd);border-radius:12px;padding:1.75rem 2rem}
+.hdr-eye{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--t3);margin-bottom:.4rem}
+.hdr h1{font-size:1.5rem;font-weight:800;color:var(--t1);line-height:1.15;margin-bottom:.85rem}
+.hdr-meta{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;font-size:12.5px;color:var(--t2);margin-bottom:1.1rem}
+.meta-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-right:.3rem}
+.status-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .85rem;border-radius:999px;font-size:12px;font-weight:600;font-family:'JetBrains Mono',monospace;letter-spacing:.04em}
+.pill-amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bd)}
+.pill-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* ── Section ── */
+.sec{background:var(--surf);border:1px solid var(--bd);border-radius:12px;overflow:hidden}
+.sec-hdr{padding:.9rem 1.5rem;border-bottom:1px solid var(--bd);background:var(--surf2);display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.sec-title{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3)}
+.sec-body{padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:.85rem}
+
+/* ── Scope alignment table ── */
+.align-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.align-tbl thead th{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);padding:.5rem .75rem;text-align:left;border-bottom:1px solid var(--bd);background:var(--surf2)}
+.align-tbl tbody td{padding:.6rem .75rem;border-bottom:1px solid var(--bd);vertical-align:top}
+.align-tbl tbody tr:last-child td{border-bottom:none}
+.align-tbl tbody td:first-child{font-size:13px;color:var(--t1);font-weight:500}
+.align-tbl tbody td:nth-child(2){color:var(--t2);font-size:13px}
+.verdict{display:inline-flex;align-items:center;gap:.3rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:.15rem .5rem;border-radius:4px;letter-spacing:.04em;white-space:nowrap}
+.v-pass{background:var(--green-bg);color:var(--green)}
+.v-gap{background:var(--amber-bg);color:var(--amber)}
+.v-watch{background:var(--blue-bg);color:var(--blue)}
+
+/* ── Findings ── */
+.finding{border:1px solid var(--bd);border-radius:9px;overflow:hidden}
+.finding-hdr{padding:.65rem 1rem;display:flex;align-items:center;gap:.65rem;border-bottom:1px solid var(--bd)}
+.finding-id{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.06em}
+.finding-title{font-size:13.5px;font-weight:600;color:var(--t1);flex:1}
+.sev{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;padding:.15rem .5rem;border-radius:4px;letter-spacing:.04em;flex-shrink:0}
+.sev-major{background:var(--amber-bg);color:var(--amber)}
+.sev-gate{background:var(--red-bg);color:var(--red)}
+.sev-watch{background:var(--blue-bg);color:var(--blue)}
+.finding-body{padding:1rem;font-size:13.5px;color:var(--t2);line-height:1.65}
+.finding-body p+p{margin-top:.55rem}
+.finding-decision{margin-top:.75rem;padding:.75rem 1rem;border-radius:7px;background:var(--green-bg);border:1px solid var(--green-bd);font-size:13px;color:var(--t1);line-height:1.6}
+.dec-lbl{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green);display:block;margin-bottom:.3rem}
+
+/* ── Amendment spec ── */
+.amendment{background:var(--violet-bg);border:1px solid var(--violet-bd);border-radius:9px;padding:1.1rem 1.25rem}
+.amendment-eye{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);margin-bottom:.5rem}
+.amendment h3{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:.65rem}
+.spec-tbl-wrap{border:1px solid var(--bd);border-radius:7px;overflow:hidden;margin-top:.75rem}
+.spec-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.spec-tbl thead th{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);padding:.5rem .75rem;text-align:left;border-bottom:1px solid var(--bd);background:var(--surf2)}
+.spec-tbl tbody td{padding:.6rem .75rem;color:var(--t2);border-bottom:1px solid var(--bd);vertical-align:top}
+.spec-tbl tbody td:first-child{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--blue)}
+.spec-tbl tbody tr:last-child td{border-bottom:none}
+
+/* ── Decision gates ── */
+.gate{border:1px solid var(--amber-bd);border-radius:9px;overflow:hidden}
+.gate-hdr{padding:.65rem 1.1rem;background:var(--amber-bg);border-bottom:1px solid var(--amber-bd);display:flex;align-items:center;gap:.65rem}
+.gate-id{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--amber)}
+.gate-title{font-size:13.5px;font-weight:700;color:var(--t1);flex:1}
+.gate-body{padding:1rem 1.1rem;font-size:13.5px;color:var(--t2);line-height:1.65;background:var(--surf)}
+.gate-body p+p{margin-top:.55rem}
+.opts{display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem}
+.opt{padding:.65rem .9rem;border-radius:7px;border:1px solid var(--bd);background:var(--surf2);font-size:13px;line-height:1.55}
+.opt-lbl{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--t3);margin-right:.4rem}
+.opt-rec{border-color:var(--green-bd);background:var(--green-bg)}
+.opt-rec .opt-lbl{color:var(--green)}
+.opt-rec-tag{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;background:var(--green-bg);color:var(--green);padding:.1rem .35rem;border-radius:3px;letter-spacing:.04em;margin-left:.3rem}
+
+/* ── Checklist ── */
+.ck-list{display:flex;flex-direction:column;gap:.45rem}
+.ck{display:grid;grid-template-columns:20px 50px 1fr;gap:.6rem;align-items:start;padding:.6rem .85rem;background:var(--surf2);border:1px solid var(--bd);border-radius:7px;font-size:13.5px;color:var(--t2)}
+.ck-box{width:14px;height:14px;border:1.5px solid var(--bd2);border-radius:3px;margin-top:2px}
+.ck-own{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:.12rem .38rem;border-radius:3px;letter-spacing:.04em;text-align:center;margin-top:2px}
+.own-a{background:rgba(96,165,250,.12);color:var(--blue)}
+.own-u{background:rgba(74,222,128,.12);color:var(--green)}
+.own-x{background:rgba(220,38,38,.08);color:var(--red)}
+.ck.gate-item{border-color:var(--amber-bd);background:var(--amber-bg)}
+.ck.gate-item .ck-box{border-color:var(--amber-bd)}
+.ck.new-item{border-color:var(--violet-bd);background:var(--violet-bg)}
+
+/* ── Clearance card ── */
+.clearance{border:2px solid var(--amber-bd);border-radius:12px;padding:1.5rem 1.75rem;background:var(--amber-bg)}
+.clearance.clear{border-color:var(--green-bd);background:var(--green-bg)}
+.clearance-eye{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin-bottom:.3rem}
+.clearance.clear .clearance-eye{color:var(--green)}
+.clearance h2{font-size:1.15rem;font-weight:800;color:var(--t1);margin-bottom:.6rem}
+.clearance p{font-size:13.5px;color:var(--t2);line-height:1.65}
+.clearance p+p{margin-top:.45rem}
+
+code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--surf2);padding:.1rem .35rem;border-radius:3px;border:1px solid var(--bd)}
+</style>
+
+<div class="doc">
+
+<!-- ── HEADER ── -->
+<div class="hdr">
+  <div class="hdr-eye">Krishna · PM Scope Review · TF-REDESIGN-001</div>
+  <h1>Design Specification Review &amp; Finalization</h1>
+  <div class="hdr-meta">
+    <span><span class="meta-lbl">Date</span>2026-09-13</span>
+    <span><span class="meta-lbl">Reviewer</span>Krishna</span>
+    <span><span class="meta-lbl">Spec Author</span>Usha</span>
+    <span><span class="meta-lbl">Plan Authority</span>TF-REDESIGN-001 Execution Plan (2026-09-13)</span>
+    <span><span class="meta-lbl">Implementer</span>Arjun</span>
+    <span><span class="meta-lbl">Approver</span>Atharva</span>
+  </div>
+  <span class="status-pill pill-green"><span class="dot"></span>APPROVED — FULL CLEARANCE GRANTED · 2026-09-13</span>
+</div>
+
+<!-- ── SCOPE ALIGNMENT ── -->
+<div class="sec">
+  <div class="sec-hdr">
+    <span class="sec-title">01 · Scope Alignment Check</span>
+    <span class="status-pill pill-amber" style="font-size:10px;padding:.2rem .6rem"><span class="dot"></span>1 gap found</span>
+  </div>
+  <div class="sec-body" style="padding:0">
+    <table class="align-tbl">
+      <thead>
+        <tr>
+          <th style="width:38%">Scoped item (Execution Plan)</th>
+          <th>Usha spec coverage</th>
+          <th style="width:90px">Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Public landing page at <code>/</code></td>
+          <td>§14 — full page spec, copy table, live mockup, route note</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>AppShell sidebar — icons, brand, 220px</td>
+          <td>§07 — icon table, brand mark, account switcher, interaction states, live mockup</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>Dashboard — stat tile hierarchy, grid layout</td>
+          <td>§08 + §15 — 3-primary + 3-secondary tile spec, grid layout, live mockup</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>Auth pages — all 6, shared layout shell</td>
+          <td>§16 — AuthShell spec, two-panel layout, brand panel, all 6 pages listed as targets</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>Analytics page — <strong>card grid layout</strong></td>
+          <td>§18 item 10 covers card styling only. Grid layout replacing narrow <code>max-w-xl</code> column <strong>not specified</strong>.</td>
+          <td><span class="verdict v-gap">⚠ GAP</span></td>
+        </tr>
+        <tr>
+          <td>TradeList — chip token fix, table polish</td>
+          <td>§13 — chip system defined, §18 item 9 assigns to Arjun. TradeDetail spacing covered implicitly via table spec §10.</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>Design token extensions (<code>tokens.css</code>)</td>
+          <td>§06 — exact CSS block, shadow/radius/chart/sidebar width, dark overrides</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>Light and dark theme correctness</td>
+          <td>All components specify token names, not hex values. Dark shadow amplification documented in §05.</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>No new npm packages without Arjun sign-off</td>
+          <td>Heroicons: inline SVG, no package. Fonts: Google Fonts link tag, no package. Clean.</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>Landing page copy — Accountable: Atharva (per RACI)</td>
+          <td>Usha authored copy (Responsible ✓). Atharva approved 2026-09-13.</td>
+          <td><span class="verdict v-pass">✓ PASS</span></td>
+        </tr>
+        <tr>
+          <td>Theme toggle (user-controlled light/dark) — landing page + authenticated app</td>
+          <td>Added as item 10a — Atharva 2026-09-13. Toggle appears on <strong>both</strong> the landing page and the app sidebar. Single <code>localStorage</code> key (<code>tf-theme</code>) drives both surfaces — theme choice persists across public and authenticated views. Usha must spec both placements before Arjun implements.</td>
+          <td><span class="verdict" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bd);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">NEW SCOPE</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── FINDINGS ── -->
+<div class="sec">
+  <div class="sec-hdr">
+    <span class="sec-title">02 · Findings</span>
+    <span style="font-size:12px;color:var(--green)">All resolved — 1 Major (amendment added) · 2 Gates (Atharva approved 2026-09-13)</span>
+  </div>
+  <div class="sec-body">
+
+    <!-- F-01 -->
+    <div class="finding">
+      <div class="finding-hdr" style="background:var(--amber-bg);border-color:var(--amber-bd)">
+        <span class="finding-id" style="color:var(--amber)">F-01</span>
+        <span class="finding-title">Analytics page grid layout not specified</span>
+        <span class="sev sev-major">MAJOR · SCOPE GAP</span>
+      </div>
+      <div class="finding-body">
+        <p>The execution plan scoped "Analytics page — card grid spacing and hierarchy." The codebase audit identified the problem as <code>w-full max-w-xl</code> (≈512px single-column) — too narrow for desktop and visually mismatched against the Dashboard's full-width layout. Usha's spec (§18 item 10) addresses card <em>styling</em> (border, radius) but not the layout <em>change</em>. Without a layout spec, Arjun has no definition of done for the grid.</p>
+        <div class="finding-decision">
+          <span class="dec-lbl">Decision — Krishna fills gap</span>
+          Analytics page grid layout is specified below in §03 Amendment. This falls within Krishna's PM authority to fill a spec gap to unblock implementation. Usha's authority over visual language is not overridden — the grid values below are the minimum required by scope; Usha may tighten them if they differ from her design intent, but cannot reduce them below single-column-removal.
+        </div>
+      </div>
+    </div>
+
+    <!-- F-02 -->
+    <div class="finding">
+      <div class="finding-hdr" style="background:var(--red-bg);border-color:var(--red-bd)">
+        <span class="finding-id" style="color:var(--red)">F-02</span>
+        <span class="finding-title">Primary color change requires Atharva decision before implementation</span>
+        <span class="sev sev-gate">GATE · BLOCKER</span>
+      </div>
+      <div class="finding-body">
+        <p>Usha proposes changing <code>--color-primary</code> from <code>#2563EB</code> (Tailwind blue-600, existing) to <code>#4F46E5</code> (indigo-600). The change affects every component that uses the <code>primary</code> token — buttons, active nav states, focus rings, CTAs. It is correctly flagged as requiring sign-off.</p>
+        <p>This is a product-visible brand decision, not a design-only detail. Per RACI, Atharva is Consulted on design direction. Because the change modifies an existing production token with broad blast radius, escalation to Atharva is correct procedure regardless of RACI.</p>
+        <div class="finding-decision">
+          <span class="dec-lbl">Decision — escalate to Atharva (Gate D-01)</span>
+          Decision gate D-01 is formally opened. See §04 for decision options. Implementation of <em>all checklist items that render primary-colored UI</em> is blocked until D-01 is resolved. Token additions (shadows, radius, chart colors) and font work are <strong>not blocked</strong> — those can proceed in parallel.
+        </div>
+      </div>
+    </div>
+
+    <!-- F-03 -->
+    <div class="finding">
+      <div class="finding-hdr" style="background:var(--blue-bg);border-color:var(--blue-bd)">
+        <span class="finding-id" style="color:var(--blue)">F-03</span>
+        <span class="finding-title">Landing page copy requires Atharva approval before it is coded</span>
+        <span class="sev sev-gate">GATE · PROCESS</span>
+      </div>
+      <div class="finding-body">
+        <p>Per the execution plan RACI, Atharva is <strong>Accountable</strong> for landing page copy (Usha is Responsible/author). Usha has written specific copy — "Turn every trade into a lesson.", feature descriptions, CTA text. This copy is in the spec document but has not been explicitly approved by Atharva. Coding the landing page with unapproved copy risks a late-stage rewrite.</p>
+        <div class="finding-decision">
+          <span class="dec-lbl">Decision — gate D-02 opened</span>
+          LandingPage.tsx may not be coded until Atharva approves the copy in Usha's spec §14 copy table. Atharva may approve as-is, amend, or replace. LandingPage is checklist item 8 — all prior items remain unblocked.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── AMENDMENT ── -->
+<div class="sec">
+  <div class="sec-hdr">
+    <span class="sec-title">03 · Spec Amendment — Analytics Page Grid Layout</span>
+    <span class="status-pill" style="background:var(--violet-bg);color:var(--violet);border:1px solid var(--violet-bd);font-size:10px;padding:.2rem .6rem"><span class="dot"></span>NEW SPEC</span>
+  </div>
+  <div class="sec-body">
+    <div class="amendment">
+      <div class="amendment-eye">Amendment A-01 · Krishna → Arjun · 2026-09-13</div>
+      <h3>Analytics page: widen layout to full-width card grid</h3>
+      <p style="font-size:13.5px;color:var(--t2);line-height:1.65;margin-bottom:.75rem">The current <code>w-full max-w-xl</code> constraint on <code>AnalyticsPage.tsx</code> produces a ≈512px single-column layout on all screen sizes. This conflicts with the dashboard's full-width treatment and the execution plan's "card grid" goal. Remove the width cap and adopt a two-column auto-fill grid.</p>
+      <div class="spec-tbl-wrap">
+        <table class="spec-tbl" style="background:var(--surf)">
+          <thead><tr><th>Property</th><th>Current value</th><th>New value</th></tr></thead>
+          <tbody>
+            <tr><td>Container width</td><td><code>w-full max-w-xl</code> (512px cap)</td><td><code>w-full</code> (remove cap)</td></tr>
+            <tr><td>Container padding</td><td>Existing</td><td><code>p-6</code> (24px, matches Dashboard)</td></tr>
+            <tr><td>Card grid</td><td>Single column (stacked)</td><td><code>grid grid-cols-1 md:grid-cols-2 gap-4</code></td></tr>
+            <tr><td>Full-width panels</td><td>n/a</td><td>Any panel that spans both columns uses <code>md:col-span-2</code></td></tr>
+            <tr><td>Card style</td><td>Existing (inconsistent)</td><td>Secondary card spec per Usha §09 — border: 1px solid border · radius: 12px · bg: surface-base</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12.5px;color:var(--t3);margin-top:.75rem;line-height:1.6">Arjun: apply this grid to the top-level container in <code>AnalyticsPage.tsx</code>. Do not restructure the existing query/chart components — only the outer layout grid and card wrappers change. Existing analytics tests must pass unchanged.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── DECISION GATES ── -->
+<div class="sec">
+  <div class="sec-hdr">
+    <span class="sec-title">04 · Atharva Decision Gates</span>
+    <span style="font-size:12px;color:var(--red)">2 decisions required before full implementation start</span>
+  </div>
+  <div class="sec-body">
+
+    <div class="gate">
+      <div class="gate-hdr">
+        <span class="gate-id">D-01</span>
+        <span class="gate-title">Primary brand color: keep #2563EB or adopt #4F46E5?</span>
+      </div>
+      <div class="gate-body">
+        <p>Every primary-colored element in the app (CTA buttons, active nav state, focus rings, sidebar active chip) is affected by this decision. Both colors pass WCAG AA (4.7:1 on white). The decision is a brand direction call, not a technical one.</p>
+        <div class="opts">
+          <div class="opt opt-rec">
+            <span class="opt-lbl">Option A</span><strong>Adopt #4F46E5 (indigo-600)</strong> — Usha's recommendation <span class="opt-rec-tag">RECOMMENDED</span>
+            <p style="font-size:12.5px;margin-top:.3rem;color:var(--t2)">More distinctive than generic SaaS blue. Reads as analytical and deliberate. Differentiates TradeForge from competitors using standard blue. All existing tests will continue to pass since they reference semantic token names, not hex values.</p>
+          </div>
+          <div class="opt">
+            <span class="opt-lbl">Option B</span><strong>Keep #2563EB (blue-600)</strong> — no token change required
+            <p style="font-size:12.5px;margin-top:.3rem;color:var(--t2)">Zero implementation risk. All existing UI is already correct. Loses the visual differentiation opportunity but eliminates any color regression risk.</p>
+          </div>
+          <div class="opt">
+            <span class="opt-lbl">Option C</span><strong>Third option</strong> — Atharva names a specific hex
+            <p style="font-size:12.5px;margin-top:.3rem;color:var(--t2)">Any indigo/violet in the 4.5:1+ WCAG AA range is acceptable. Provide the hex to Usha for confirmation before Arjun implements.</p>
+          </div>
+        </div>
+        <p style="font-size:12.5px;color:var(--green);margin-top:.6rem;font-weight:600">✓ RESOLVED 2026-09-13 — Atharva chose #4F46E5 (indigo-600). Arjun implements as part of token additions.</p>
+      </div>
+    </div>
+
+    <div class="gate">
+      <div class="gate-hdr" style="background:var(--green-bg);border-color:var(--green-bd)">
+        <span class="gate-id" style="color:var(--green)">D-02 ✓</span>
+        <span class="gate-title">Landing page copy — <strong>APPROVED as written</strong></span>
+      </div>
+      <div class="gate-body">
+        <p><strong>Atharva's decision (2026-09-13):</strong> Copy approved as written. Arjun implements LandingPage.tsx using the copy verbatim from design spec §14 copy table — no amendments.</p>
+        <p style="font-size:12.5px;color:var(--t3);margin-top:.6rem">LandingPage.tsx (checklist item 8) is now fully unblocked.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── FINALIZED CHECKLIST ── -->
+<div class="sec">
+  <div class="sec-hdr">
+    <span class="sec-title">05 · Finalized Implementation Checklist</span>
+    <span style="font-size:12px;color:var(--t3)">Amended from Usha §18 · 17 items</span>
+  </div>
+  <div class="sec-body">
+    <p style="font-size:13px;color:var(--t2);margin-bottom:.75rem">Supersedes Usha's original §18 checklist. Atharva decisions resolved 2026-09-13 — all items fully unblocked. Violet items are new since Usha's spec.</p>
+    <div class="ck-list">
+
+      <div class="ck" style="border-color:var(--green-bd);background:var(--green-bg)">
+        <div class="ck-box" style="background:var(--green);border-color:var(--green)"></div>
+        <span class="ck-own own-u">Done</span>
+        <span style="color:var(--t3);text-decoration:line-through"><strong>D-01: Primary color</strong> — resolved: #4F46E5 (indigo-600) approved by Atharva 2026-09-13.</span>
+      </div>
+
+      <div class="ck" style="border-color:var(--green-bd);background:var(--green-bg)">
+        <div class="ck-box" style="background:var(--green);border-color:var(--green)"></div>
+        <span class="ck-own own-u">Done</span>
+        <span style="color:var(--t3);text-decoration:line-through"><strong>D-02: Landing page copy</strong> — approved as written by Atharva 2026-09-13.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span>Add Google Fonts link to <code>index.html</code> — Plus Jakarta Sans (400,500,600,700,800) + JetBrains Mono (400,500,600). Update <code>index.css</code> body font-family.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span>Add all new tokens from spec §06 to <code>tokens.css</code> (both light and dark blocks). Expose in <code>tailwind.config.ts</code> — shadow, radius, surface-accent, accent-border, chart-1–6.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span>Create <code>AuthShell.tsx</code> per spec §16. Apply to all 6 auth pages. Verify existing auth tests pass.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span>Rebuild <code>AppShell.tsx</code> sidebar per spec §07 — 220px, brand mark, account switcher, icons. Existing AppShell tests must pass.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span>Rebuild <code>DashboardPage.tsx</code> layout per spec §15 — 3-column primary tiles, 3-column secondary tiles, 2-panel table row. Existing DashboardPage tests must pass.</span>
+      </div>
+
+      <div class="ck gate-item">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span><strong>Blocked on D-02.</strong> Create <code>LandingPage.tsx</code> per spec §14 with Atharva-approved copy. Add public <code>/</code> route in <code>app.tsx</code> outside RequireAuth. Add auth-check redirect: authenticated users at <code>/</code> navigate to <code>/dashboard</code> via <code>useAuth</code> + <code>useEffect</code>. Write 2 tests: unauthenticated sees landing; authenticated redirects.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span>Fix chip classes in <code>TradeListPage.tsx</code> — replace hardcoded <code>bg-green-100 dark:bg-green-900/30</code> etc. with token-based chip system per spec §13.</span>
+      </div>
+
+      <div class="ck new-item">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span><strong>New (Amendment A-01).</strong> Widen <code>AnalyticsPage.tsx</code> — remove <code>max-w-xl</code>, apply <code>grid grid-cols-1 md:grid-cols-2 gap-4 p-6</code>. Full-width panels use <code>md:col-span-2</code>. Apply secondary card style (border + radius-lg) to all card wrappers. Existing analytics tests must pass.</span>
+      </div>
+
+      <div class="ck" style="border-color:var(--green-bd);background:var(--green-bg)">
+        <div class="ck-box" style="background:var(--green);border-color:var(--green)">✓</div>
+        <span class="ck-own own-u">Usha</span>
+        <span><strong>Prerequisite for 10a — DONE 2026-09-13.</strong> Theme toggle spec complete in design spec §19. Covers both surfaces:<br>
+          <strong>App (sidebar footer):</strong> 32×32px button, MoonIcon/SunIcon (Heroicons mini 16px), flush-right alongside logout, <code>--color-toggle-moon</code> / <code>--color-toggle-sun</code> tokens.<br>
+          <strong>Landing page (nav, left of Log in):</strong> 36×36px button, same icons, nav order: links → [toggle] → Log in → Get started.<br>
+          3 states (system/muted, light/amber, dark/indigo), hover/active/focus all specified. All 4 contrast pairs pass WCAG AA. Full spec in design spec §19.</span>
+      </div>
+
+      <div class="ck new-item">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span><strong>10a — New (Atharva 2026-09-13).</strong> Implement light/dark mode toggle on <strong>both surfaces</strong> per Usha's spec (design spec §19).<br>
+          <strong>Shared logic:</strong> on app init (before first render) read <code>localStorage</code> key <code>tf-theme</code>; apply <code>data-theme="light"</code> or <code>data-theme="dark"</code> to <code>&lt;html&gt;</code>; fall back to <code>prefers-color-scheme</code> when no stored value; write choice back to <code>localStorage</code> on toggle. No flash of incorrect theme.<br>
+          <strong>Landing page toggle:</strong> placed in nav cluster, left of "Log in" (36×36px). Reads and writes the same <code>tf-theme</code> key — theme set on the landing page persists into the app, and vice versa.<br>
+          <strong>App toggle:</strong> placed in sidebar footer, second-to-last before logout (32×32px).<br>
+          <strong>Exit criteria (item 10a is not done until all pass):</strong><br>
+          • <code>useTheme.test.ts</code>: reads <code>tf-theme</code> from localStorage; writes on toggle; falls back to <code>prefers-color-scheme</code> when key absent; applies <code>data-theme</code> to <code>&lt;html&gt;</code>.<br>
+          • Landing page render test: <code>getByTestId('theme-toggle')</code> within <code>data-testid="landing-nav"</code> is present; aria-label matches the current state string.<br>
+          • Sidebar render test: <code>getByTestId('theme-toggle')</code> in the sidebar footer is present; aria-label matches the current state string.<br>
+          • Pre-mount init script: manually verified by Usha during visual QA — no flash of incorrect theme on hard reload in both light and dark OS preference modes.<br>
+          Full test specification in design spec §19 "data-testid attributes" and "Test coverage Arjun must provide" sections.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span>Run <code>tsc --noEmit</code> and full test suite. All tests pass. F-18-14 is deleted at item 8 (358 surviving existing tests), plus all new tests: LandingPage route tests, AuthShell structural tests, <code>useTheme</code> unit tests, and toggle render tests on both surfaces. See §18 item 11 in design spec for the full gate list.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-u">Usha</span>
+        <span>Visual QA: verify sidebar, dashboard, auth pages, landing page, and analytics grid match the spec in both light and dark themes. Confirm in INBOX.md.</span>
+      </div>
+
+      <div class="ck">
+        <div class="ck-box"></div>
+        <span class="ck-own own-a">Arjun</span>
+        <span>Produce handoff to Sahadeva: branch name, build link, known limitations, test results. Sahadeva tests against execution plan acceptance criteria.</span>
+      </div>
+
+    </div>
+    <p style="font-size:12px;color:var(--green);margin-top:.75rem;font-weight:600">All items unblocked. Atharva approved D-01 (#4F46E5) and D-02 (copy) on 2026-09-13. Usha delivered toggle spec (§19) on 2026-09-13. Arjun may proceed with full implementation in order.</p>
+  </div>
+</div>
+
+<!-- ── CLEARANCE ── -->
+<div class="clearance clear">
+  <div class="clearance-eye">Implementation Clearance Status</div>
+  <h2>APPROVED — Full clearance granted. Arjun, go.</h2>
+  <p>All scope conflicts resolved. All Atharva decisions recorded. Primary color confirmed as <code>#4F46E5</code>. Landing page copy approved as written. Analytics grid layout gap filled by Amendment A-01. Theme toggle added as item 10a (Atharva 2026-09-13) — covers both the landing page nav and the app sidebar, driven by a single shared <code>tf-theme</code> <code>localStorage</code> key.</p>
+  <p><strong>Arjun proceeds with the full checklist in order, starting at item 3.</strong> Items 1–2 are resolved. Item 10a is now unblocked — Usha delivered the complete toggle spec (§19 of the design spec) on 2026-09-13. No further approvals required.</p>
+  <p style="margin-top:.75rem;font-size:12.5px;color:var(--t3)">Reviewed by Krishna · Approved by Atharva · 2026-09-13 · This document is the authoritative implementation reference for Arjun. Saved at <code>docs/design/TF-REDESIGN-001-scope-review.html</code>.</p>
+</div>
+
+</div>

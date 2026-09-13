@@ -31,8 +31,7 @@ export function VerifyEmailPage() {
   }, [token])
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-base px-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg text-center">
+    <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg text-center">
         {state === 'loading' && (
           <p className="text-sm text-text-secondary">Verifying your email…</p>
         )}
@@ -69,7 +68,6 @@ export function VerifyEmailPage() {
             </Link>
           </>
         )}
-      </div>
     </div>
   )
 }

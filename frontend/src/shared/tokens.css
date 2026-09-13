@@ -36,6 +36,14 @@
   /* Brand */
   --color-primary: #2563eb;
   --color-primary-emphasis: #1d4ed8;
+
+  /* Redesign brand — indigo */
+  --color-brand: #4f46e5;
+  --color-brand-emphasis: #4338ca;
+
+  /* Theme toggle icons */
+  --color-toggle-sun: #d97706;
+  --color-toggle-moon: #4f46e5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,6 +76,12 @@
 
     --color-primary: #60a5fa;
     --color-primary-emphasis: #3b82f6;
+
+    --color-brand: #818cf8;
+    --color-brand-emphasis: #6366f1;
+
+    --color-toggle-sun: #f59e0b;
+    --color-toggle-moon: #818cf8;
   }
 }
 
@@ -100,4 +114,10 @@
 
   --color-primary: #60a5fa;
   --color-primary-emphasis: #3b82f6;
+
+  --color-brand: #818cf8;
+  --color-brand-emphasis: #6366f1;
+
+  --color-toggle-sun: #f59e0b;
+  --color-toggle-moon: #818cf8;
 }

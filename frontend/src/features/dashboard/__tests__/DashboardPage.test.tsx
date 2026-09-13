@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, Navigate } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { DashboardPage } from '../DashboardPage'
 import {
@@ -45,6 +45,9 @@ vi.mock('@/features/accounts/context/AccountContext', () => ({
 }))
 vi.mock('@/features/auth/context/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
+}))
+vi.mock('@/shared/hooks/useTheme', () => ({
+  useTheme: () => ({ theme: 'light' as const, toggle: vi.fn() }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -242,20 +245,6 @@ describe('DashboardPage', () => {
 
     const dashboardLink = screen.getByRole('link', { name: 'Dashboard' })
     expect(dashboardLink).toHaveAttribute('href', '/dashboard')
-  })
-
-  it('F-18-14: root path / redirects to /dashboard and renders DashboardPage', () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-        </Routes>
-      </MemoryRouter>,
-    )
-
-    // DashboardPage renders — account name is visible
-    expect(screen.getByText('Main Account')).toBeInTheDocument()
   })
 
   it('F-18-15: renders loading skeleton with role=status while data is loading', () => {

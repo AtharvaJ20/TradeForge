@@ -58,14 +58,12 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-base px-4">
-        <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg text-center">
-          <h1 className="mb-3 text-xl font-bold text-text-primary">Invalid reset link</h1>
-          <p className="mb-4 text-sm text-danger-emphasis">This reset link is missing a token.</p>
-          <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-            Request a new reset link
-          </Link>
-        </div>
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg text-center">
+        <h1 className="mb-3 text-xl font-bold text-text-primary">Invalid reset link</h1>
+        <p className="mb-4 text-sm text-danger-emphasis">This reset link is missing a token.</p>
+        <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+          Request a new reset link
+        </Link>
       </div>
     )
   }
@@ -84,9 +82,8 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-base px-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg">
-        <h1 className="mb-6 text-2xl font-bold text-text-primary">Set new password</h1>
+    <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg">
+      <h1 className="mb-6 text-2xl font-bold text-text-primary">Set new password</h1>
 
         {confirm.error && (
           <div role="alert" className="mb-4 rounded-lg bg-surface-danger px-4 py-3 text-sm text-danger-emphasis">
@@ -139,7 +136,6 @@ export function ResetPasswordPage() {
             {confirm.isPending ? 'Saving…' : 'Set new password'}
           </button>
         </form>
-      </div>
     </div>
   )
 }

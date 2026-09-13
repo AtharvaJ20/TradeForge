@@ -41,8 +41,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-base px-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg">
+    <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg">
         <h1 className="mb-6 text-2xl font-bold text-text-primary">Sign in</h1>
 
         {expired && (
@@ -131,7 +130,6 @@ export function LoginPage() {
             Sign up
           </Link>
         </p>
-      </div>
     </div>
   )
 }

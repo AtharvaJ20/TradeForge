@@ -77,52 +77,60 @@ function SkeletonRow() {
 }
 
 // ---------------------------------------------------------------------------
-// Section 1: Account Overview
+// Section 1: Account Overview — stat tiles
 // ---------------------------------------------------------------------------
+
+function StatTile({
+  label,
+  value,
+  valueClass = 'text-text-primary',
+  large = false,
+}: {
+  label: string
+  value: string
+  valueClass?: string
+  large?: boolean
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-surface-subtle p-4">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-text-secondary">
+        {label}
+      </p>
+      <p className={`tabular-nums font-bold ${large ? 'text-3xl' : 'text-xl'} ${valueClass}`}>
+        {value}
+      </p>
+    </div>
+  )
+}
 
 function AccountOverviewContent({ data }: { data: DashboardSummaryOut }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-      <div>
-        <p className="text-xs uppercase tracking-wider text-text-secondary">All-time P&L</p>
-        <p className={`text-2xl font-bold tabular-nums ${pnlClass(data.all_time_net_pnl)}`}>
-          {formatPnl(data.all_time_net_pnl)}
-        </p>
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-wider text-text-secondary">MTD P&L</p>
-        <p className={`text-2xl font-bold tabular-nums ${pnlClass(data.mtd_net_pnl)}`}>
-          {formatPnl(data.mtd_net_pnl)}
-        </p>
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-wider text-text-secondary">WTD P&L</p>
-        <p className={`text-2xl font-bold tabular-nums ${pnlClass(data.wtd_net_pnl)}`}>
-          {formatPnl(data.wtd_net_pnl)}
-        </p>
-      </div>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <StatTile
+        label="All-time P&L"
+        value={formatPnl(data.all_time_net_pnl)}
+        valueClass={pnlClass(data.all_time_net_pnl)}
+        large
+      />
+      <StatTile
+        label="MTD P&L"
+        value={formatPnl(data.mtd_net_pnl)}
+        valueClass={pnlClass(data.mtd_net_pnl)}
+        large
+      />
+      <StatTile
+        label="WTD P&L"
+        value={formatPnl(data.wtd_net_pnl)}
+        valueClass={pnlClass(data.wtd_net_pnl)}
+        large
+      />
       {data.starting_capital !== null && (
-        <div>
-          <p className="text-xs uppercase tracking-wider text-text-secondary">Starting Capital</p>
-          <p className="text-xl font-semibold tabular-nums text-text-primary">
-            {formatCapital(data.starting_capital)}
-          </p>
-        </div>
+        <StatTile label="Starting Capital" value={formatCapital(data.starting_capital)} />
       )}
       {data.realized_equity !== null && (
-        <div>
-          <p className="text-xs uppercase tracking-wider text-text-secondary">Realized Equity</p>
-          <p className="text-xl font-semibold tabular-nums text-text-primary">
-            {formatCapital(data.realized_equity)}
-          </p>
-        </div>
+        <StatTile label="Realized Equity" value={formatCapital(data.realized_equity)} />
       )}
-      <div>
-        <p className="text-xs uppercase tracking-wider text-text-secondary">Open Positions</p>
-        <p className="text-xl font-semibold tabular-nums text-text-primary">
-          {data.open_trade_count}
-        </p>
-      </div>
+      <StatTile label="Open Positions" value={String(data.open_trade_count)} />
     </div>
   )
 }
@@ -143,21 +151,10 @@ function PerformanceContent({ data }: { data: AnalyticsSummary }) {
   const pf = data.profit_factor.profit_factor ?? 'N/A'
 
   return (
-    <div className="flex gap-6">
-      <div>
-        <p className="text-xs uppercase tracking-wider text-text-secondary">Win Rate</p>
-        <p className="text-2xl font-bold tabular-nums text-text-primary">
-          {formatPct(data.outcome.win_rate)}
-        </p>
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-wider text-text-secondary">Expectancy</p>
-        <p className="text-2xl font-bold tabular-nums text-text-primary">{expectancy}</p>
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-wider text-text-secondary">Profit Factor</p>
-        <p className="text-2xl font-bold tabular-nums text-text-primary">{pf}</p>
-      </div>
+    <div className="grid grid-cols-3 gap-3">
+      <StatTile label="Win Rate" value={formatPct(data.outcome.win_rate)} large />
+      <StatTile label="Expectancy" value={String(expectancy)} large />
+      <StatTile label="Profit Factor" value={String(pf)} large />
     </div>
   )
 }
