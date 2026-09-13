@@ -192,10 +192,11 @@ class AuthService:
                     "TradeForge account, you can safely ignore this email.</p>"
                 ),
             )
-        except EmailDeliveryError:
+        except EmailDeliveryError as exc:
             _log.error(
-                "Verification email delivery failed for new user (email send error); "
-                "user created, token stored — user must request resend"
+                "Verification email delivery failed for new user; "
+                "user created, token stored — user must request resend: %s",
+                exc,
             )
         # Prevent session creation before email is verified — user.is_email_verified stays False
         _ = user  # user stored; verification required before login is allowed
