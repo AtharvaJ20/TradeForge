@@ -21,23 +21,20 @@ export function ForgotPasswordPage() {
 
   if (reset.isSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-base px-4">
-        <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg text-center">
-          <h1 className="mb-4 text-2xl font-bold text-text-primary">Check your inbox</h1>
-          <p className="text-sm text-text-secondary">
-            If this email is registered, a password reset link has been sent. Check your inbox.
-          </p>
-          <Link to="/login" className="mt-4 inline-block text-sm text-primary hover:underline">
-            Back to sign in
-          </Link>
-        </div>
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg text-center">
+        <h1 className="mb-4 text-2xl font-bold text-text-primary">Check your inbox</h1>
+        <p className="text-sm text-text-secondary">
+          If this email is registered, a password reset link has been sent. Check your inbox.
+        </p>
+        <Link to="/login" className="mt-4 inline-block text-sm text-primary hover:underline">
+          Back to sign in
+        </Link>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-base px-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg">
+    <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg">
         <h1 className="mb-2 text-2xl font-bold text-text-primary">Reset your password</h1>
         <p className="mb-6 text-sm text-text-secondary">
           Enter your email and we'll send a reset link.
@@ -80,7 +77,6 @@ export function ForgotPasswordPage() {
             Back to sign in
           </Link>
         </p>
-      </div>
     </div>
   )
 }

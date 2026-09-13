@@ -74,8 +74,7 @@ export function RegisterPage() {
   const apiError = register.error ? mapRegisterError(register.error) : null
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-base px-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg">
+    <div className="w-full max-w-sm rounded-xl border border-border bg-surface-base p-8 shadow-lg">
         <h1 className="mb-6 text-2xl font-bold text-text-primary">Create account</h1>
 
         {apiError && (
@@ -152,7 +151,6 @@ export function RegisterPage() {
             Sign in
           </Link>
         </p>
-      </div>
     </div>
   )
 }
