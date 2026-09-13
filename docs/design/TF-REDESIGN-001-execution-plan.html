@@ -1,0 +1,975 @@
+<title>TradeForge Redesign Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  /* ── Tokens ──────────────────────────────────────────────── */
+  :root {
+    --bg:           #F0F2F6;
+    --surface:      #FFFFFF;
+    --surface-2:    #F8F9FB;
+    --border:       #DDE1EA;
+    --border-strong:#C4CBD9;
+    --text-1:       #0F1623;
+    --text-2:       #4A5568;
+    --text-3:       #8896AD;
+    --blue:         #2563EB;
+    --blue-bg:      #EEF4FF;
+    --blue-border:  #BFCFFD;
+    --amber:        #D97706;
+    --amber-bg:     #FFFBEB;
+    --amber-border: #FDE68A;
+    --green:        #16A34A;
+    --green-bg:     #F0FDF4;
+    --green-border: #BBF7D0;
+    --red:          #DC2626;
+    --red-bg:       #FEF2F2;
+    --red-border:   #FECACA;
+    --slate:        #64748B;
+    --phase-1:      #7C3AED;
+    --phase-1-bg:   #F5F3FF;
+    --phase-2:      #0EA5E9;
+    --phase-2-bg:   #F0F9FF;
+    --phase-3:      #16A34A;
+    --phase-3-bg:   #F0FDF4;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:           #0B0F1A;
+      --surface:      #111827;
+      --surface-2:    #1A2236;
+      --border:       #1E2D42;
+      --border-strong:#2A3D55;
+      --text-1:       #E8EDF5;
+      --text-2:       #8896AD;
+      --text-3:       #4A5C76;
+      --blue:         #60A5FA;
+      --blue-bg:      #0C1A3A;
+      --blue-border:  #1E3A6E;
+      --amber:        #FBB93B;
+      --amber-bg:     #1C1408;
+      --amber-border: #78530A;
+      --green:        #4ADE80;
+      --green-bg:     #052E16;
+      --green-border: #166534;
+      --red:          #F87171;
+      --red-bg:       #1C0606;
+      --red-border:   #7F1D1D;
+      --slate:        #8896AD;
+      --phase-1:      #A78BFA;
+      --phase-1-bg:   #1A0F3A;
+      --phase-2:      #38BDF8;
+      --phase-2-bg:   #0C1929;
+      --phase-3:      #4ADE80;
+      --phase-3-bg:   #052E16;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg:           #0B0F1A;
+    --surface:      #111827;
+    --surface-2:    #1A2236;
+    --border:       #1E2D42;
+    --border-strong:#2A3D55;
+    --text-1:       #E8EDF5;
+    --text-2:       #8896AD;
+    --text-3:       #4A5C76;
+    --blue:         #60A5FA;
+    --blue-bg:      #0C1A3A;
+    --blue-border:  #1E3A6E;
+    --amber:        #FBB93B;
+    --amber-bg:     #1C1408;
+    --amber-border: #78530A;
+    --green:        #4ADE80;
+    --green-bg:     #052E16;
+    --green-border: #166534;
+    --red:          #F87171;
+    --red-bg:       #1C0606;
+    --red-border:   #7F1D1D;
+    --slate:        #8896AD;
+    --phase-1:      #A78BFA;
+    --phase-1-bg:   #1A0F3A;
+    --phase-2:      #38BDF8;
+    --phase-2-bg:   #0C1929;
+    --phase-3:      #4ADE80;
+    --phase-3-bg:   #052E16;
+  }
+
+  /* ── Reset & Base ────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    padding: 2rem 1rem 4rem;
+  }
+
+  /* ── Layout ──────────────────────────────────────────────── */
+  .doc {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* ── Header ──────────────────────────────────────────────── */
+  .header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem 2.25rem;
+  }
+
+  .header-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 0.75rem;
+  }
+
+  .header h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--text-1);
+    line-height: 1.2;
+    text-wrap: balance;
+    margin-bottom: 0.75rem;
+  }
+
+  .header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    font-size: 13px;
+    color: var(--text-2);
+    margin-bottom: 1.25rem;
+  }
+
+  .header-meta span { display: flex; align-items: center; gap: 0.35rem; }
+
+  .meta-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--amber-bg);
+    color: var(--amber);
+    border: 1px solid var(--amber-border);
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .problem-statement {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-size: 14px;
+    color: var(--text-2);
+    line-height: 1.7;
+    margin-top: 0.5rem;
+  }
+
+  /* ── Section ─────────────────────────────────────────────── */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.75rem 2.25rem;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Two-col goals ───────────────────────────────────────── */
+  .goals-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  @media (max-width: 640px) {
+    .goals-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.4rem; }
+    .section { padding: 1.25rem 1.25rem; }
+    .header { padding: 1.5rem 1.25rem; }
+  }
+
+  .goal-box {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+  }
+
+  .goal-box.in { border-left: 3px solid var(--green); }
+  .goal-box.out { border-left: 3px solid var(--red); }
+
+  .goal-box-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 0.6rem;
+  }
+
+  .goal-box.in .goal-box-label { color: var(--green); }
+  .goal-box.out .goal-box-label { color: var(--red); }
+
+  .goal-box ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .goal-box ul li {
+    font-size: 13.5px;
+    color: var(--text-2);
+    padding-left: 1.1rem;
+    position: relative;
+    line-height: 1.5;
+  }
+
+  .goal-box.in ul li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-size: 12px; font-weight: 700; top: 1px; }
+  .goal-box.out ul li::before { content: "✕"; position: absolute; left: 0; color: var(--red); font-size: 12px; font-weight: 700; top: 1px; }
+
+  /* ── RACI table ──────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  thead th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    padding: 0 0.75rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  thead th:first-child { padding-left: 0; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+
+  tbody td {
+    padding: 0.75rem 0.75rem;
+    color: var(--text-2);
+    vertical-align: top;
+  }
+
+  tbody td:first-child { padding-left: 0; color: var(--text-1); font-weight: 500; }
+
+  .raci-chip {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+  }
+
+  .raci-a { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
+  .raci-r { background: var(--phase-1-bg); color: var(--phase-1); border: 1px solid rgba(124,58,237,0.2); }
+  .raci-c { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+  .raci-i { background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border); }
+
+  /* ── Affected components ─────────────────────────────────── */
+  .comp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .comp-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .comp-priority {
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0.2rem 0.45rem;
+    border-radius: 4px;
+    letter-spacing: 0.06em;
+    margin-top: 1px;
+  }
+
+  .p-high { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+  .p-med  { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+  .p-low  { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+  .p-new  { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
+
+  .comp-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--blue);
+    display: block;
+    margin-bottom: 0.2rem;
+  }
+
+  .comp-desc {
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+
+  /* ── Phases ──────────────────────────────────────────────── */
+  .phases { display: flex; flex-direction: column; gap: 1rem; }
+
+  .phase-card {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .phase-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .phase-header-left { display: flex; align-items: center; gap: 0.75rem; }
+
+  .phase-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    border-radius: 5px;
+    letter-spacing: 0.04em;
+  }
+
+  .phase-title { font-size: 15px; font-weight: 700; color: var(--text-1); }
+  .phase-owner { font-size: 13px; color: var(--text-2); font-weight: 500; }
+
+  .ph-1-header { background: var(--phase-1-bg); }
+  .ph-1 .phase-num { background: rgba(124,58,237,0.15); color: var(--phase-1); }
+  .ph-2-header { background: var(--phase-2-bg); }
+  .ph-2 .phase-num { background: rgba(14,165,233,0.15); color: var(--phase-2); }
+  .ph-3-header { background: var(--phase-3-bg); }
+  .ph-3 .phase-num { background: rgba(22,163,74,0.15); color: var(--phase-3); }
+
+  .phase-body {
+    background: var(--surface);
+    padding: 1rem 1.25rem;
+  }
+
+  .phase-tasks {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .phase-tasks li {
+    font-size: 13.5px;
+    color: var(--text-2);
+    padding-left: 1.25rem;
+    position: relative;
+    line-height: 1.5;
+  }
+
+  .phase-tasks li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  .phase-deliverable {
+    margin-top: 0.85rem;
+    padding: 0.6rem 0.85rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: var(--text-2);
+  }
+
+  .phase-deliverable strong {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-right: 0.5rem;
+  }
+
+  /* ── Constraints ─────────────────────────────────────────── */
+  .constraint-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .constraint {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--amber-bg);
+    border: 1px solid var(--amber-border);
+    border-radius: 7px;
+    font-size: 13.5px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+
+  .constraint-icon {
+    flex-shrink: 0;
+    font-size: 13px;
+    margin-top: 2px;
+    color: var(--amber);
+  }
+
+  /* ── Acceptance criteria ─────────────────────────────────── */
+  .ac-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .ac-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.7rem 1rem;
+    background: var(--green-bg);
+    border: 1px solid var(--green-border);
+    border-radius: 7px;
+    font-size: 13.5px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+
+  .ac-check {
+    flex-shrink: 0;
+    width: 16px; height: 16px;
+    border: 1.5px solid var(--green-border);
+    border-radius: 4px;
+    margin-top: 2px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Handoff note ────────────────────────────────────────── */
+  .handoff {
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .handoff-title {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 0.6rem;
+  }
+
+  .handoff p {
+    font-size: 13.5px;
+    color: var(--text-2);
+    line-height: 1.65;
+  }
+
+  /* ── Footer ──────────────────────────────────────────────── */
+  .footer {
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.06em;
+  }
+</style>
+
+<div class="doc">
+
+  <!-- ── Header ──────────────────────────────────────── -->
+  <div class="header">
+    <div class="header-eyebrow">PROJECT EXECUTION PLAN · TF-REDESIGN-001</div>
+    <h1>TradeForge Frontend Visual Redesign &amp; Landing Page</h1>
+    <div class="header-meta">
+      <span><span class="meta-label">Date</span> 2026-09-13</span>
+      <span><span class="meta-label">Design Owner</span> Usha</span>
+      <span><span class="meta-label">Implementation Owner</span> Arjun</span>
+      <span><span class="meta-label">PM</span> Krishna</span>
+      <span><span class="meta-label">Approver</span> Atharva</span>
+    </div>
+    <div style="margin-bottom: 1rem;">
+      <span class="status-pill"><span class="status-dot"></span> Planning — Not Started</span>
+    </div>
+    <div class="problem-statement">
+      <strong>Problem:</strong> The TradeForge web application has no visual identity beyond raw function. Cards have equal weight with no hierarchy. The sidebar is text-only with no brand treatment. Auth pages are plain white with no brand presence. There is no public landing page — unauthenticated visitors land directly on <code>/login</code> with no product framing. The app does not read as a professional trading tool.
+    </div>
+  </div>
+
+  <!-- ── Scope ────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Scope</div>
+    <div class="goals-grid">
+      <div class="goal-box in">
+        <div class="goal-box-label">In Scope</div>
+        <ul>
+          <li>New public landing page at <code>/</code></li>
+          <li>AppShell sidebar — icons, brand logo, visual grouping</li>
+          <li>Dashboard — stat tile hierarchy, card grid layout</li>
+          <li>Auth pages — Login, Register, ForgotPassword, ResetPassword, VerifyEmail, RegisterSuccess</li>
+          <li>Analytics page — card grid spacing and hierarchy</li>
+          <li>TradeList &amp; TradeDetail — table polish and spacing</li>
+          <li>Design token extensions in <code>tokens.css</code> (Usha-owned)</li>
+          <li>Light and dark theme correctness across all pages</li>
+        </ul>
+      </div>
+      <div class="goal-box out">
+        <div class="goal-box-label">Out of Scope</div>
+        <ul>
+          <li>New features or data-model changes</li>
+          <li>Backend API changes</li>
+          <li>Mobile/responsive overhaul</li>
+          <li>Component library or Storybook setup</li>
+          <li>Animation system or motion design</li>
+          <li>Risk page (currently a placeholder — deferred)</li>
+          <li>Settings page visual redesign</li>
+          <li>New npm packages without Arjun's explicit sign-off</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Product Goals ─────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Product Goals</div>
+    <div class="comp-list">
+      <div class="comp-item">
+        <span class="comp-priority p-new">G-1</span>
+        <div>
+          <span class="comp-desc" style="font-weight:600;color:var(--text-1);">First impression exists.</span>
+          <span class="comp-desc"> A visitor who lands on the TradeForge URL sees a product, not a login form. The landing page communicates what TradeForge is and who it's for within 5 seconds.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-new">G-2</span>
+        <div>
+          <span class="comp-desc" style="font-weight:600;color:var(--text-1);">Visual hierarchy is legible.</span>
+          <span class="comp-desc"> The most important numbers on any page (P&amp;L, win rate, equity) are visually dominant. Supporting context is subordinate. A user can scan the dashboard in under 3 seconds and find what matters.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-new">G-3</span>
+        <div>
+          <span class="comp-desc" style="font-weight:600;color:var(--text-1);">Brand identity is consistent.</span>
+          <span class="comp-desc"> The TradeForge name, color, and typographic voice appear consistently across the sidebar, auth pages, and landing page. It looks like one product.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-new">G-4</span>
+        <div>
+          <span class="comp-desc" style="font-weight:600;color:var(--text-1);">Cards and layout are intentional.</span>
+          <span class="comp-desc"> Elements are positioned on a consistent grid. Cards are sized to their content. Nothing is misaligned, floats in dead space, or stretches incorrectly.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RACI ──────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">RACI</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:200px;">Activity</th>
+            <th>Accountable</th>
+            <th>Responsible</th>
+            <th>Consulted</th>
+            <th>Informed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Design direction &amp; visual language</td>
+            <td><span class="raci-chip raci-a">Usha</span></td>
+            <td><span class="raci-chip raci-r">Usha</span></td>
+            <td><span class="raci-chip raci-c">Atharva</span></td>
+            <td><span class="raci-chip raci-i">Arjun</span></td>
+          </tr>
+          <tr>
+            <td>Wireframes &amp; page specs</td>
+            <td><span class="raci-chip raci-a">Usha</span></td>
+            <td><span class="raci-chip raci-r">Usha</span></td>
+            <td><span class="raci-chip raci-c">Arjun</span></td>
+            <td><span class="raci-chip raci-i">Atharva</span></td>
+          </tr>
+          <tr>
+            <td>Design token decisions (<code>tokens.css</code>)</td>
+            <td><span class="raci-chip raci-a">Usha</span></td>
+            <td><span class="raci-chip raci-r">Usha</span></td>
+            <td><span class="raci-chip raci-c">Arjun</span></td>
+            <td><span class="raci-chip raci-i">—</span></td>
+          </tr>
+          <tr>
+            <td>Landing page copy</td>
+            <td><span class="raci-chip raci-a">Atharva</span></td>
+            <td><span class="raci-chip raci-r">Usha</span></td>
+            <td><span class="raci-chip raci-c">Atharva</span></td>
+            <td><span class="raci-chip raci-i">Arjun</span></td>
+          </tr>
+          <tr>
+            <td>Frontend implementation</td>
+            <td><span class="raci-chip raci-a">Arjun</span></td>
+            <td><span class="raci-chip raci-r">Arjun</span></td>
+            <td><span class="raci-chip raci-c">Usha</span></td>
+            <td><span class="raci-chip raci-i">Atharva</span></td>
+          </tr>
+          <tr>
+            <td>Frontend test suite integrity</td>
+            <td><span class="raci-chip raci-a">Arjun</span></td>
+            <td><span class="raci-chip raci-r">Arjun</span></td>
+            <td><span class="raci-chip raci-i">—</span></td>
+            <td><span class="raci-chip raci-i">Sahadeva</span></td>
+          </tr>
+          <tr>
+            <td>Visual QA &amp; regression testing</td>
+            <td><span class="raci-chip raci-a">Sahadeva</span></td>
+            <td><span class="raci-chip raci-r">Sahadeva</span></td>
+            <td><span class="raci-chip raci-c">Arjun</span></td>
+            <td><span class="raci-chip raci-i">Atharva</span></td>
+          </tr>
+          <tr>
+            <td>Final design approval</td>
+            <td><span class="raci-chip raci-a">Atharva</span></td>
+            <td><span class="raci-chip raci-i">—</span></td>
+            <td><span class="raci-chip raci-c">Usha, Arjun</span></td>
+            <td><span class="raci-chip raci-i">—</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Affected Pages & Components ──────────────────── -->
+  <div class="section">
+    <div class="section-title">Affected Pages &amp; Components</div>
+    <div class="comp-list">
+      <div class="comp-item">
+        <span class="comp-priority p-new">NEW</span>
+        <div>
+          <span class="comp-path">frontend/src/features/landing/LandingPage.tsx</span>
+          <span class="comp-desc">New public marketing page at <code>/</code>. Must be visible to unauthenticated visitors. Authenticated <code>/</code> still redirects to <code>/dashboard</code>. Requires new route in <code>app.tsx</code>.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-high">HIGH</span>
+        <div>
+          <span class="comp-path">frontend/src/layout/AppShell.tsx</span>
+          <span class="comp-desc">Sidebar redesign: brand logo treatment, nav item icons, active state styling, account switcher region, visual grouping of nav vs. logout. Current: plain text nav with no icons, no brand presence.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-high">HIGH</span>
+        <div>
+          <span class="comp-path">frontend/src/features/dashboard/DashboardPage.tsx</span>
+          <span class="comp-desc">Dashboard layout overhaul: replace five equal-weight stacked sections with a two-column grid. Stat tiles (P&amp;L, Win Rate, Expectancy) as large typographic blocks. Streaks and Recent Trades/Journal as secondary panels. Current: five identical bordered boxes with identical padding.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-high">HIGH</span>
+        <div>
+          <span class="comp-path">frontend/src/features/auth/components/LoginPage.tsx</span>
+          <span class="comp-desc">Auth page polish — brand header, visual identity, background treatment. Covers all 6 auth pages: Login, Register, RegisterSuccess, VerifyEmail, ForgotPassword, ResetPassword. Shared auth layout component likely needed.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-med">MED</span>
+        <div>
+          <span class="comp-path">frontend/src/features/analytics/AnalyticsPage.tsx + card components</span>
+          <span class="comp-desc">Analytics card grid spacing and hierarchy. Cards currently render with inconsistent sizing and no visual grouping. 14 card components affected.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-med">MED</span>
+        <div>
+          <span class="comp-path">frontend/src/features/trades/TradeListPage.tsx</span>
+          <span class="comp-desc">Table polish: row spacing, column alignment, P&amp;L coloring, direction badges. TradeDetailPage similarly affected.</span>
+        </div>
+      </div>
+      <div class="comp-item">
+        <span class="comp-priority p-low">LOW</span>
+        <div>
+          <span class="comp-path">frontend/src/shared/tokens.css</span>
+          <span class="comp-desc">Possible token additions per Usha's design spec — e.g. shadow scale, spacing scale, additional brand shades. Usha owns any additions. No token removal without Arjun sign-off (risk of test regressions).</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Implementation Phases ─────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Implementation Phases</div>
+    <div class="phases">
+
+      <div class="phase-card ph-1">
+        <div class="phase-header ph-1-header">
+          <div class="phase-header-left">
+            <span class="phase-num">PHASE 1</span>
+            <span class="phase-title">Design</span>
+          </div>
+          <span class="phase-owner">Owner: Usha</span>
+        </div>
+        <div class="phase-body">
+          <ul class="phase-tasks">
+            <li>Establish visual language: color palette rationale, typographic scale, spacing system, icon treatment</li>
+            <li>Wireframe landing page (above-the-fold hero, feature sections, CTA)</li>
+            <li>Spec sidebar redesign (icon set, brand mark, layout structure)</li>
+            <li>Spec dashboard layout (grid, stat tile hierarchy, secondary panels)</li>
+            <li>Spec shared auth layout component and all 6 auth page treatments</li>
+            <li>Spec analytics card grid adjustments</li>
+            <li>List any new design tokens required in <code>tokens.css</code></li>
+            <li>Present to Atharva for approval before implementation begins</li>
+          </ul>
+          <div class="phase-deliverable">
+            <strong>Deliverable</strong> Usha → Arjun handoff: annotated wireframes, design spec document, token additions list, icon asset list
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-card ph-2">
+        <div class="phase-header ph-2-header">
+          <div class="phase-header-left">
+            <span class="phase-num">PHASE 2</span>
+            <span class="phase-title">Implementation</span>
+          </div>
+          <span class="phase-owner">Owner: Arjun</span>
+        </div>
+        <div class="phase-body">
+          <ul class="phase-tasks">
+            <li>Apply token additions from Usha's spec to <code>tokens.css</code> and <code>tailwind.config.ts</code></li>
+            <li>Build <code>LandingPage.tsx</code> and add public <code>/</code> route to <code>app.tsx</code></li>
+            <li>Implement sidebar redesign in <code>AppShell.tsx</code></li>
+            <li>Implement dashboard layout (grid, stat tiles, secondary panels)</li>
+            <li>Build shared auth layout component; apply to all 6 auth pages</li>
+            <li>Apply analytics card grid and TradeList table polish</li>
+            <li>Maintain all existing tests — any new tests for the landing page and auth layout</li>
+            <li>Ensure TypeScript strict-mode clean (<code>tsc --noEmit</code> passes)</li>
+          </ul>
+          <div class="phase-deliverable">
+            <strong>Deliverable</strong> Arjun → Sahadeva handoff: implementation committed on branch, all existing tests passing, known limitations listed
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-card ph-3">
+        <div class="phase-header ph-3-header">
+          <div class="phase-header-left">
+            <span class="phase-num">PHASE 3</span>
+            <span class="phase-title">QA</span>
+          </div>
+          <span class="phase-owner">Owner: Sahadeva</span>
+        </div>
+        <div class="phase-body">
+          <ul class="phase-tasks">
+            <li>Visual QA against Usha's design spec — spot misalignments, spacing gaps, color mismatches</li>
+            <li>Verify light and dark theme correctness on all affected pages</li>
+            <li>Confirm landing page is visible unauthenticated; confirm <code>/</code> redirect works when authenticated</li>
+            <li>Confirm auth pages share consistent brand treatment</li>
+            <li>Run full frontend test suite; confirm no regressions</li>
+            <li>Issue QA release recommendation (Go / Go with risks / No Go)</li>
+          </ul>
+          <div class="phase-deliverable">
+            <strong>Deliverable</strong> Sahadeva → Atharva: QA report and release recommendation
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Constraints ───────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Constraints</div>
+    <div class="constraint-list">
+      <div class="constraint">
+        <span class="constraint-icon">⚠</span>
+        <span>All existing frontend tests (currently 359) must continue to pass. Implementation may not modify test expectations without a corresponding defect being logged and Sahadeva informed.</span>
+      </div>
+      <div class="constraint">
+        <span class="constraint-icon">⚠</span>
+        <span>Design tokens in <code>tokens.css</code> are the single source of truth for color and theming. No hardcoded color values in component files. Usha may add tokens; removal requires Arjun sign-off.</span>
+      </div>
+      <div class="constraint">
+        <span class="constraint-icon">⚠</span>
+        <span>No new npm dependencies without Arjun's explicit sign-off. Icon sets must be either inline SVG or a dependency Arjun approves.</span>
+      </div>
+      <div class="constraint">
+        <span class="constraint-icon">⚠</span>
+        <span>No backend API changes. No changes to URL routing except adding the new public <code>/</code> route. All authenticated routes and their behavior remain unchanged.</span>
+      </div>
+      <div class="constraint">
+        <span class="constraint-icon">⚠</span>
+        <span>Implementation must not begin until Atharva has approved Usha's Phase 1 design spec. Premature implementation that diverges from the spec will be reverted.</span>
+      </div>
+      <div class="constraint">
+        <span class="constraint-icon">⚠</span>
+        <span>TypeScript strict mode must remain clean throughout. <code>tsc --noEmit</code> must pass before Arjun's handoff to Sahadeva.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Acceptance Criteria ───────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Acceptance Criteria</div>
+    <div class="ac-list">
+      <div class="ac-item">
+        <span class="ac-check"></span>
+        <span>Landing page is visible to unauthenticated users at <code>/</code> and communicates TradeForge's purpose without requiring login.</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-check"></span>
+        <span>Authenticated users navigating to <code>/</code> are still redirected to <code>/dashboard</code> with no regression in auth behavior.</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-check"></span>
+        <span>Sidebar includes icons for all navigation items and a legible brand logo treatment for "TradeForge".</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-check"></span>
+        <span>Dashboard key metrics (All-time P&amp;L, Win Rate, Expectancy) are visually dominant — larger text weight or dedicated stat tile treatment — over secondary information.</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-check"></span>
+        <span>All 6 auth pages share a consistent brand layout with the TradeForge visual identity (not plain white centered card with no context).</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-check"></span>
+        <span>All pages render correctly in both light and dark themes. No text is unreadable, no surface is transparent, no element disappears in either mode.</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-check"></span>
+        <span>All 359 existing frontend tests pass. No new TypeScript errors introduced.</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-check"></span>
+        <span>Atharva approves the final visual output after Phase 3 QA completes.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Success Metrics ───────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Success Metrics</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Target</th>
+            <th>Owner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Frontend test suite</td>
+            <td>All existing tests pass, zero new failures</td>
+            <td>Arjun / Sahadeva</td>
+          </tr>
+          <tr>
+            <td>TypeScript strict mode</td>
+            <td><code>tsc --noEmit</code> clean</td>
+            <td>Arjun</td>
+          </tr>
+          <tr>
+            <td>Visual design consistency</td>
+            <td>Usha assessment: all pages conform to the approved design spec</td>
+            <td>Usha / Sahadeva</td>
+          </tr>
+          <tr>
+            <td>Theme correctness</td>
+            <td>Both light and dark themes fully functional across all pages (Sahadeva QA)</td>
+            <td>Sahadeva</td>
+          </tr>
+          <tr>
+            <td>Product owner approval</td>
+            <td>Atharva signs off after visual review of the deployed redesign</td>
+            <td>Atharva</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── First Action ──────────────────────────────────── -->
+  <div class="handoff">
+    <div class="handoff-title">First Action — Usha</div>
+    <p>
+      This plan is approved and ready. The first step is Usha producing the Phase 1 design spec: visual language definition, annotated wireframes for the landing page and sidebar, dashboard layout spec, and auth layout spec. Arjun does not begin implementation until Atharva approves that spec. Usha should raise any ambiguities about the TradeForge brand voice or target audience with Atharva before wireframing begins.
+    </p>
+  </div>
+
+  <div class="footer">TF-REDESIGN-001 · Krishna · 2026-09-13 · Do not implement before Phase 1 design approval</div>
+
+</div>

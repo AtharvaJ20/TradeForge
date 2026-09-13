@@ -1,0 +1,1381 @@
+<title>TradeForge Design Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg:#0B0F1C; --surf:#111827; --surf2:#1A2236; --bd:#1E2D42; --bd2:#2A3D55;
+  --t1:#EEF2FF; --t2:#8896AD; --t3:#4A5C76;
+  --acc:#4F46E5; --acc-em:#4338CA; --acc-bg:rgba(79,70,229,.12); --acc-bd:rgba(79,70,229,.25);
+  --ok:#4ADE80; --ok-bg:rgba(74,222,128,.1); --ok-bd:rgba(74,222,128,.25);
+  --err:#F87171; --err-bg:rgba(248,113,113,.1); --err-bd:rgba(248,113,113,.25);
+  --warn:#FBB93B; --warn-bg:rgba(251,185,59,.1); --warn-bd:rgba(251,185,59,.25);
+  --sky:#60A5FA;
+}
+@media(prefers-color-scheme:light){:root:not([data-theme=dark]){
+  --bg:#F0F2F7; --surf:#fff; --surf2:#F8F9FC; --bd:#DDE1EA; --bd2:#C4CBD9;
+  --t1:#0F1623; --t2:#4A5568; --t3:#8896AD;
+}}
+:root[data-theme=light]{
+  --bg:#F0F2F7; --surf:#fff; --surf2:#F8F9FC; --bd:#DDE1EA; --bd2:#C4CBD9;
+  --t1:#0F1623; --t2:#4A5568; --t3:#8896AD;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14px;line-height:1.6}
+
+/* ── Layout ── */
+.hdr{position:sticky;top:0;z-index:100;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd);padding:.65rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.hdr-id{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.06em}
+.hdr-badge{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:var(--acc);letter-spacing:.08em;text-transform:uppercase;background:var(--acc-bg);border:1px solid var(--acc-bd);padding:.2rem .6rem;border-radius:4px}
+.wrap{display:grid;grid-template-columns:200px 1fr;max-width:1140px;margin:0 auto}
+
+/* ── TOC ── */
+.toc{position:sticky;top:37px;height:calc(100vh - 37px);overflow-y:auto;padding:1.25rem .5rem 2rem;border-right:1px solid var(--bd);scrollbar-width:thin;scrollbar-color:var(--bd) transparent}
+.toc-g{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--t3);padding:.85rem .5rem .3rem}
+.toc a{display:block;padding:.28rem .5rem;font-size:12px;color:var(--t2);text-decoration:none;border-radius:5px;transition:background .1s,color .1s}
+.toc a:hover{background:var(--acc-bg);color:var(--t1)}
+
+/* ── Main ── */
+.main{padding:2rem 2.5rem 5rem;min-width:0}
+.sec{margin-bottom:3rem;padding-bottom:2.5rem;border-bottom:1px solid var(--bd)}
+.sec:last-child{border-bottom:none}
+.sec-eye{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);margin-bottom:.3rem}
+.sec-title{font-size:1.4rem;font-weight:800;color:var(--t1);margin-bottom:.6rem;line-height:1.15}
+.sec-desc{font-size:13.5px;color:var(--t2);max-width:600px;margin-bottom:1.5rem;line-height:1.7}
+h3{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);font-family:'JetBrains Mono',monospace;margin:1.5rem 0 .75rem}
+h3:first-child{margin-top:0}
+
+/* ── Swatches ── */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:.6rem;margin-bottom:1rem}
+.sw{border-radius:8px;overflow:hidden;border:1px solid var(--bd)}
+.sw-color{height:52px}
+.sw-info{background:var(--surf);padding:.45rem .6rem}
+.sw-tok{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--t2);display:block}
+.sw-hex{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--t1);display:block;margin-top:.1rem}
+.sw-note{font-size:10px;color:var(--t3);margin-top:.1rem}
+.badge-new{display:inline-block;background:var(--acc-bg);color:#818CF8;font-size:9px;font-weight:700;padding:.08rem .35rem;border-radius:3px;font-family:'JetBrains Mono',monospace;vertical-align:middle}
+.badge-attn{display:inline-block;background:var(--warn-bg);color:var(--warn);font-size:9px;font-weight:700;padding:.08rem .35rem;border-radius:3px;font-family:'JetBrains Mono',monospace;vertical-align:middle}
+
+/* ── Type scale ── */
+.type-table{border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:var(--surf)}
+.type-row{display:grid;grid-template-columns:168px 1fr;border-bottom:1px solid var(--bd)}
+.type-row:last-child{border-bottom:none}
+.type-meta{padding:.7rem .9rem;border-right:1px solid var(--bd);background:var(--surf2)}
+.type-lbl{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--t3);display:block}
+.type-spec{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--t2);display:block;margin-top:.1rem}
+.type-use{font-size:10px;color:var(--t3);display:block;margin-top:.1rem}
+.type-sample{padding:.55rem 1.1rem;display:flex;align-items:center;overflow:hidden;font-family:'Plus Jakarta Sans',sans-serif}
+
+/* ── Code ── */
+pre{background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:1.1rem 1.25rem;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8;color:#a5b4fc}
+pre .cm{color:var(--t3)}
+pre .sec{color:var(--warn)}
+pre .prop{color:#94a3b8}
+pre .val{color:#6ee7b7}
+
+/* ── Alert boxes ── */
+.info{background:var(--acc-bg);border:1px solid var(--acc-bd);border-radius:8px;padding:.8rem 1rem;font-size:13px;color:#a5b4fc;line-height:1.6;margin-top:.75rem}
+.warn-box{background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:8px;padding:.8rem 1rem;font-size:13px;color:var(--warn);line-height:1.6;margin-top:.75rem}
+
+/* ── Demo container ── */
+.demo{background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:1.25rem;margin-top:.5rem}
+.demo-lbl{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:1rem}
+
+/* ── Sidebar demo ── */
+.sb{width:220px;background:#111827;border:1px solid #1E2D42;border-radius:12px;overflow:hidden;font-size:13px}
+.sb-brand{padding:1rem .85rem;border-bottom:1px solid #1E2D42;display:flex;align-items:center;gap:.5rem}
+.sb-mark{width:26px;height:26px;background:#4F46E5;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;flex-shrink:0}
+.sb-name{font-weight:700;font-size:14px;color:#EEF2FF;letter-spacing:-.01em}
+.sb-acct{padding:.55rem .85rem;border-bottom:1px solid #1E2D42;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.sb-acct-name{font-size:11.5px;font-weight:500;color:#8896AD}
+.sb-nav{padding:.4rem .4rem;display:flex;flex-direction:column;gap:2px}
+.sb-item{display:flex;align-items:center;gap:.55rem;padding:.5rem .65rem;border-radius:8px;font-size:13px;font-weight:500;color:#8896AD;cursor:pointer;text-decoration:none}
+.sb-item.active{background:rgba(79,70,229,.14);color:#818CF8}
+.sb-icon{width:16px;height:16px;flex-shrink:0;opacity:.8}
+.sb-item.active .sb-icon{opacity:1}
+.sb-foot{border-top:1px solid #1E2D42;padding:.4rem}
+
+/* ── Stat tiles ── */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem}
+.tile{background:#111827;border:1px solid #1E2D42;border-radius:12px;padding:1.1rem 1.25rem}
+.tile-lbl{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#4A5C76;margin-bottom:.35rem}
+.tile-val{font-family:'JetBrains Mono',monospace;font-size:1.9rem;font-weight:600;line-height:1;margin-bottom:.25rem}
+.tile-sub{font-size:11px;color:#4A5C76}
+.tile-val.pos{color:#4ADE80}
+.tile-val.neg{color:#F87171}
+.tile-val.neu{color:#EEF2FF}
+
+/* ── Buttons ── */
+.btn-row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:.75rem}
+.btn{display:inline-flex;align-items:center;gap:.4rem;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;border:none;cursor:pointer;border-radius:8px;line-height:1;text-decoration:none}
+.btn:focus-visible{outline:2px solid #4F46E5;outline-offset:2px}
+.btn-primary{background:#4F46E5;color:#fff}.btn-primary:hover{background:#4338CA}
+.btn-secondary{background:rgba(79,70,229,.12);color:#818CF8;border:1px solid rgba(79,70,229,.25)}.btn-secondary:hover{background:rgba(79,70,229,.2)}
+.btn-ghost{background:transparent;color:#8896AD;border:1px solid #1E2D42}.btn-ghost:hover{background:rgba(255,255,255,.04);color:#EEF2FF}
+.btn-danger{background:rgba(248,113,113,.1);color:#F87171;border:1px solid rgba(248,113,113,.25)}
+.btn-sm{font-size:12px;padding:.4rem .8rem}
+.btn-md{font-size:13.5px;padding:.58rem 1.05rem}
+.btn-lg{font-size:15px;padding:.7rem 1.35rem}
+
+/* ── Form ── */
+.form-demo{display:flex;flex-direction:column;gap:1rem;max-width:320px}
+.field{display:flex;flex-direction:column;gap:.3rem}
+.f-label{font-size:13px;font-weight:500;color:#EEF2FF}
+.f-input{background:#1A2236;border:1px solid #1E2D42;border-radius:8px;padding:.58rem .85rem;font-size:13.5px;color:#EEF2FF;font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:border-color .15s,box-shadow .15s;width:100%}
+.f-input::placeholder{color:#4A5C76}
+.f-input:focus{border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.2)}
+.f-input.err{border-color:#F87171}
+.f-err{font-size:11.5px;color:#F87171}
+.f-hint{font-size:11.5px;color:#4A5C76}
+
+/* ── Chips ── */
+.chip-row{display:flex;flex-wrap:wrap;gap:.5rem}
+.chip{display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .6rem;border-radius:999px;font-size:12px;font-weight:600}
+.chip-long{background:rgba(74,222,128,.1);color:#4ADE80;border:1px solid rgba(74,222,128,.25)}
+.chip-short{background:rgba(248,113,113,.1);color:#F87171;border:1px solid rgba(248,113,113,.25)}
+.chip-open{background:rgba(96,165,250,.1);color:#60A5FA;border:1px solid rgba(96,165,250,.25)}
+.chip-closed{background:rgba(255,255,255,.05);color:#8896AD;border:1px solid #1E2D42}
+.chip-partial{background:rgba(251,185,59,.1);color:#FBB93B;border:1px solid rgba(251,185,59,.25)}
+
+/* ── Landing mockup ── */
+.lm{background:#0B0F1C;border:1px solid #1E2D42;border-radius:12px;overflow:hidden;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif}
+.lm-nav{padding:.85rem 1.5rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1E2D42}
+.lm-logo{font-weight:800;font-size:15px;color:#EEF2FF;display:flex;align-items:center;gap:.4rem}
+.lm-logo-mark{width:22px;height:22px;background:#4F46E5;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:800}
+.lm-nav-r{display:flex;align-items:center;gap:.65rem}
+.lm-nav-link{color:#8896AD;font-size:12.5px;font-weight:500;text-decoration:none}
+.lm-nav-cta{background:#4F46E5;color:#fff;font-size:12.5px;font-weight:600;padding:.35rem .85rem;border-radius:6px;text-decoration:none}
+.lm-hero{padding:3rem 2rem 2rem;text-align:center}
+.lm-eye{display:inline-block;background:rgba(79,70,229,.12);color:#818CF8;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:.28rem .8rem;border-radius:999px;border:1px solid rgba(79,70,229,.25);margin-bottom:1.1rem}
+.lm-h1{font-size:2.1rem;font-weight:800;line-height:1.1;color:#EEF2FF;margin-bottom:.75rem}
+.lm-sub{font-size:13.5px;color:#8896AD;max-width:460px;margin:0 auto 1.4rem;line-height:1.65}
+.lm-ctas{display:flex;align-items:center;justify-content:center;gap:.65rem;margin-bottom:2rem}
+.lm-dash{background:#111827;border:1px solid #1E2D42;border-radius:10px;padding:1.1rem;max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem}
+.lm-stat{background:#1A2236;border:1px solid #1E2D42;border-radius:8px;padding:.75rem .9rem}
+.lm-sl{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#4A5C76;margin-bottom:.3rem}
+.lm-sv{font-family:'JetBrains Mono',monospace;font-size:1.15rem;font-weight:600}
+.lm-sv.pos{color:#4ADE80}.lm-sv.neu{color:#EEF2FF}
+.lm-feats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #1E2D42}
+.lm-feat{padding:1.35rem;border-right:1px solid #1E2D42}
+.lm-feat:last-child{border-right:none}
+.lm-feat-icon{width:30px;height:30px;background:rgba(79,70,229,.12);border:1px solid rgba(79,70,229,.2);border-radius:7px;display:flex;align-items:center;justify-content:center;margin-bottom:.7rem;color:#818CF8}
+.lm-feat-title{font-size:13px;font-weight:700;color:#EEF2FF;margin-bottom:.3rem}
+.lm-feat-desc{font-size:11.5px;color:#8896AD;line-height:1.6}
+.lm-cta-band{background:rgba(79,70,229,.07);border-top:1px solid rgba(79,70,229,.15);padding:1.75rem 2rem;text-align:center}
+.lm-cta-h{font-size:1.15rem;font-weight:800;color:#EEF2FF;margin-bottom:.4rem}
+.lm-cta-s{font-size:12.5px;color:#8896AD;margin-bottom:1.1rem}
+.lm-foot{padding:1.1rem 1.5rem;border-top:1px solid #1E2D42;display:flex;align-items:center;justify-content:space-between}
+.lm-foot-txt{font-size:11px;color:#4A5C76}
+.lm-foot-links{display:flex;gap:.85rem}
+.lm-foot-link{font-size:11px;color:#4A5C76;text-decoration:none}
+
+/* ── Dashboard layout spec ── */
+.dash-spec{background:#111827;border:1px solid #1E2D42;border-radius:12px;overflow:hidden;display:grid;grid-template-columns:220px 1fr}
+.ds-side{border-right:1px solid #1E2D42;padding:.85rem .5rem}
+.ds-main{padding:1.1rem;display:flex;flex-direction:column;gap:.75rem}
+.ds-top{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.ds-tile{background:#1A2236;border:1px solid #1E2D42;border-radius:8px;padding:.85rem}
+.ds-tile-lbl{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#4A5C76;margin-bottom:.25rem}
+.ds-tile-val{font-family:'JetBrains Mono',monospace;font-size:1.25rem;font-weight:600;line-height:1}
+.ds-mid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.ds-panel{background:#1A2236;border:1px solid #1E2D42;border-radius:8px;padding:.85rem;min-height:72px}
+.ds-panel-lbl{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#4A5C76;margin-bottom:.4rem}
+.ds-bot{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+
+/* ── Auth spec ── */
+.auth-spec{background:#111827;border:1px solid #1E2D42;border-radius:12px;overflow:hidden;display:grid;grid-template-columns:5fr 7fr;min-height:320px}
+.auth-brand{background:#0D1526;border-right:1px solid #1E2D42;padding:2rem;display:flex;flex-direction:column;gap:1rem}
+.auth-form-area{padding:2rem}
+
+/* ── Spec table ── */
+.spec-tbl-wrap{border:1px solid var(--bd);border-radius:8px;overflow:hidden;margin-top:.75rem}
+.spec-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.spec-tbl thead th{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);padding:.5rem .75rem;text-align:left;border-bottom:1px solid var(--bd);background:var(--surf2)}
+.spec-tbl tbody td{padding:.6rem .75rem;color:var(--t2);border-bottom:1px solid var(--bd);vertical-align:top}
+.spec-tbl tbody td:first-child{font-family:'JetBrains Mono',monospace;font-size:12px;color:#6ee7b7}
+.spec-tbl tbody tr:last-child td{border-bottom:none}
+
+/* ── Checklist ── */
+.ck-list{display:flex;flex-direction:column;gap:.45rem}
+.ck-item{display:flex;align-items:flex-start;gap:.65rem;padding:.6rem .85rem;background:var(--surf);border:1px solid var(--bd);border-radius:7px;font-size:13px;color:var(--t2)}
+.ck-box{width:14px;height:14px;border:1.5px solid var(--bd2);border-radius:3px;flex-shrink:0;margin-top:2px}
+.ck-own{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:.1rem .35rem;border-radius:3px;flex-shrink:0;letter-spacing:.04em}
+.own-a{background:rgba(129,140,248,.12);color:#818CF8}
+.own-u{background:rgba(52,211,153,.12);color:#34d399}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .wrap{grid-template-columns:1fr}
+  .toc{display:none}
+  .main{padding:1.5rem 1rem 4rem}
+  .tiles,.lm-feats,.lm-dash,.ds-top,.ds-mid,.ds-bot{grid-template-columns:1fr}
+  .dash-spec,.auth-spec{grid-template-columns:1fr}
+  .lm-feat{border-right:none;border-bottom:1px solid #1E2D42}
+}
+</style>
+
+<!-- HEADER -->
+<header class="hdr">
+  <span class="hdr-id">TF-REDESIGN-001 · Design Specification v1.0 · 2026-09-13</span>
+  <span class="hdr-badge">Usha → Arjun Handoff</span>
+</header>
+
+<div class="wrap">
+<!-- TOC -->
+<nav class="toc">
+  <div class="toc-g">Visual System</div>
+  <a href="#rationale">01 Rationale</a>
+  <a href="#colors">02 Color System</a>
+  <a href="#type">03 Typography</a>
+  <a href="#spacing">04 Spacing</a>
+  <a href="#elevation">05 Elevation</a>
+  <a href="#tokens">06 Token Additions</a>
+  <div class="toc-g">Components</div>
+  <a href="#sidebar">07 Sidebar</a>
+  <a href="#tiles">08 Stat Tiles</a>
+  <a href="#cards">09 Cards</a>
+  <a href="#tables">10 Tables</a>
+  <a href="#buttons">11 Buttons</a>
+  <a href="#forms">12 Forms</a>
+  <a href="#chips">13 Chips</a>
+  <div class="toc-g">Pages</div>
+  <a href="#landing">14 Landing Page</a>
+  <a href="#dashboard">15 Dashboard</a>
+  <a href="#auth">16 Auth Shell</a>
+  <div class="toc-g">Handoff</div>
+  <a href="#icons">17 Icons</a>
+  <a href="#checklist">18 Checklist</a>
+  <a href="#theme-toggle">19 Theme Toggle</a>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- 01 RATIONALE -->
+<section class="sec" id="rationale">
+  <div class="sec-eye">01 · Design Rationale</div>
+  <h2 class="sec-title">Precision tool, not a consumer app</h2>
+  <p class="sec-desc">TradeForge serves Indian retail traders who review trades in focused sessions — evenings, weekends, between market hours. They scan P&L figures the way developers scan logs: quickly, looking for anomalies. The interface must surface numbers first, context second, decoration never. Every visual decision follows from this: dark-first, data-dense, typographically precise.</p>
+  <p class="sec-desc">The primary color upgrades from <code>#2563EB</code> (Tailwind blue-600, generic SaaS) to <code>#4F46E5</code> (indigo-600). Indigo reads as analytical and deliberate — closer to tools than products. It still clears WCAG AA against white (4.7:1). The font upgrades from <code>system-ui</code> to Plus Jakarta Sans for all UI text, and JetBrains Mono for all numeric data — the same typeface a professional trader uses in their IDE.</p>
+  <div class="warn-box">⚠ Primary color change (#2563EB → #4F46E5) requires Atharva sign-off before Arjun implements. All other changes are within Usha's authority.</div>
+</section>
+
+<!-- 02 COLORS -->
+<section class="sec" id="colors">
+  <div class="sec-eye">02 · Color System</div>
+  <h2 class="sec-title">Token palette</h2>
+  <p class="sec-desc">All values below map directly to CSS custom properties in <code>tokens.css</code>. Light values are on <code>:root</code>; dark values override via <code>@media(prefers-color-scheme:dark)</code> and <code>[data-theme=dark]</code>. Items marked <span class="badge-new">NEW</span> are additions. Items marked <span class="badge-attn">CHANGE</span> modify an existing token value.</p>
+
+  <h3>Brand</h3>
+  <div class="swatches">
+    <div class="sw"><div class="sw-color" style="background:#4F46E5"></div><div class="sw-info"><span class="sw-tok">--color-primary</span><span class="sw-hex">#4F46E5 <span class="badge-attn">CHANGE</span></span><span class="sw-note">Light+Dark · was #2563EB</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#4338CA"></div><div class="sw-info"><span class="sw-tok">--color-primary-emphasis</span><span class="sw-hex">#4338CA <span class="badge-attn">CHANGE</span></span><span class="sw-note">Hover/active state</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#EEF2FF"></div><div class="sw-info"><span class="sw-tok">--color-surface-accent</span><span class="sw-hex">#EEF2FF <span class="badge-new">NEW</span></span><span class="sw-note">Light · indigo tinted bg</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#1E1B4B"></div><div class="sw-info"><span class="sw-tok">--color-surface-accent</span><span class="sw-hex">#1E1B4B <span class="badge-new">NEW</span></span><span class="sw-note">Dark · indigo tinted bg</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#C7D2FE"></div><div class="sw-info"><span class="sw-tok">--color-accent-border</span><span class="sw-hex">#C7D2FE <span class="badge-new">NEW</span></span><span class="sw-note">Light · indigo border</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#3730A3"></div><div class="sw-info"><span class="sw-tok">--color-accent-border</span><span class="sw-hex">#3730A3 <span class="badge-new">NEW</span></span><span class="sw-note">Dark · indigo border</span></div></div>
+  </div>
+
+  <h3>Semantic (existing — no change)</h3>
+  <div class="swatches">
+    <div class="sw"><div class="sw-color" style="background:#16A34A"></div><div class="sw-info"><span class="sw-tok">--color-success</span><span class="sw-hex">#16A34A · Light</span><span class="sw-note">#4ADE80 Dark</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#DC2626"></div><div class="sw-info"><span class="sw-tok">--color-danger</span><span class="sw-hex">#DC2626 · Light</span><span class="sw-note">#F87171 Dark</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#D97706"></div><div class="sw-info"><span class="sw-tok">--color-warning</span><span class="sw-hex">#D97706 · Light</span><span class="sw-note">#FBB93B Dark</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#2563EB"></div><div class="sw-info"><span class="sw-tok">--color-info</span><span class="sw-hex">#2563EB · Light</span><span class="sw-note">#60A5FA Dark</span></div></div>
+  </div>
+
+  <h3>Chart palette <span class="badge-new">NEW</span></h3>
+  <div class="swatches">
+    <div class="sw"><div class="sw-color" style="background:#4F46E5"></div><div class="sw-info"><span class="sw-tok">--color-chart-1</span><span class="sw-hex">#4F46E5</span><span class="sw-note">Indigo — primary series</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#0EA5E9"></div><div class="sw-info"><span class="sw-tok">--color-chart-2</span><span class="sw-hex">#0EA5E9</span><span class="sw-note">Sky — secondary series</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#10B981"></div><div class="sw-info"><span class="sw-tok">--color-chart-3</span><span class="sw-hex">#10B981</span><span class="sw-note">Emerald — win series</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#F59E0B"></div><div class="sw-info"><span class="sw-tok">--color-chart-4</span><span class="sw-hex">#F59E0B</span><span class="sw-note">Amber — neutral series</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#EF4444"></div><div class="sw-info"><span class="sw-tok">--color-chart-5</span><span class="sw-hex">#EF4444</span><span class="sw-note">Red — loss series</span></div></div>
+    <div class="sw"><div class="sw-color" style="background:#A78BFA"></div><div class="sw-info"><span class="sw-tok">--color-chart-6</span><span class="sw-hex">#A78BFA</span><span class="sw-note">Violet — tertiary</span></div></div>
+  </div>
+</section>
+
+<!-- 03 TYPOGRAPHY -->
+<section class="sec" id="type">
+  <div class="sec-eye">03 · Typography</div>
+  <h2 class="sec-title">Two faces, one purpose</h2>
+  <p class="sec-desc"><strong>Plus Jakarta Sans</strong> — all UI text: nav labels, headings, body, buttons, form fields, landing page copy. Load weights 400, 500, 600, 700, 800.<br><strong>JetBrains Mono</strong> — all numeric data: P&L figures, R-multiples, win rates, percentages, dates in tables. Load weights 400, 500, 600.</p>
+  <p class="sec-desc">Google Fonts link to add to <code>index.html</code>:<br><code style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#818CF8">https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap</code></p>
+
+  <div class="type-table">
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">Hero</span><span class="type-spec">52px · 800</span><span class="type-use">Landing page H1</span></div>
+      <div class="type-sample"><span style="font-size:52px;font-weight:800;line-height:1;color:#EEF2FF;white-space:nowrap">Turn every trade</span></div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">Display</span><span class="type-spec">32px · 800</span><span class="type-use">Section headings, landing</span></div>
+      <div class="type-sample"><span style="font-size:32px;font-weight:800;line-height:1.1;color:#EEF2FF">The metrics that matter</span></div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">Page title</span><span class="type-spec">22px · 700</span><span class="type-use">Dashboard, page headers</span></div>
+      <div class="type-sample"><span style="font-size:22px;font-weight:700;color:#EEF2FF">Dashboard</span></div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">Card title</span><span class="type-spec">12px · 600 · caps</span><span class="type-use">Section labels, card headers</span></div>
+      <div class="type-sample"><span style="font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8896AD">Account Overview</span></div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">Body</span><span class="type-spec">14px · 400</span><span class="type-use">Descriptions, tooltips</span></div>
+      <div class="type-sample"><span style="font-size:14px;color:#8896AD">Import your broker's trade file and TradeForge reconstructs everything.</span></div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">UI / Nav</span><span class="type-spec">13.5px · 500</span><span class="type-use">Nav items, table rows, inputs</span></div>
+      <div class="type-sample"><span style="font-size:13.5px;font-weight:500;color:#EEF2FF">Recent Trades</span></div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">Caption</span><span class="type-spec">11px · 500</span><span class="type-use">Timestamps, hints, meta</span></div>
+      <div class="type-sample"><span style="font-size:11px;font-weight:500;color:#4A5C76">Updated 3 minutes ago</span></div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">Stat — large</span><span class="type-spec">Mono · 2rem · 600</span><span class="type-use">Primary P&L, Win Rate</span></div>
+      <div class="type-sample"><span style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:600;color:#4ADE80;line-height:1">+₹24,500</span></div>
+    </div>
+    <div class="type-row">
+      <div class="type-meta"><span class="type-lbl">Stat — small</span><span class="type-spec">Mono · 14px · 500</span><span class="type-use">Table P&L, R-multiples</span></div>
+      <div class="type-sample"><span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:#4ADE80">+₹4,200</span>&nbsp;&nbsp;<span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:#8896AD">+1.4R</span></div>
+    </div>
+  </div>
+  <div class="info">font-variant-numeric: tabular-nums is already applied via className in the codebase. Keep it on all stat values. Apply it to the entire sidebar nav if account balance figures appear there later.</div>
+</section>
+
+<!-- 04 SPACING -->
+<section class="sec" id="spacing">
+  <div class="sec-eye">04 · Spacing</div>
+  <h2 class="sec-title">4px base grid</h2>
+  <p class="sec-desc">All spacing is a multiple of 4px. Use Tailwind's spacing scale (1 unit = 4px). Never use arbitrary values.</p>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Token (Tailwind)</th><th>px value</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td>p-1 / gap-1</td><td>4px</td><td>Icon-to-label gap, tight chip padding</td></tr>
+        <tr><td>p-2 / gap-2</td><td>8px</td><td>Nav item icon-label gap, badge padding</td></tr>
+        <tr><td>p-3 / gap-3</td><td>12px</td><td>Card inner padding (compact), chip group gap</td></tr>
+        <tr><td>p-4 / gap-4</td><td>16px</td><td>Button padding, form field padding, sidebar padding</td></tr>
+        <tr><td>p-5 / gap-5</td><td>20px</td><td>Card inner padding (standard)</td></tr>
+        <tr><td>p-6 / gap-6</td><td>24px</td><td>Page padding, section gap</td></tr>
+        <tr><td>p-8 / gap-8</td><td>32px</td><td>Section spacing on dashboard</td></tr>
+        <tr><td>p-12 / gap-12</td><td>48px</td><td>Landing page section vertical padding</td></tr>
+        <tr><td>p-16 / gap-16</td><td>64px</td><td>Landing page hero padding</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 05 ELEVATION -->
+<section class="sec" id="elevation">
+  <div class="sec-eye">05 · Elevation &amp; Radius</div>
+  <h2 class="sec-title">Four shadow levels, four radii</h2>
+
+  <h3>Shadows — add to tokens.css as CSS custom properties</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Token</th><th>Value</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td>--shadow-xs</td><td>0 1px 2px 0 rgb(0 0 0/.08)</td><td>Subtle lift: inputs on focus, small chips</td></tr>
+        <tr><td>--shadow-sm</td><td>0 1px 3px 0 rgb(0 0 0/.10), 0 1px 2px -1px rgb(0 0 0/.06)</td><td>Default card elevation</td></tr>
+        <tr><td>--shadow-md</td><td>0 4px 6px -1px rgb(0 0 0/.12), 0 2px 4px -2px rgb(0 0 0/.08)</td><td>Primary/elevated cards</td></tr>
+        <tr><td>--shadow-lg</td><td>0 10px 15px -3px rgb(0 0 0/.12), 0 4px 6px -4px rgb(0 0 0/.08)</td><td>Modals, drawers</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="info">Dark mode: multiply all alpha values by 2.5× (e.g. .08 → .20) since shadows are invisible against dark surfaces otherwise. Add corresponding dark values under [data-theme=dark] and the prefers-color-scheme:dark media query.</div>
+
+  <h3>Border radius</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Token</th><th>Value</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td>--radius-sm</td><td>4px</td><td>Chips, badges, table cells</td></tr>
+        <tr><td>--radius-md</td><td>8px</td><td>Buttons, inputs, small cards, nav items</td></tr>
+        <tr><td>--radius-lg</td><td>12px</td><td>Cards, panels, sidebar</td></tr>
+        <tr><td>--radius-xl</td><td>16px</td><td>Modals, large floating surfaces</td></tr>
+        <tr><td>--radius-full</td><td>9999px</td><td>Pills, avatar rings, progress bars</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 06 TOKEN ADDITIONS -->
+<section class="sec" id="tokens">
+  <div class="sec-eye">06 · Token Additions</div>
+  <h2 class="sec-title">Paste into tokens.css</h2>
+  <p class="sec-desc">Add the following after the existing <code>--color-primary-emphasis</code> line in <code>:root</code> and mirror in the two dark blocks. The dark shadow values use higher alpha since shadows are invisible on dark grounds without amplification.</p>
+<pre>
+<span class="cm">/* ── New in TF-REDESIGN-001 ── */</span>
+
+<span class="sec">/* Accent surfaces (indigo tint) */</span>
+<span class="prop">--color-surface-accent:</span> <span class="val">#EEF2FF</span>;
+<span class="prop">--color-accent-border:</span>  <span class="val">#C7D2FE</span>;
+
+<span class="sec">/* Sidebar width */</span>
+<span class="prop">--sidebar-width:</span> <span class="val">220px</span>;
+
+<span class="sec">/* Shadow scale */</span>
+<span class="prop">--shadow-xs:</span> <span class="val">0 1px 2px 0 rgb(0 0 0/.08)</span>;
+<span class="prop">--shadow-sm:</span> <span class="val">0 1px 3px 0 rgb(0 0 0/.10), 0 1px 2px -1px rgb(0 0 0/.06)</span>;
+<span class="prop">--shadow-md:</span> <span class="val">0 4px 6px -1px rgb(0 0 0/.12), 0 2px 4px -2px rgb(0 0 0/.08)</span>;
+<span class="prop">--shadow-lg:</span> <span class="val">0 10px 15px -3px rgb(0 0 0/.12), 0 4px 6px -4px rgb(0 0 0/.08)</span>;
+
+<span class="sec">/* Border radius scale */</span>
+<span class="prop">--radius-sm:</span>   <span class="val">4px</span>;
+<span class="prop">--radius-md:</span>   <span class="val">8px</span>;
+<span class="prop">--radius-lg:</span>   <span class="val">12px</span>;
+<span class="prop">--radius-xl:</span>   <span class="val">16px</span>;
+<span class="prop">--radius-full:</span> <span class="val">9999px</span>;
+
+<span class="sec">/* Chart palette */</span>
+<span class="prop">--color-chart-1:</span> <span class="val">#4F46E5</span>;
+<span class="prop">--color-chart-2:</span> <span class="val">#0EA5E9</span>;
+<span class="prop">--color-chart-3:</span> <span class="val">#10B981</span>;
+<span class="prop">--color-chart-4:</span> <span class="val">#F59E0B</span>;
+<span class="prop">--color-chart-5:</span> <span class="val">#EF4444</span>;
+<span class="prop">--color-chart-6:</span> <span class="val">#A78BFA</span>;
+
+<span class="cm">/* ── Dark overrides (add inside both dark blocks) ── */</span>
+<span class="prop">--color-surface-accent:</span> <span class="val">#1E1B4B</span>;
+<span class="prop">--color-accent-border:</span>  <span class="val">#3730A3</span>;
+<span class="prop">--shadow-xs:</span> <span class="val">0 1px 2px 0 rgb(0 0 0/.25)</span>;
+<span class="prop">--shadow-sm:</span> <span class="val">0 1px 3px 0 rgb(0 0 0/.30), 0 1px 2px -1px rgb(0 0 0/.20)</span>;
+<span class="prop">--shadow-md:</span> <span class="val">0 4px 6px -1px rgb(0 0 0/.35), 0 2px 4px -2px rgb(0 0 0/.25)</span>;
+<span class="prop">--shadow-lg:</span> <span class="val">0 10px 15px -3px rgb(0 0 0/.40), 0 4px 6px -4px rgb(0 0 0/.30)</span>;
+</pre>
+  <div class="info">Also add the new token names to <code>tailwind.config.ts</code> under <code>theme.extend</code> so Tailwind utility classes like <code>shadow-md</code>, <code>rounded-lg</code> and <code>bg-surface-accent</code> resolve correctly. Use <code>var(--shadow-md)</code> etc. for each key.</div>
+</section>
+
+<!-- 07 SIDEBAR -->
+<section class="sec" id="sidebar">
+  <div class="sec-eye">07 · Component</div>
+  <h2 class="sec-title">Navigation Sidebar</h2>
+  <p class="sec-desc">Width: <strong>220px</strong> (up from 224px / w-56). Three zones: brand header, account switcher, nav list + footer. All icons are Heroicons mini (16×16 inline SVG, MIT license — copy SVG paths directly, no npm package needed).</p>
+
+  <div class="demo">
+    <div class="demo-lbl">Sidebar — live mockup</div>
+    <div class="sb">
+      <div class="sb-brand">
+        <div class="sb-mark">T</div>
+        <span class="sb-name">TradeForge</span>
+      </div>
+      <div class="sb-acct">
+        <span class="sb-acct-name">Zerodha · Main</span>
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="#4A5C76"><path d="M5.22 10.22a.75.75 0 0 1 1.06 0L8 11.94l1.72-1.72a.75.75 0 1 1 1.06 1.06l-2.25 2.25a.75.75 0 0 1-1.06 0L5.22 11.28a.75.75 0 0 1 0-1.06ZM10.78 5.78a.75.75 0 0 1-1.06 0L8 4.06 6.28 5.78a.75.75 0 0 1-1.06-1.06l2.25-2.25a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1 0 1.06Z"/></svg>
+      </div>
+      <nav class="sb-nav">
+        <a class="sb-item active">
+          <svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.75A.75.75 0 0 1 2.75 2h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 2.75Zm0 5A.75.75 0 0 1 2.75 7h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 7.75Zm0 5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"/></svg>
+          Dashboard
+        </a>
+        <a class="sb-item">
+          <svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5a.5.5 0 0 0-.5-.5H11V2a1 1 0 0 0-1-1H2Zm1.5 5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5V6Zm4-2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-.5.5H8a.5.5 0 0 1-.5-.5V3.5Z"/></svg>
+          Analytics
+        </a>
+        <a class="sb-item">
+          <svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1ZM6.25 7.25A.75.75 0 0 1 7 6.5h1.25v4.25h1a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5h1V8H7a.75.75 0 0 1-.75-.75ZM8 5.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+          Risk
+        </a>
+        <a class="sb-item">
+          <svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Zm1.5.5v1h9V4h-9Zm0 2.5v5h9V7h-9Z"/></svg>
+          Trades
+        </a>
+        <a class="sb-item">
+          <svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.75.75 0 0 1 .75.75v5.5h5.5a.75.75 0 0 1 0 1.5h-5.5v5.5a.75.75 0 0 1-1.5 0v-5.5H1.75a.75.75 0 0 1 0-1.5h5.5V1.75A.75.75 0 0 1 8 1Z"/></svg>
+          Import
+        </a>
+        <a class="sb-item">
+          <svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 4.75a.75.75 0 0 1 1.5 0v3.5h1.75a.75.75 0 0 1 0 1.5H8a.75.75 0 0 1-.75-.75v-4.25Z"/></svg>
+          Settings
+        </a>
+      </nav>
+      <div class="sb-foot">
+        <a class="sb-item" style="width:100%">
+          <svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2 4.75A2.75 2.75 0 0 1 4.75 2h4a2.75 2.75 0 0 1 2.75 2.75v.5a.75.75 0 0 1-1.5 0v-.5c0-.69-.56-1.25-1.25-1.25h-4c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h4c.69 0 1.25-.56 1.25-1.25v-.5a.75.75 0 0 1 1.5 0v.5A2.75 2.75 0 0 1 8.75 14h-4A2.75 2.75 0 0 1 2 11.25v-6.5Zm9.47.47a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1 0 1.06l-2.25 2.25a.75.75 0 1 1-1.06-1.06l.97-.97H6.75a.75.75 0 0 1 0-1.5h5.69l-.97-.97a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+          Log out
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <h3>Spec notes</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Element</th><th>Specification</th></tr></thead>
+      <tbody>
+        <tr><td>Width</td><td>220px fixed (--sidebar-width token). Remove existing w-56 (224px).</td></tr>
+        <tr><td>Brand mark</td><td>26×26px indigo square (bg-primary), border-radius: 7px, "T" in white 800-weight — replace with SVG logo when available</td></tr>
+        <tr><td>Brand name</td><td>14px · 700 · Plus Jakarta Sans · letter-spacing: -0.01em</td></tr>
+        <tr><td>Account switcher</td><td>One line: account display_name + broker, chevron-up-down icon. Clicking opens account selection (existing AccountContext logic).</td></tr>
+        <tr><td>Nav item default</td><td>13.5px · 500 · color: text-secondary · bg: transparent · radius: 8px · padding: 8px 10px · gap: 8px</td></tr>
+        <tr><td>Nav item active</td><td>color: primary (indigo) · bg: surface-accent · no border</td></tr>
+        <tr><td>Nav item hover</td><td>bg: surface-subtle · color: text-primary</td></tr>
+        <tr><td>Icons</td><td>16×16px Heroicons mini · fill="currentColor" · aria-hidden="true"</td></tr>
+        <tr><td>Log out</td><td>Same styling as nav item · at footer · arrow-left-on-rectangle icon · no active state</td></tr>
+        <tr><td>Skip link <em>(must preserve)</em></td><td>First child of the AppShell root element: <code>&lt;a class="sr-only focus:not-sr-only" href="#main"&gt;Skip to content&lt;/a&gt;</code>. Must survive the sidebar rebuild — do not remove or relocate it. The <code>&lt;main&gt;</code> element must keep <code>id="main"</code>. Required by existing AppShell tests (F-14-30 group).</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 08 STAT TILES -->
+<section class="sec" id="tiles">
+  <div class="sec-eye">08 · Component</div>
+  <h2 class="sec-title">Stat Tiles</h2>
+  <p class="sec-desc">The most important change to the dashboard. Primary metrics (All-time P&amp;L, Win Rate, Expectancy) get large typographic treatment — 2rem JetBrains Mono figures, colored by P&amp;L direction or neutral for ratios. Secondary metrics (Profit Factor, Streaks, Open Positions) use the same card but smaller value type.</p>
+
+  <div class="demo">
+    <div class="demo-lbl">Primary stat tiles</div>
+    <div class="tiles">
+      <div class="tile">
+        <div class="tile-lbl">All-time P&amp;L</div>
+        <div class="tile-val pos">+₹24,500</div>
+        <div class="tile-sub">12 closed trades</div>
+      </div>
+      <div class="tile">
+        <div class="tile-lbl">Win Rate</div>
+        <div class="tile-val neu">62.4%</div>
+        <div class="tile-sub">All periods</div>
+      </div>
+      <div class="tile">
+        <div class="tile-lbl">Expectancy</div>
+        <div class="tile-val neu">+1.2R</div>
+        <div class="tile-sub">Per trade average</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Spec notes</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Property</th><th>Primary tile</th><th>Secondary tile</th></tr></thead>
+      <tbody>
+        <tr><td>Value font-size</td><td>2rem (32px) JetBrains Mono 600</td><td>1.25rem (20px) JetBrains Mono 600</td></tr>
+        <tr><td>Label</td><td>10.5px · 600 · uppercase · letter-spacing: .1em · color: text-muted</td><td>Same</td></tr>
+        <tr><td>Sub-label</td><td>11px · color: text-muted</td><td>Same</td></tr>
+        <tr><td>P&amp;L coloring</td><td>positive → success-emphasis · negative → danger-emphasis · zero → text-primary</td><td>Same</td></tr>
+        <tr><td>Ratio values</td><td>text-primary (neutral, not colored)</td><td>Same</td></tr>
+        <tr><td>Card style</td><td>border: 1px solid border · radius: 12px · padding: 20px · no shadow</td><td>Same</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 09 CARDS -->
+<section class="sec" id="cards">
+  <div class="sec-eye">09 · Component</div>
+  <h2 class="sec-title">Card Hierarchy</h2>
+  <p class="sec-desc">Three card variants encode visual weight. Use <strong>Primary</strong> for the single most important panel on a page (e.g. Account Overview). Use <strong>Secondary</strong> for supporting panels (Performance, Recent Trades). Use <strong>Ghost</strong> for inline grouping that shouldn't compete visually.</p>
+
+  <div class="demo">
+    <div class="demo-lbl">Card variants</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem">
+      <div style="background:#111827;border:1px solid #1E2D42;border-radius:12px;padding:1.1rem;box-shadow:0 4px 6px -1px rgb(0 0 0/.35)">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#4A5C76;margin-bottom:.5rem">PRIMARY CARD</div>
+        <div style="height:36px;background:#1A2236;border-radius:6px"></div>
+        <div style="font-size:11px;color:#4A5C76;margin-top:.5rem">shadow-md · border · radius-lg</div>
+      </div>
+      <div style="background:#111827;border:1px solid #1E2D42;border-radius:12px;padding:1.1rem">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#4A5C76;margin-bottom:.5rem">SECONDARY CARD</div>
+        <div style="height:36px;background:#1A2236;border-radius:6px"></div>
+        <div style="font-size:11px;color:#4A5C76;margin-top:.5rem">no shadow · border · radius-lg</div>
+      </div>
+      <div style="background:transparent;border:1px solid #1E2D42;border-radius:12px;padding:1.1rem">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#4A5C76;margin-bottom:.5rem">GHOST CARD</div>
+        <div style="height:36px;background:#1A2236;border-radius:6px"></div>
+        <div style="font-size:11px;color:#4A5C76;margin-top:.5rem">transparent bg · border · radius-lg</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 TABLES -->
+<section class="sec" id="tables">
+  <div class="sec-eye">10 · Component</div>
+  <h2 class="sec-title">Data Tables</h2>
+  <p class="sec-desc">All data tables share the same row anatomy. Numeric columns always use JetBrains Mono. Direction and Status values become chips — replace the hardcoded Tailwind color classes in <code>TradeListPage.tsx</code> with the token-based chip system defined in section 13.</p>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Row height</td><td>44px minimum (padding: 10px 12px vertically)</td></tr>
+        <tr><td>Body font</td><td>Plus Jakarta Sans · 13.5px · 400 · color: text-secondary</td></tr>
+        <tr><td>Numeric cells</td><td>JetBrains Mono · 13.5px · 500 · font-variant-numeric: tabular-nums</td></tr>
+        <tr><td>Header row</td><td>10px · 600 · uppercase · letter-spacing: .1em · color: text-muted · border-bottom: 1px border</td></tr>
+        <tr><td>Row separator</td><td>border-bottom: 1px solid border · remove on last row</td></tr>
+        <tr><td>Hover row</td><td>bg: surface-subtle on hover</td></tr>
+        <tr><td>Sort indicator</td><td>Chevron icon 12px next to header label · active: color-primary</td></tr>
+        <tr><td>Symbol column</td><td>font-weight: 600 · color: text-primary · clickable → underline on hover</td></tr>
+        <tr><td>P&amp;L column</td><td>JetBrains Mono · colored by pnlClass (success-emphasis / danger-emphasis / text-primary)</td></tr>
+        <tr><td>R-multiple column</td><td>JetBrains Mono · same coloring as P&amp;L</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 11 BUTTONS -->
+<section class="sec" id="buttons">
+  <div class="sec-eye">11 · Component</div>
+  <h2 class="sec-title">Buttons</h2>
+
+  <div class="demo">
+    <div class="demo-lbl">Variants × sizes</div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-lg">Start journaling</button>
+      <button class="btn btn-primary btn-md">Save changes</button>
+      <button class="btn btn-primary btn-sm">Apply</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-md">Sign in →</button>
+      <button class="btn btn-ghost btn-md">Cancel</button>
+      <button class="btn btn-danger btn-md">Delete trade</button>
+    </div>
+  </div>
+
+  <div class="spec-tbl-wrap" style="margin-top:1rem">
+    <table class="spec-tbl">
+      <thead><tr><th>Variant</th><th>Use</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>btn-primary</td><td>Single main action per page: Submit, Save, Start</td><td>hover: bg-primary-emphasis · focus: ring 3px · disabled: opacity-60</td></tr>
+        <tr><td>btn-secondary</td><td>Secondary CTAs alongside primary: "Sign in" on landing</td><td>hover: slightly lighter bg</td></tr>
+        <tr><td>btn-ghost</td><td>Cancel, dismiss, low-priority actions</td><td>hover: surface-subtle bg</td></tr>
+        <tr><td>btn-danger</td><td>Destructive actions: delete, remove</td><td>Confirm dialog required before action executes</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 12 FORMS -->
+<section class="sec" id="forms">
+  <div class="sec-eye">12 · Component</div>
+  <h2 class="sec-title">Form Elements</h2>
+
+  <div class="demo">
+    <div class="demo-lbl">Input states</div>
+    <div class="form-demo">
+      <div class="field">
+        <label class="f-label">Email address</label>
+        <input class="f-input" type="email" placeholder="you@example.com">
+        <span class="f-hint">We'll send a verification link here.</span>
+      </div>
+      <div class="field">
+        <label class="f-label">Password</label>
+        <input class="f-input err" type="password" value="password">
+        <span class="f-err">Password must be at least 8 characters.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="spec-tbl-wrap" style="margin-top:1rem">
+    <table class="spec-tbl">
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Input height</td><td>40px (padding: 9px 12px)</td></tr>
+        <tr><td>Background</td><td>surface-subtle (not surface-base — distinguishes from page ground)</td></tr>
+        <tr><td>Border default</td><td>1px solid border · radius: 8px</td></tr>
+        <tr><td>Border focus</td><td>border-color: primary · box-shadow: 0 0 0 3px rgb(primary/.2)</td></tr>
+        <tr><td>Border error</td><td>border-color: danger · box-shadow: 0 0 0 3px rgb(danger/.15) on focus</td></tr>
+        <tr><td>Label</td><td>13px · 500 · color: text-primary · always visible (not placeholder-only)</td></tr>
+        <tr><td>Placeholder</td><td>color: text-muted · supplemental only, never the only label</td></tr>
+        <tr><td>Error message</td><td>11.5px · color: danger · appears below input · specific action text ("must be at least 8 characters", not "invalid")</td></tr>
+        <tr><td>Hint text</td><td>11.5px · color: text-muted · appears below input when no error</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 13 CHIPS -->
+<section class="sec" id="chips">
+  <div class="sec-eye">13 · Component</div>
+  <h2 class="sec-title">Chips &amp; Badges</h2>
+  <p class="sec-desc">Replace all hardcoded Tailwind dark: color classes in <code>TradeListPage.tsx</code> and <code>TradeDetailPage.tsx</code> with the token-based chip classes below. These respect both themes automatically.</p>
+
+  <div class="demo">
+    <div class="demo-lbl">Direction chips</div>
+    <div class="chip-row" style="margin-bottom:.85rem">
+      <span class="chip chip-long">Long</span>
+      <span class="chip chip-short">Short</span>
+    </div>
+    <div class="demo-lbl">Status chips</div>
+    <div class="chip-row">
+      <span class="chip chip-open">Open</span>
+      <span class="chip chip-partial">Partial</span>
+      <span class="chip chip-closed">Closed</span>
+    </div>
+  </div>
+
+  <div class="spec-tbl-wrap" style="margin-top:1rem">
+    <table class="spec-tbl">
+      <thead><tr><th>Chip</th><th>Token mapping (both themes)</th></tr></thead>
+      <tbody>
+        <tr><td>Long</td><td>bg: surface-success · color: success-emphasis · border: success-subtle</td></tr>
+        <tr><td>Short</td><td>bg: surface-danger · color: danger-emphasis · border: danger-subtle</td></tr>
+        <tr><td>Open</td><td>bg: surface-info · color: info · border: 1px solid color-info/30</td></tr>
+        <tr><td>Partial</td><td>bg: surface-warning · color: warning · border: 1px solid color-warning/30</td></tr>
+        <tr><td>Closed</td><td>bg: surface-neutral · color: text-secondary · border: border</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 14 LANDING PAGE -->
+<section class="sec" id="landing">
+  <div class="sec-eye">14 · Page Design</div>
+  <h2 class="sec-title">Landing Page</h2>
+  <p class="sec-desc">New route: <code>/</code> — publicly accessible. When authenticated, <code>/</code> still redirects to <code>/dashboard</code> (existing <code>RequireAuth</code> behaviour unchanged). The landing page is outside the <code>AppShell</code>. New file: <code>frontend/src/features/landing/LandingPage.tsx</code>.</p>
+  <div class="warn-box"><strong>Test conflict — action required at checklist item 8:</strong> Existing test <strong>F-18-14</strong> in <code>DashboardPage.test.tsx</code> mounts <code>/</code> as a bare redirect to <code>/dashboard</code>. Once <code>LandingPage.tsx</code> is added, that test fails because <code>/</code> is no longer a plain redirect — it renders the landing page for unauthenticated users. Arjun must delete F-18-14 when implementing item 8 and replace its routing coverage with the two new landing page tests. See §18 item 8 for the full instruction.</div>
+
+  <div class="demo" style="padding:0">
+    <div class="lm">
+      <!-- Nav -->
+      <div class="lm-nav">
+        <div class="lm-logo"><div class="lm-logo-mark">T</div>TradeForge</div>
+        <div class="lm-nav-r">
+          <a class="lm-nav-link" href="/login">Sign in</a>
+          <a class="lm-nav-cta" href="/register">Start free →</a>
+        </div>
+      </div>
+      <!-- Hero -->
+      <div class="lm-hero">
+        <div class="lm-eye">Built for serious traders</div>
+        <div class="lm-h1">Turn every trade<br>into a lesson.</div>
+        <div class="lm-sub">TradeForge captures your trades, surfaces your patterns, and journals your psychology — so you trade with intention, not instinct.</div>
+        <div class="lm-ctas">
+          <a class="btn btn-primary btn-lg" href="/register">Start journaling free</a>
+          <a class="btn btn-ghost btn-md" href="/login">Sign in →</a>
+        </div>
+        <!-- Dashboard preview -->
+        <div class="lm-dash">
+          <div class="lm-stat"><div class="lm-sl">All-time P&amp;L</div><div class="lm-sv pos">+₹48,200</div></div>
+          <div class="lm-stat"><div class="lm-sl">Win Rate</div><div class="lm-sv neu">62.4%</div></div>
+          <div class="lm-stat"><div class="lm-sl">Expectancy</div><div class="lm-sv neu">+1.2R</div></div>
+        </div>
+      </div>
+      <!-- Features -->
+      <div class="lm-feats">
+        <div class="lm-feat">
+          <div class="lm-feat-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.75.75 0 0 1 .75.75v5.5h5.5a.75.75 0 0 1 0 1.5h-5.5v5.5a.75.75 0 0 1-1.5 0v-5.5H1.75a.75.75 0 0 1 0-1.5h5.5V1.75A.75.75 0 0 1 8 1Z"/></svg>
+          </div>
+          <div class="lm-feat-title">Import &amp; log trades</div>
+          <div class="lm-feat-desc">Upload your Zerodha, Upstox, or Angel One contract note. TradeForge reconstructs positions, calculates net P&amp;L with all charges, and maps every fill to a trade.</div>
+        </div>
+        <div class="lm-feat">
+          <div class="lm-feat-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5a.5.5 0 0 0-.5-.5H11V2a1 1 0 0 0-1-1H2Zm1.5 5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5V6Zm4-2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-.5.5H8a.5.5 0 0 1-.5-.5V3.5Z"/></svg>
+          </div>
+          <div class="lm-feat-title">Analytics that tell the truth</div>
+          <div class="lm-feat-desc">Win rate, expectancy, profit factor, R-multiples, time-of-day analysis, streak detection, Kelly criterion. The metrics that predict future performance — not vanity stats.</div>
+        </div>
+        <div class="lm-feat">
+          <div class="lm-feat-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 4.75a.75.75 0 0 1 1.5 0v3.5h1.75a.75.75 0 0 1 0 1.5H8a.75.75 0 0 1-.75-.75v-4.25Z" clip-rule="evenodd"/></svg>
+          </div>
+          <div class="lm-feat-title">Journal your psychology</div>
+          <div class="lm-feat-desc">Log emotions, discipline scores, and specific mistakes against every trade. Discover whether your biggest losses come after your biggest wins.</div>
+        </div>
+      </div>
+      <!-- CTA band -->
+      <div class="lm-cta-band">
+        <div class="lm-cta-h">Start building your edge today.</div>
+        <div class="lm-cta-s">Free to use. No broker integration required — just a CSV export.</div>
+        <a class="btn btn-primary btn-lg" href="/register">Create free account</a>
+      </div>
+      <!-- Footer -->
+      <div class="lm-foot">
+        <span class="lm-foot-txt">© 2026 TradeForge</span>
+        <div class="lm-foot-links">
+          <a class="lm-foot-link" href="/login">Sign in</a>
+          <a class="lm-foot-link" href="/register">Register</a>
+          <a class="lm-foot-link" href="#">Privacy</a>
+          <a class="lm-foot-link" href="#">Terms</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Copy spec (verbatim for Arjun)</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Element</th><th>Copy</th></tr></thead>
+      <tbody>
+        <tr><td>Eyebrow tag</td><td>"Built for serious traders"</td></tr>
+        <tr><td>H1</td><td>"Turn every trade into a lesson."</td></tr>
+        <tr><td>Subline</td><td>"TradeForge captures your trades, surfaces your patterns, and journals your psychology — so you trade with intention, not instinct."</td></tr>
+        <tr><td>Primary CTA</td><td>"Start journaling free" → /register</td></tr>
+        <tr><td>Secondary CTA</td><td>"Sign in →" → /login</td></tr>
+        <tr><td>Feature 1 title</td><td>"Import &amp; log trades"</td></tr>
+        <tr><td>Feature 1 body</td><td>"Upload your Zerodha, Upstox, or Angel One contract note. TradeForge reconstructs positions, calculates net P&amp;L with all charges, and maps every fill to a trade."</td></tr>
+        <tr><td>Feature 2 title</td><td>"Analytics that tell the truth"</td></tr>
+        <tr><td>Feature 2 body</td><td>"Win rate, expectancy, profit factor, R-multiples, time-of-day analysis, streak detection, Kelly criterion. The metrics that predict future performance — not vanity stats."</td></tr>
+        <tr><td>Feature 3 title</td><td>"Journal your psychology"</td></tr>
+        <tr><td>Feature 3 body</td><td>"Log emotions, discipline scores, and specific mistakes against every trade. Discover whether your biggest losses come after your biggest wins."</td></tr>
+        <tr><td>CTA band headline</td><td>"Start building your edge today."</td></tr>
+        <tr><td>CTA band sub</td><td>"Free to use. No broker integration required — just a CSV export."</td></tr>
+        <tr><td>CTA band button</td><td>"Create free account" → /register</td></tr>
+        <tr><td>Footer copyright</td><td>"© 2026 TradeForge"</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>data-testid attributes (required)</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Element</th><th>data-testid value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Nav element</td><td><code>landing-nav</code></td><td>The <code>&lt;nav&gt;</code> or nav wrapper element containing logo, links, toggle, and CTAs</td></tr>
+        <tr><td>Hero section</td><td><code>landing-hero</code></td><td>The section containing the H1, subline, and CTA buttons</td></tr>
+        <tr><td>Features section</td><td><code>landing-features</code></td><td>The three-card feature grid</td></tr>
+        <tr><td>CTA band</td><td><code>landing-cta-band</code></td><td>The full-width "Start building your edge" section</td></tr>
+        <tr><td>Theme toggle button</td><td><code>theme-toggle</code></td><td>The icon button in the nav bar; both toggle instances share this value (see §19)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 15 DASHBOARD -->
+<section class="sec" id="dashboard">
+  <div class="sec-eye">15 · Page Design</div>
+  <h2 class="sec-title">Dashboard Layout</h2>
+  <p class="sec-desc">Replace the current 5-section vertical stack with a purpose-built grid. Primary metrics top, supporting panels below, full-width tables at the bottom. The Account Overview section becomes the top stat-tile row — not a bordered card containing smaller text.</p>
+
+  <div class="demo" style="padding:0;overflow:hidden">
+    <div class="dash-spec">
+      <div class="ds-side">
+        <div class="sb-brand" style="padding:.7rem .6rem;border-bottom:1px solid #1E2D42;display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
+          <div class="sb-mark" style="width:22px;height:22px;font-size:10px;border-radius:5px">T</div>
+          <span style="font-size:13px;font-weight:700;color:#EEF2FF">TradeForge</span>
+        </div>
+        <div class="sb-nav" style="padding:.3rem">
+          <a class="sb-item active" style="font-size:12px;padding:.4rem .55rem">
+            <svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px"><path d="M2 2.75A.75.75 0 0 1 2.75 2h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 2.75Zm0 5A.75.75 0 0 1 2.75 7h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 7.75Zm0 5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"/></svg>
+            Dashboard
+          </a>
+          <a class="sb-item" style="font-size:12px;padding:.4rem .55rem"><svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px"><path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5a.5.5 0 0 0-.5-.5H11V2a1 1 0 0 0-1-1H2Zm1.5 5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5V6Zm4-2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-.5.5H8a.5.5 0 0 1-.5-.5V3.5Z"/></svg>Analytics</a>
+          <a class="sb-item" style="font-size:12px;padding:.4rem .55rem"><svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Zm1.5.5v1h9V4h-9Zm0 2.5v5h9V7h-9Z"/></svg>Trades</a>
+          <a class="sb-item" style="font-size:12px;padding:.4rem .55rem"><svg class="sb-icon" viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px"><path d="M8 1a.75.75 0 0 1 .75.75v5.5h5.5a.75.75 0 0 1 0 1.5h-5.5v5.5a.75.75 0 0 1-1.5 0v-5.5H1.75a.75.75 0 0 1 0-1.5h5.5V1.75A.75.75 0 0 1 8 1Z"/></svg>Import</a>
+        </div>
+      </div>
+      <div class="ds-main">
+        <div style="font-size:11px;font-weight:700;color:#EEF2FF;padding-bottom:.4rem">Zerodha · Main Account</div>
+        <!-- Top: 3 primary stat tiles -->
+        <div class="ds-top">
+          <div class="ds-tile">
+            <div class="ds-tile-lbl">All-time P&amp;L</div>
+            <div class="ds-tile-val" style="color:#4ADE80">+₹24,500</div>
+          </div>
+          <div class="ds-tile">
+            <div class="ds-tile-lbl">Win Rate</div>
+            <div class="ds-tile-val" style="color:#EEF2FF">62.4%</div>
+          </div>
+          <div class="ds-tile">
+            <div class="ds-tile-lbl">Expectancy</div>
+            <div class="ds-tile-val" style="color:#EEF2FF">+1.2R</div>
+          </div>
+        </div>
+        <!-- Mid: 3 secondary tiles -->
+        <div class="ds-mid">
+          <div class="ds-tile">
+            <div class="ds-tile-lbl">Profit Factor</div>
+            <div class="ds-tile-val" style="color:#EEF2FF;font-size:1.1rem">1.8×</div>
+          </div>
+          <div class="ds-tile">
+            <div class="ds-tile-lbl">Current Streak</div>
+            <div class="ds-tile-val" style="color:#4ADE80;font-size:1.1rem">+3 wins</div>
+          </div>
+          <div class="ds-tile">
+            <div class="ds-tile-lbl">Open Positions</div>
+            <div class="ds-tile-val" style="color:#EEF2FF;font-size:1.1rem">2</div>
+          </div>
+        </div>
+        <!-- Bottom: 2 panels -->
+        <div class="ds-bot">
+          <div class="ds-panel">
+            <div class="ds-panel-lbl">Recent Trades</div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">
+              <div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid #1E2D42"><span style="color:#EEF2FF;font-weight:500">RELIANCE</span><span style="font-family:'JetBrains Mono',monospace;color:#4ADE80">+₹1,200</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid #1E2D42"><span style="color:#EEF2FF;font-weight:500">INFY</span><span style="font-family:'JetBrains Mono',monospace;color:#F87171">-₹480</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0"><span style="color:#EEF2FF;font-weight:500">TCS</span><span style="font-family:'JetBrains Mono',monospace;color:#4ADE80">+₹2,100</span></div>
+            </div>
+          </div>
+          <div class="ds-panel">
+            <div class="ds-panel-lbl">Recent Journal</div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">
+              <div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid #1E2D42"><span style="color:#EEF2FF;font-weight:500">RELIANCE</span><span style="color:#FBB93B">Score: 8</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid #1E2D42"><span style="color:#EEF2FF;font-weight:500">INFY</span><span style="color:#FBB93B">Score: 5</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0"><span style="color:#EEF2FF;font-weight:500">TCS</span><span style="color:#FBB93B">Score: 9</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Grid specification</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Zone</th><th>Grid</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td>Row 1 — Primary</td><td>3 equal columns, gap-4</td><td>All-time P&amp;L (colored) · Win Rate (neutral) · Expectancy (neutral). Font: 2rem JetBrains Mono 600.</td></tr>
+        <tr><td>Row 2 — Secondary</td><td>3 equal columns, gap-4</td><td>Profit Factor · Current Streak (colored) · Open Positions. Font: 1.25rem JetBrains Mono 600.</td></tr>
+        <tr><td>Row 3 — MTD/WTD</td><td>2 equal columns, gap-4</td><td>MTD P&amp;L · WTD P&amp;L. Font: 1.25rem. Only show when data exists.</td></tr>
+        <tr><td>Row 4 — Tables</td><td>2 equal columns, gap-4</td><td>Recent Trades (left) · Recent Journal (right). Full-width table inside each panel.</td></tr>
+        <tr><td>Page padding</td><td>p-6 (24px)</td><td>All sides. Gap between rows: gap-4 (16px).</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 16 AUTH SHELL -->
+<section class="sec" id="auth">
+  <div class="sec-eye">16 · Page Design</div>
+  <h2 class="sec-title">Auth Layout Shell</h2>
+  <p class="sec-desc">New shared component: <code>frontend/src/features/auth/components/AuthShell.tsx</code>. All 6 auth pages (Login, Register, RegisterSuccess, VerifyEmail, ForgotPassword, ResetPassword) use this wrapper. Left panel carries brand identity; right panel carries the form.</p>
+
+  <div class="demo" style="padding:0;overflow:hidden">
+    <div class="auth-spec">
+      <div class="auth-brand" style="background:linear-gradient(135deg,#0D1526 0%,#1E1B4B 100%);padding:2rem;display:flex;flex-direction:column;justify-content:space-between">
+        <div>
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem">
+            <div class="sb-mark" style="width:28px;height:28px;font-size:13px;border-radius:7px">T</div>
+            <span style="font-size:15px;font-weight:800;color:#EEF2FF">TradeForge</span>
+          </div>
+          <div style="font-size:1.15rem;font-weight:700;color:#EEF2FF;line-height:1.25;margin-bottom:.6rem">Trade with intention,<br>not instinct.</div>
+          <div style="font-size:12.5px;color:#8896AD;line-height:1.65">The journal that turns your raw trades into a performance edge.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+          <div style="display:flex;align-items:center;gap:.5rem;font-size:12px;color:#8896AD">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="#4ADE80"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd"/></svg>
+            Win rate, expectancy, R-multiples
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem;font-size:12px;color:#8896AD">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="#4ADE80"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd"/></svg>
+            Zerodha, Upstox, Angel One import
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem;font-size:12px;color:#8896AD">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="#4ADE80"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd"/></svg>
+            Psychology journaling &amp; scoring
+          </div>
+        </div>
+      </div>
+      <div class="auth-form-area" style="display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:1.35rem;font-weight:800;color:#EEF2FF;margin-bottom:.35rem">Sign in</div>
+        <div style="font-size:13px;color:#8896AD;margin-bottom:1.5rem">New to TradeForge? <a href="#" style="color:#818CF8;text-decoration:none;font-weight:500">Create an account</a></div>
+        <div class="form-demo" style="max-width:none">
+          <div class="field">
+            <label class="f-label">Email</label>
+            <input class="f-input" type="email" placeholder="you@example.com">
+          </div>
+          <div class="field">
+            <label class="f-label">Password</label>
+            <input class="f-input" type="password">
+            <span class="f-hint"><a href="#" style="color:#818CF8;text-decoration:none">Forgot password?</a></span>
+          </div>
+          <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center">Sign in</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Spec notes</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Element</th><th>Specification</th></tr></thead>
+      <tbody>
+        <tr><td>Layout</td><td>Two-column grid: 5fr left (brand) + 7fr right (form). Min-height: 100vh. Collapses to single-column on mobile (brand panel moves to compact top bar).</td></tr>
+        <tr><td>Brand panel bg</td><td>CSS gradient: #0D1526 → #1E1B4B (diagonal). Not a flat color.</td></tr>
+        <tr><td>Brand panel content</td><td>Logo mark + name (top) · Tagline + description (middle) · 3 feature bullets with green checkmarks (bottom)</td></tr>
+        <tr><td>Form panel bg</td><td>surface-base (#FFFFFF light / #111827 dark)</td></tr>
+        <tr><td>Form panel padding</td><td>p-12 (48px) on desktop · p-8 (32px) on mobile</td></tr>
+        <tr><td>Page title</td><td>Passed as prop to AuthShell — each page sets its own ("Sign in", "Create account", "Reset your password")</td></tr>
+        <tr><td>Context link</td><td>Below title — "New to TradeForge? Create account" or "Already have an account? Sign in" as appropriate</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Test rendering context (decision for Arjun)</h3>
+  <div class="info">
+    <strong>Decision: existing auth page tests continue to mount page components WITHOUT the AuthShell wrapper.</strong> Each of the 5 auth page test files (LoginPage, RegisterPage, ForgotPasswordPage, VerifyEmailPage, ResetPasswordPage) tests page-specific behaviour — form validation, error messaging, copy, links — not layout. Mounting without AuthShell keeps those tests focused and fast.<br><br>
+    AuthShell gets its own dedicated test file (<code>AuthShell.test.tsx</code>) covering: brand panel renders, form panel renders, title prop is rendered, mobile single-column layout class is present. This is Arjun's responsibility at checklist item 5.<br><br>
+    <strong>Rationale:</strong> coupling 5 existing test files to AuthShell's internal structure means a layout change breaks all 5 tests simultaneously, obscuring whether the failure is in the layout or the page. Isolation is the correct pattern here.
+  </div>
+
+  <h3>data-testid attributes (required)</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Element</th><th>data-testid value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>AuthShell root</td><td><code>auth-shell</code></td><td>The two-column grid container wrapping both panels</td></tr>
+        <tr><td>Brand panel</td><td><code>auth-shell-brand</code></td><td>Left panel: logo + tagline + feature bullets</td></tr>
+        <tr><td>Form panel</td><td><code>auth-shell-form</code></td><td>Right panel: page title + context link + form slot</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 17 ICONS -->
+<section class="sec" id="icons">
+  <div class="sec-eye">17 · Icon Library</div>
+  <h2 class="sec-title">Heroicons Mini — inline SVG</h2>
+  <p class="sec-desc"><strong>Decision:</strong> No npm package. Copy SVG paths directly from <a href="https://heroicons.com" style="color:#818CF8">heroicons.com</a> (MIT license). Use the <strong>mini</strong> variant (16×16 viewBox) for sidebar and table icons. Use the <strong>solid</strong> variant (24×24) for illustrative icons on the landing page. Every functional icon needs <code>aria-hidden="true"</code> and a sibling text label or <code>aria-label</code>.</p>
+
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Nav item</th><th>Heroicon name (mini)</th><th>SVG path key</th></tr></thead>
+      <tbody>
+        <tr><td>Dashboard</td><td>bars-3</td><td>Three horizontal lines</td></tr>
+        <tr><td>Analytics</td><td>chart-bar-square</td><td>Bar chart in a square frame</td></tr>
+        <tr><td>Risk</td><td>shield-check</td><td>Shield with checkmark</td></tr>
+        <tr><td>Trades</td><td>table-cells</td><td>Table grid icon</td></tr>
+        <tr><td>Import</td><td>arrow-up-tray</td><td>Arrow pointing up into a tray</td></tr>
+        <tr><td>Settings</td><td>cog-6-tooth</td><td>Gear / cog</td></tr>
+        <tr><td>Log out</td><td>arrow-left-on-rectangle</td><td>Arrow leaving a rectangle</td></tr>
+        <tr><td>Account switcher</td><td>chevrons-up-down</td><td>Up/down chevrons stacked</td></tr>
+        <tr><td>Sort ascending</td><td>chevron-up</td><td>Single chevron up</td></tr>
+        <tr><td>Sort descending</td><td>chevron-down</td><td>Single chevron down</td></tr>
+        <tr><td>Filter</td><td>funnel</td><td>Funnel / filter shape (already in AnalyticsPage)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="info">The AnalyticsPage already uses an inline SVG for the filter icon with the correct pattern. Follow that exact pattern for all nav icons: <code>&lt;svg xmlns="..." viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"&gt;&lt;path d="..."/&gt;&lt;/svg&gt;</code></div>
+</section>
+
+<!-- 18 CHECKLIST -->
+<section class="sec" id="checklist">
+  <div class="sec-eye">18 · Handoff Checklist</div>
+  <h2 class="sec-title">Implementation checklist for Arjun</h2>
+  <p class="sec-desc">Complete in order. Do not begin a later item until the preceding item's tests pass. Items marked <span class="ck-own own-u" style="display:inline">Usha</span> require Usha to verify the output matches this spec before proceeding.</p>
+
+  <div class="ck-list">
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-u">Usha</span>Obtain Atharva sign-off on primary color change: #2563EB → #4F46E5. Block all other work until confirmed.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Add Google Fonts link to <code>index.html</code>: Plus Jakarta Sans (400,500,600,700,800) + JetBrains Mono (400,500,600).</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Add all new tokens from §06 to <code>tokens.css</code> — both light (:root) and dark blocks. Update <code>tailwind.config.ts</code> to expose shadow, radius, surface-accent, accent-border, and chart-1–6 as Tailwind utilities.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Update <code>index.css</code>: set <code>font-family: 'Plus Jakarta Sans', system-ui, sans-serif</code> on <code>body</code>.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Create <code>AuthShell.tsx</code> shared layout per §16. Apply to all 6 auth pages. Verify existing auth tests still pass.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Rebuild <code>AppShell.tsx</code> sidebar per §07 — 220px, brand mark, account switcher, icons for all nav items. Existing <code>AppShell.test.tsx</code> assertions must continue to pass.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Rebuild <code>DashboardPage.tsx</code> layout per §15 — 3-column primary stat tiles, 3-column secondary tiles, 2-column table panels. Existing <code>DashboardPage.test.tsx</code> assertions must continue to pass.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Create <code>frontend/src/features/landing/LandingPage.tsx</code> per §14. Add public <code>/</code> route in <code>app.tsx</code> before the RequireAuth wrapper. <strong>Delete test F-18-14 from <code>DashboardPage.test.tsx</code></strong> — it hardcodes <code>/</code> as a plain redirect and fails once the landing page route is in place; its routing coverage is superseded by the two new tests below. Write at minimum 2 new tests in <code>LandingPage.test.tsx</code>: (1) unauthenticated user at <code>/</code> sees the landing page (eyebrow text "Built for serious traders" is rendered); (2) authenticated user at <code>/</code> is redirected to <code>/dashboard</code>.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Fix chip classes in <code>TradeListPage.tsx</code> and <code>TradeDetailPage.tsx</code>: replace hardcoded <code>bg-green-100 dark:bg-green-900/30</code> etc. with token-based chip styles per §13.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Apply card hierarchy per §09 to Analytics page — ensure cards use border + correct radius, not arbitrary values.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Run <code>tsc --noEmit</code> and full test suite. Gate: all tests pass. New tests that must exist and pass: (a) <code>LandingPage.test.tsx</code> — 2 route tests (unauthenticated renders landing; authenticated redirects to dashboard); (b) <code>AuthShell.test.tsx</code> — brand panel, form panel, title prop; (c) <code>useTheme.test.ts</code> — reads <code>tf-theme</code>, writes on toggle, falls back to <code>prefers-color-scheme</code>, applies <code>data-theme</code> to <code>&lt;html&gt;</code>; (d) <code>LandingPage.test.tsx</code> or separate toggle test — <code>theme-toggle</code> button present in landing nav, aria-label matches state; (e) <code>AppShell.test.tsx</code> toggle render — <code>theme-toggle</code> present in sidebar footer, aria-label matches state. Note: F-18-14 deleted at item 8, so total test count will be 358 existing + all new tests.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-u">Usha</span>Visual QA: verify sidebar, dashboard, auth pages, and landing page match this spec in both light and dark themes.</div>
+    <div class="ck-item"><div class="ck-box"></div><span class="ck-own own-a">Arjun</span>Produce handoff artifact to Sahadeva: branch name, build link, known limitations, test results.</div>
+  </div>
+</section>
+
+<!-- 19 THEME TOGGLE -->
+<section class="sec" id="theme-toggle">
+  <div class="sec-eye">19 · Theme Toggle — Item 10a</div>
+  <h2 class="sec-title">Theme toggle: landing page + authenticated app</h2>
+  <p class="sec-desc">A single icon button appears on both the public landing page and the authenticated sidebar. One <code>localStorage</code> key (<code>tf-theme</code>) drives both surfaces — the preference persists across navigation between public and authenticated views.</p>
+
+  <!-- ── OVERVIEW ── -->
+  <h3>Overview &amp; rationale</h3>
+  <p style="font-size:13.5px;color:var(--t2);line-height:1.7;max-width:620px;margin-bottom:1rem">
+    Traders work at screens for hours. Theme is a meaningful comfort choice, not a novelty — it must be discoverable before login (landing page) and persistent once set. The same preference value must not reset on navigation. No separate "system" UI control is exposed after the user makes their first explicit choice; the OS preference is the default state only.
+  </p>
+  <div class="info">
+    <strong>Shared state contract:</strong> On app init (before first render), read <code>localStorage.getItem('tf-theme')</code>. If <code>"light"</code> or <code>"dark"</code>, apply <code>data-theme</code> to <code>&lt;html&gt;</code> immediately. If absent, fall back to <code>prefers-color-scheme</code> — do not write to <code>localStorage</code> at this point. Write only when the user explicitly clicks the toggle.
+  </div>
+
+  <!-- ── ICON TREATMENT ── -->
+  <h3>Icon treatment</h3>
+  <div style="background:var(--surf);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:1rem">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.5rem .9rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase">State</div>
+      <div style="padding:.5rem .9rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--bd)">Icon</div>
+      <div style="padding:.5rem .9rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--bd)">Color (dark bg / light bg)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.65rem .9rem;font-size:13px;color:var(--t2)"><strong style="color:var(--t1)">System</strong><br><span style="font-size:11px;color:var(--t3)">No stored preference</span></div>
+      <div style="padding:.65rem .9rem;font-size:13px;color:var(--t2);border-left:1px solid var(--bd)">Heroicons mini <code>SunIcon</code> (OS=light) or <code>MoonIcon</code> (OS=dark)</div>
+      <div style="padding:.65rem .9rem;font-size:13px;color:var(--t2);border-left:1px solid var(--bd)"><code>--t3</code> at <code>opacity: 0.55</code> — muted to signal "auto, not explicit"</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.65rem .9rem;font-size:13px;color:var(--t2)"><strong style="color:#F59E0B">Light active</strong><br><span style="font-size:11px;color:var(--t3)">tf-theme = "light"</span></div>
+      <div style="padding:.65rem .9rem;font-size:13px;color:var(--t2);border-left:1px solid var(--bd)">Heroicons mini <code>SunIcon</code></div>
+      <div style="padding:.65rem .9rem;font-size:13px;border-left:1px solid var(--bd)">
+        Dark bg: <code style="color:#F59E0B">#F59E0B</code> (amber-400, 6.4:1 ✓)<br>
+        Light bg: <code style="color:#D97706">#D97706</code> (amber-600, 4.5:1 ✓)<br>
+        <span style="font-size:11px;color:var(--t3)">New tokens: <code>--color-toggle-sun</code></span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr">
+      <div style="padding:.65rem .9rem;font-size:13px;color:var(--t2)"><strong style="color:#818CF8">Dark active</strong><br><span style="font-size:11px;color:var(--t3)">tf-theme = "dark"</span></div>
+      <div style="padding:.65rem .9rem;font-size:13px;color:var(--t2);border-left:1px solid var(--bd)">Heroicons mini <code>MoonIcon</code></div>
+      <div style="padding:.65rem .9rem;font-size:13px;border-left:1px solid var(--bd)">
+        Dark bg: <code style="color:#818CF8">#818CF8</code> (indigo-400, 5.2:1 ✓)<br>
+        Light bg: <code style="color:#4F46E5">#4F46E5</code> (indigo-600, 4.6:1 ✓)<br>
+        <span style="font-size:11px;color:var(--t3)">New tokens: <code>--color-toggle-moon</code></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- new tokens -->
+  <pre><span class="cm">/* Add to tokens.css — dark defaults */</span>
+<span class="prop">--color-toggle-sun</span>: <span class="val">#F59E0B</span>;   <span class="cm">/* amber-400 — 6.4:1 on dark bg */</span>
+<span class="prop">--color-toggle-moon</span>: <span class="val">#818CF8</span>;  <span class="cm">/* indigo-400 — 5.2:1 on dark bg */</span>
+
+<span class="cm">/* Add to light theme override block */</span>
+<span class="prop">--color-toggle-sun</span>: <span class="val">#D97706</span>;   <span class="cm">/* amber-600 — 4.5:1 on white */</span>
+<span class="prop">--color-toggle-moon</span>: <span class="val">#4F46E5</span>;  <span class="cm">/* indigo-600 — 4.6:1 on white */</span></pre>
+
+  <!-- ── STATES ── -->
+  <h3>Three states — interaction cycle</h3>
+  <p style="font-size:13px;color:var(--t2);margin-bottom:.75rem;line-height:1.6">
+    The cycle after first explicit choice is two-state: <strong>light ↔ dark</strong>. The system state is the initial resting state and cannot be returned to via the toggle — only by clearing <code>localStorage</code>. This is intentional: once a trader sets a preference, the app honours it until they explicitly change it.
+  </p>
+  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap">
+    <div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:.6rem 1rem;font-size:12.5px;color:var(--t2);text-align:center">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:.3rem">INITIAL</div>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" width="20" height="20" style="color:var(--t3);opacity:.55;display:block;margin:0 auto .3rem"><path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM8 0a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V.75A.75.75 0 0 1 8 0ZM0 8a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5H.75A.75.75 0 0 1 0 8ZM8 13.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 13.5ZM13.5 8a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 13.5 8ZM2.636 2.636a.75.75 0 0 1 1.06 0l1.062 1.06a.75.75 0 0 1-1.061 1.061L2.636 3.697a.75.75 0 0 1 0-1.06ZM11.243 4.757a.75.75 0 0 1 0-1.06l1.06-1.062a.75.75 0 1 1 1.061 1.061l-1.06 1.062a.75.75 0 0 1-1.061 0ZM2.636 13.364a.75.75 0 0 1 0-1.06l1.06-1.062a.75.75 0 0 1 1.062 1.061l-1.061 1.061a.75.75 0 0 1-1.061 0ZM11.243 11.243a.75.75 0 0 1 1.06 0l1.062 1.06a.75.75 0 0 1-1.061 1.062l-1.062-1.061a.75.75 0 0 1 0-1.061Z"/></svg>
+      System (OS=light)<br><span style="font-size:11px;color:var(--t3)">muted, no key stored</span>
+    </div>
+    <div style="font-size:18px;color:var(--t3)">→</div>
+    <div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:.6rem 1rem;font-size:12.5px;text-align:center">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:.3rem">EXPLICIT</div>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" width="20" height="20" style="color:#F59E0B;display:block;margin:0 auto .3rem"><path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM8 0a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V.75A.75.75 0 0 1 8 0ZM0 8a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5H.75A.75.75 0 0 1 0 8ZM8 13.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 13.5ZM13.5 8a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 13.5 8ZM2.636 2.636a.75.75 0 0 1 1.06 0l1.062 1.06a.75.75 0 0 1-1.061 1.061L2.636 3.697a.75.75 0 0 1 0-1.06ZM11.243 4.757a.75.75 0 0 1 0-1.06l1.06-1.062a.75.75 0 1 1 1.061 1.061l-1.06 1.062a.75.75 0 0 1-1.061 0ZM2.636 13.364a.75.75 0 0 1 0-1.06l1.06-1.062a.75.75 0 0 1 1.062 1.061l-1.061 1.061a.75.75 0 0 1-1.061 0ZM11.243 11.243a.75.75 0 0 1 1.06 0l1.062 1.06a.75.75 0 0 1-1.061 1.062l-1.062-1.061a.75.75 0 0 1 0-1.061Z"/></svg>
+      Light active<br><span style="font-size:11px;color:var(--t3)">tf-theme = "light"</span>
+    </div>
+    <div style="font-size:18px;color:var(--t3)">⇌</div>
+    <div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:.6rem 1rem;font-size:12.5px;text-align:center">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:.3rem">EXPLICIT</div>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" width="20" height="20" style="color:#818CF8;display:block;margin:0 auto .3rem"><path d="M9.598 1.591a.749.749 0 0 1 .785-.175 7 7 0 1 1-8.967 8.967.75.75 0 0 1 .961-.96 5.5 5.5 0 0 0 7.046-7.046.75.75 0 0 1 .175-.786Zm1.616 1.945a7 7 0 0 1-7.678 7.678 5.499 5.499 0 1 0 7.678-7.678Z"/></svg>
+      Dark active<br><span style="font-size:11px;color:var(--t3)">tf-theme = "dark"</span>
+    </div>
+  </div>
+
+  <!-- ── BUTTON ANATOMY ── -->
+  <h3>Button anatomy</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+    <div style="background:var(--surf);border:1px solid var(--bd);border-radius:10px;padding:1rem">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:.75rem">Landing page</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8">
+        Element: <code>&lt;button&gt;</code><br>
+        Tap target: <strong>36 × 36 px</strong><br>
+        Icon: 16 × 16 px (Heroicons mini), centered<br>
+        Border-radius: <code>--radius-md</code> (8 px)<br>
+        Background resting: <code>transparent</code><br>
+        Border resting: <code>none</code>
+      </div>
+    </div>
+    <div style="background:var(--surf);border:1px solid var(--bd);border-radius:10px;padding:1rem">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:.75rem">Authenticated app (sidebar)</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8">
+        Element: <code>&lt;button&gt;</code><br>
+        Tap target: <strong>32 × 32 px</strong><br>
+        Icon: 16 × 16 px (Heroicons mini), centered<br>
+        Border-radius: <code>--radius-md</code> (8 px)<br>
+        Background resting: <code>transparent</code><br>
+        Border resting: <code>none</code>
+      </div>
+    </div>
+  </div>
+  <div class="warn-box">Icon is decorative — the button must carry <code>aria-label</code> (see Accessibility section below). Do not add a visible text label; sun and moon are universally understood affordances and text would crowd the nav/sidebar footer.</div>
+
+  <!-- ── STATES DETAIL ── -->
+  <h3>State-by-state visual specification</h3>
+  <div style="background:var(--surf);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:1rem">
+    <!-- header -->
+    <div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr;border-bottom:1px solid var(--bd);background:var(--surf2)">
+      <div style="padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase">State</div>
+      <div style="padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--bd)">Icon color</div>
+      <div style="padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--bd)">Background</div>
+      <div style="padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--bd)">Other</div>
+    </div>
+    <!-- resting system -->
+    <div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.65rem .75rem;font-size:13px;font-weight:600;color:var(--t2)">Resting<br><span style="font-weight:400;font-size:11px;color:var(--t3)">any state</span></div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)">System: <code>--t3</code> @ 55% opacity<br>Light: <code>--color-toggle-sun</code><br>Dark: <code>--color-toggle-moon</code></div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>transparent</code></div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)">—</div>
+    </div>
+    <!-- hover -->
+    <div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.65rem .75rem;font-size:13px;font-weight:600;color:var(--t2)">Hover</div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>--t1</code> (full contrast, invites click)</div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)">Dark theme: <code>rgba(255,255,255,.07)</code><br>Light theme: <code>rgba(0,0,0,.05)</code></div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)">Transition: <code>120ms ease</code></div>
+    </div>
+    <!-- active/pressed -->
+    <div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.65rem .75rem;font-size:13px;font-weight:600;color:var(--t2)">Active<br><span style="font-weight:400;font-size:11px;color:var(--t3)">(pressed)</span></div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>--t1</code></div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)">Dark: <code>rgba(255,255,255,.11)</code><br>Light: <code>rgba(0,0,0,.08)</code></div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>transform: scale(0.92)</code><br>Transition: <code>80ms ease-out</code></div>
+    </div>
+    <!-- focus -->
+    <div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr">
+      <div style="padding:.65rem .75rem;font-size:13px;font-weight:600;color:var(--t2)">Focus-visible<br><span style="font-weight:400;font-size:11px;color:var(--t3)">(keyboard)</span></div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)">Unchanged</div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)">Unchanged</div>
+      <div style="padding:.65rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>outline: 2px solid var(--acc)</code><br><code>outline-offset: 2px</code><br>Matches all other buttons in system</div>
+    </div>
+  </div>
+
+  <!-- ── TRANSITION ── -->
+  <h3>Icon swap transition</h3>
+  <p style="font-size:13px;color:var(--t2);margin-bottom:.75rem;line-height:1.6">When the toggle fires, the icon swaps (sun ↔ moon). Use a short opacity fade to avoid a jarring instant swap:</p>
+  <pre><span class="cm">/* CSS on the icon element */</span>
+<span class="prop">transition</span>: <span class="val">opacity 150ms ease-in-out, color 150ms ease-in-out</span>;
+
+<span class="cm">/* On swap: set opacity:0, swap SVG, set opacity:1 */</span>
+<span class="cm">/* Respect prefers-reduced-motion: skip transition, swap immediately */</span>
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle-icon { transition: none; }
+}</pre>
+
+  <!-- ── PLACEMENT: LANDING PAGE ── -->
+  <h3>Placement — landing page</h3>
+  <p style="font-size:13.5px;color:var(--t2);margin-bottom:.75rem;line-height:1.7">The toggle sits in the nav bar's right cluster, to the <strong>left of "Log in"</strong> — between nav links and auth CTAs. Placing it before auth actions keeps the far-right zone for primary conversion actions, while still giving first-time visitors immediate theme control before they decide to sign up.</p>
+  <div class="demo" style="padding:0">
+    <div class="demo-lbl" style="padding:.75rem 1rem .4rem">Landing page nav — right side order</div>
+    <div class="lm" style="border-radius:0;border:none;border-top:1px solid var(--bd)">
+      <div class="lm-nav">
+        <div class="lm-logo">
+          <div class="lm-logo-mark">T</div>
+          TradeForge
+        </div>
+        <div class="lm-nav-r" style="gap:.75rem;align-items:center">
+          <a class="lm-nav-link">Features</a>
+          <a class="lm-nav-link">Pricing</a>
+          <!-- Theme toggle -->
+          <button style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#818CF8" title="Theme: Dark — click to switch to Light">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M9.598 1.591a.749.749 0 0 1 .785-.175 7 7 0 1 1-8.967 8.967.75.75 0 0 1 .961-.96 5.5 5.5 0 0 0 7.046-7.046.75.75 0 0 1 .175-.786Zm1.616 1.945a7 7 0 0 1-7.678 7.678 5.499 5.499 0 1 0 7.678-7.678Z"/></svg>
+          </button>
+          <a class="lm-nav-link">Log in</a>
+          <a class="lm-nav-cta">Get started</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:.75rem;font-size:12.5px;color:var(--t2);line-height:1.7">
+    <strong>Order (left → right):</strong> nav links → [Theme toggle] → Log in → Get started<br>
+    <strong>Gap between toggle and "Log in":</strong> 8 px (half the standard nav gap — visually separates the utility control from auth actions)<br>
+    <strong>Vertical alignment:</strong> <code>align-items: center</code> with other nav items<br>
+    <strong>Mobile / narrow viewports:</strong> when the nav collapses to a hamburger, the theme toggle remains visible in the top-right bar (not hidden inside the menu) — it is a persistent utility control, not navigation
+  </div>
+
+  <!-- ── PLACEMENT: AUTHENTICATED SIDEBAR ── -->
+  <h3>Placement — authenticated app sidebar</h3>
+  <p style="font-size:13.5px;color:var(--t2);margin-bottom:.75rem;line-height:1.7">The toggle lives in the sidebar footer (<code>.sb-foot</code>), flush-right in the same row as the logout button. This groups utility controls at the bottom — out of the navigation's way — while keeping them accessible without scrolling.</p>
+  <div class="demo">
+    <div class="demo-lbl">Sidebar footer — toggle + logout</div>
+    <div class="sb" style="width:220px">
+      <div class="sb-brand">
+        <div class="sb-mark">T</div>
+        <span class="sb-name">TradeForge</span>
+      </div>
+      <div class="sb-nav" style="flex:1;padding:.65rem .4rem">
+        <div class="sb-item active">
+          <svg class="sb-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8.543 2.232a.75.75 0 0 0-1.085 0l-5.25 5.5A.75.75 0 0 0 2.75 9H4v4a1 1 0 0 0 1 1h1.5a.75.75 0 0 0 .75-.75v-3h1.5v3c0 .414.336.75.75.75H11a1 1 0 0 0 1-1V9h1.25a.75.75 0 0 0 .543-1.268l-5.25-5.5Z"/></svg>
+          Dashboard
+        </div>
+        <div class="sb-item">
+          <svg class="sb-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3ZM2 7.5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1ZM3 11a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1H3Z"/></svg>
+          Trades
+        </div>
+      </div>
+      <div class="sb-foot" style="display:flex;align-items:center;justify-content:flex-end;gap:2px;padding:.4rem .5rem">
+        <!-- Theme toggle: dark active state -->
+        <button style="width:32px;height:32px;border-radius:8px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#818CF8" aria-label="Color theme: dark — switch to light">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M9.598 1.591a.749.749 0 0 1 .785-.175 7 7 0 1 1-8.967 8.967.75.75 0 0 1 .961-.96 5.5 5.5 0 0 0 7.046-7.046.75.75 0 0 1 .175-.786Zm1.616 1.945a7 7 0 0 1-7.678 7.678 5.499 5.499 0 1 0 7.678-7.678Z"/></svg>
+        </button>
+        <!-- Logout -->
+        <button style="width:32px;height:32px;border-radius:8px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#4A5C76" aria-label="Log out">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M2 4.75A2.75 2.75 0 0 1 4.75 2h3.5A2.75 2.75 0 0 1 11 4.75v.5a.75.75 0 0 1-1.5 0v-.5c0-.69-.56-1.25-1.25-1.25h-3.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h3.5c.69 0 1.25-.56 1.25-1.25v-.5a.75.75 0 0 1 1.5 0v.5A2.75 2.75 0 0 1 8.25 14h-3.5A2.75 2.75 0 0 1 2 11.25v-6.5Zm9.47.47a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1 0 1.06l-2.25 2.25a.75.75 0 1 1-1.06-1.06l.97-.97H4.75a.75.75 0 0 1 0-1.5h7.69l-.97-.97a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:.75rem;font-size:12.5px;color:var(--t2);line-height:1.7">
+    <strong>Layout:</strong> footer row, <code>justify-content: flex-end</code> — toggle is second-to-last, logout is last<br>
+    <strong>Gap between buttons:</strong> <code>gap: 2px</code> — tight grouping signals they are utility controls, not nav destinations<br>
+    <strong>No label text:</strong> consistent with the rest of the sidebar's icon-only pattern at this size
+  </div>
+
+  <!-- ── CONTRAST SUMMARY ── -->
+  <h3>Contrast and readability — both themes</h3>
+  <div style="background:var(--surf);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:1rem">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid var(--bd);background:var(--surf2)">
+      <div style="padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase">State</div>
+      <div style="padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--bd)">Color</div>
+      <div style="padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--bd)">Bg</div>
+      <div style="padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--bd)">Ratio</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.6rem .75rem;font-size:12.5px;color:var(--t2)">Sun — dark bg</div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;border-left:1px solid var(--bd)"><code style="color:#F59E0B">#F59E0B</code></div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>#0B0F1C</code></div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;border-left:1px solid var(--bd)"><span style="color:var(--ok);font-weight:600">6.4 : 1 ✓</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.6rem .75rem;font-size:12.5px;color:var(--t2)">Sun — light bg</div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;border-left:1px solid var(--bd)"><code style="color:#D97706">#D97706</code></div>
+      <div style="padding:.6rem .75px;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>#FFFFFF</code></div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;border-left:1px solid var(--bd)"><span style="color:var(--ok);font-weight:600">4.5 : 1 ✓</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid var(--bd)">
+      <div style="padding:.6rem .75rem;font-size:12.5px;color:var(--t2)">Moon — dark bg</div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;border-left:1px solid var(--bd)"><code style="color:#818CF8">#818CF8</code></div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>#0B0F1C</code></div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;border-left:1px solid var(--bd)"><span style="color:var(--ok);font-weight:600">5.2 : 1 ✓</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr">
+      <div style="padding:.6rem .75rem;font-size:12.5px;color:var(--t2)">Moon — light bg</div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;border-left:1px solid var(--bd)"><code style="color:#4F46E5">#4F46E5</code></div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;color:var(--t2);border-left:1px solid var(--bd)"><code>#FFFFFF</code></div>
+      <div style="padding:.6rem .75rem;font-size:12.5px;border-left:1px solid var(--bd)"><span style="color:var(--ok);font-weight:600">4.6 : 1 ✓</span></div>
+    </div>
+  </div>
+  <div class="info">All four color/background pairs pass WCAG AA (3 : 1 minimum for UI components). Sun on light bg (#D97706 on white) hits exactly 4.5 : 1 — the more demanding text contrast threshold — giving headroom for anti-aliasing variation.</div>
+
+  <!-- ── ACCESSIBILITY ── -->
+  <h3>Accessibility</h3>
+  <pre><span class="cm">/* Dynamic aria-label — update on every state change */</span>
+<span class="cm">// System state:</span>
+<span class="prop">aria-label</span>="<span class="val">Color theme: system default</span>"
+
+<span class="cm">// Light active:</span>
+<span class="prop">aria-label</span>="<span class="val">Color theme: light — switch to dark</span>"
+
+<span class="cm">// Dark active:</span>
+<span class="prop">aria-label</span>="<span class="val">Color theme: dark — switch to light</span>"
+
+<span class="cm">/* Icon is decorative */</span>
+&lt;svg <span class="prop">aria-hidden</span>="<span class="val">true</span>" ...&gt;
+
+<span class="cm">/* Do NOT use aria-pressed (not a binary toggle) */</span>
+<span class="cm">/* aria-label is sufficient — describes current state + action */</span></pre>
+
+  <!-- ── IMPLEMENTATION NOTES ── -->
+  <h3>Implementation notes for Arjun</h3>
+  <div style="display:flex;flex-direction:column;gap:.5rem">
+    <div class="info">Extract toggle logic into a <code>useTheme()</code> hook: manages reading/writing <code>tf-theme</code>, applying <code>data-theme</code> to <code>&lt;html&gt;</code>, and returning <code>{ theme, setTheme }</code>. Both the landing page and sidebar components consume the same hook — this guarantees the shared-key contract is enforced in one place.</div>
+    <div class="warn-box">Apply <code>data-theme</code> to <code>&lt;html&gt;</code> in a script that runs before the React root mounts (<code>index.html</code> inline script or <code>main.tsx</code> top-of-file). This eliminates the flash of incorrect theme on reload. Do not do this inside a <code>useEffect</code> — that fires after paint.</div>
+    <div class="info">The landing page toggle and the app sidebar toggle are separate component instances but share state through <code>localStorage</code> and the <code>data-theme</code> attribute on <code>&lt;html&gt;</code>. No React context or prop-drilling is needed — each toggle instance reads from and writes to the same key and the same DOM attribute.</div>
+  </div>
+
+  <!-- ── DATA-TESTID ── -->
+  <h3>data-testid attributes (required)</h3>
+  <div class="spec-tbl-wrap">
+    <table class="spec-tbl">
+      <thead><tr><th>Element</th><th>data-testid value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Toggle button — landing page</td><td><code>theme-toggle</code></td><td>The <code>&lt;button&gt;</code> in the landing page nav cluster</td></tr>
+        <tr><td>Toggle button — sidebar</td><td><code>theme-toggle</code></td><td>The <code>&lt;button&gt;</code> in the sidebar footer. Both instances share the same value — tests query by surface context (within <code>landing-nav</code> or within the sidebar) to disambiguate.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="info" style="margin-top:.75rem">
+    <strong>Test coverage Arjun must provide for item 10a:</strong><br>
+    1. <code>useTheme()</code> unit tests: reads <code>tf-theme</code> from localStorage; writes on toggle call; returns system fallback when key absent; applies <code>data-theme</code> to <code>&lt;html&gt;</code>.<br>
+    2. Landing page render test: <code>getByTestId('theme-toggle')</code> within <code>landing-nav</code> is present; <code>aria-label</code> matches the current state string.<br>
+    3. Sidebar render test: <code>getByTestId('theme-toggle')</code> within the sidebar footer is present; <code>aria-label</code> matches the current state string.<br>
+    4. Pre-mount init script: cannot be unit-tested (runs before React). Arjun must add a comment in <code>index.html</code> or <code>main.tsx</code> referencing this note, and the init script must be manually verified against FOCT (flash of incorrect theme) during Usha's visual QA pass.
+  </div>
+</section>
+
+</main>
+</div>
