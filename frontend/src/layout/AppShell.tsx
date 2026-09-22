@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/features/auth/context/AuthContext'
 import { useTheme } from '@/shared/hooks/useTheme'
 
-// Heroicons mini (16×16 inline SVG, MIT licence)
+// ─── Icons ───────────────────────────────────────────────────────────────────
+
 function IconDashboard() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -31,6 +34,14 @@ function IconTrades() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <path fillRule="evenodd" d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Zm4.5 1a.75.75 0 0 0 0 1.5h3a.75.75 0 0 0 0-1.5h-3Zm0 3a.75.75 0 0 0 0 1.5h3a.75.75 0 0 0 0-1.5h-3Zm0 3a.75.75 0 0 0 0 1.5h1a.75.75 0 0 0 0-1.5h-1Z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
+function IconJournal() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path fillRule="evenodd" d="M3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3Zm2.5 3a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5h-5ZM5 7.75A.75.75 0 0 1 5.75 7h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 5 7.75Zm.75 2.5a.75.75 0 0 0 0 1.5h2.5a.75.75 0 0 0 0-1.5h-2.5Z" clipRule="evenodd" />
     </svg>
   )
 }
@@ -69,106 +80,222 @@ function IconMoon() {
   )
 }
 
-const NAV_ITEMS = [
-  { label: 'Dashboard', path: '/dashboard', icon: IconDashboard, end: false },
-  { label: 'Analytics', path: '/analytics', icon: IconAnalytics, end: false },
-  { label: 'Risk', path: '/risk', icon: IconRisk, end: false },
-  { label: 'Trades', path: '/trades', icon: IconTrades, end: false },
-  { label: 'Import', path: '/import', icon: IconImport, end: false },
-  { label: 'Settings', path: '/settings', icon: IconSettings, end: false },
+function IconCollapse({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d={collapsed ? 'M5 2L10 7L5 12' : 'M9 2L4 7L9 12'}
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+// ─── Nav config ──────────────────────────────────────────────────────────────
+
+const NAV_GROUPS = [
+  {
+    items: [
+      { label: 'Dashboard', path: '/dashboard', icon: IconDashboard },
+      { label: 'Analytics', path: '/analytics', icon: IconAnalytics },
+    ],
+  },
+  {
+    items: [
+      { label: 'Risk', path: '/risk', icon: IconRisk },
+      { label: 'Trades', path: '/trades', icon: IconTrades },
+      { label: 'Journal', path: '/journal', icon: IconJournal },
+      { label: 'Import', path: '/import', icon: IconImport },
+    ],
+  },
+  {
+    items: [{ label: 'Settings', path: '/settings', icon: IconSettings }],
+  },
 ]
 
-function navLinkClass({ isActive }: { isActive: boolean }) {
+function navItemClass(isActive: boolean, collapsed: boolean) {
   const base =
-    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand/50'
+    'flex items-center rounded-lg py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand/50'
+  const padded = collapsed ? 'px-3 justify-center gap-0' : 'px-3 gap-2.5'
   return isActive
-    ? `${base} bg-brand/10 text-brand`
-    : `${base} text-text-secondary hover:bg-surface-subtle hover:text-text-primary`
+    ? `${base} ${padded} bg-brand/10 text-brand`
+    : `${base} ${padded} text-text-secondary hover:bg-surface-subtle hover:text-text-primary`
 }
+
+// ─── AppShell ────────────────────────────────────────────────────────────────
 
 export function AppShell() {
   const { logout } = useAuth()
   const { theme, toggle } = useTheme()
   const isDark = theme === 'dark'
 
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('tf-sidebar-collapsed') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('tf-sidebar-collapsed', String(collapsed))
+    } catch {
+      // ignore
+    }
+  }, [collapsed])
+
   return (
-    <div className="flex min-h-screen bg-surface-base">
-      {/* Skip-link — first child, must remain here (F-14-30 group) */}
+    <div className="flex min-h-screen bg-canvas">
+      {/* Skip-link — must be first focusable element */}
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-text-primary focus:shadow focus:outline-none focus:ring-2 focus:ring-brand"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-surface-base focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-text-primary focus:shadow focus:outline-none focus:ring-2 focus:ring-brand"
       >
         Skip to content
       </a>
 
-      <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface-base">
-        {/* Brand mark */}
-        <div className="border-b border-border px-4 py-5">
-          <span className="text-base font-extrabold tracking-tight text-brand">TradeForge</span>
+      {/* Sidebar */}
+      <motion.aside
+        className="flex shrink-0 flex-col border-r border-border bg-surface-base overflow-hidden"
+        animate={{ width: collapsed ? 52 : 224 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      >
+        {/* Brand header */}
+        <div className="flex h-14 shrink-0 items-center border-b border-border px-3">
+          {collapsed ? (
+            <span className="mx-auto font-extrabold tracking-tight text-brand">T</span>
+          ) : (
+            <>
+              <span className="flex-1 text-base font-extrabold tracking-tight text-brand">
+                TradeForge
+              </span>
+              <button
+                type="button"
+                onClick={() => setCollapsed(true)}
+                aria-label="Collapse sidebar"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/50"
+              >
+                <IconCollapse collapsed={false} />
+              </button>
+            </>
+          )}
+          {collapsed && (
+            <button
+              type="button"
+              onClick={() => setCollapsed(false)}
+              aria-label="Expand sidebar"
+              className="absolute mt-14 hidden"
+              tabIndex={-1}
+            />
+          )}
         </div>
 
+        {/* Expand button when collapsed */}
+        {collapsed && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            aria-label="Expand sidebar"
+            className="mx-auto mt-1 flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/50"
+          >
+            <IconCollapse collapsed={true} />
+          </button>
+        )}
+
         {/* Nav */}
-        <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-2 py-4">
-          <ul className="flex flex-col gap-0.5">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon
-              if (item.path === '/trades') {
-                return (
-                  <li key={item.path}>
-                    <div className="flex items-center gap-1">
-                      <NavLink to={item.path} end={item.end} className={navLinkClass}>
-                        <Icon />
-                        {item.label}
-                      </NavLink>
-                      <Link
-                        to="/trades/new"
-                        title="Add Trade"
-                        aria-label="Add Trade"
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/50"
+        <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-1.5 py-3">
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={gi} className={gi > 0 ? 'mt-1 border-t border-border pt-1' : ''}>
+              <ul className="flex flex-col gap-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  if (item.path === '/trades') {
+                    return (
+                      <li key={item.path}>
+                        <div className="flex items-center gap-1">
+                          <NavLink
+                            to={item.path}
+                            className={({ isActive }) => navItemClass(isActive, collapsed)}
+                            style={collapsed ? undefined : { flex: 1 }}
+                            title={collapsed ? item.label : undefined}
+                          >
+                            <Icon />
+                            {!collapsed && item.label}
+                          </NavLink>
+                          {!collapsed && (
+                            <Link
+                              to="/trades/new"
+                              title="Add Trade"
+                              aria-label="Add Trade"
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/50"
+                            >
+                              +
+                            </Link>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  }
+                  return (
+                    <li key={item.path}>
+                      <NavLink
+                        to={item.path}
+                        className={({ isActive }) => navItemClass(isActive, collapsed)}
+                        title={collapsed ? item.label : undefined}
                       >
-                        +
-                      </Link>
-                    </div>
-                  </li>
-                )
-              }
-              return (
-                <li key={item.path}>
-                  <NavLink to={item.path} end={item.end} className={navLinkClass}>
-                    <Icon />
-                    {item.label}
-                  </NavLink>
-                </li>
-              )
-            })}
-          </ul>
+                        <Icon />
+                        {!collapsed && item.label}
+                      </NavLink>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ))}
         </nav>
 
-        {/* Footer — theme toggle + logout */}
-        <div className="border-t border-border px-2 py-3">
+        {/* Footer */}
+        <div className="shrink-0 border-t border-border px-1.5 py-2">
           <button
             type="button"
             data-testid="theme-toggle"
             onClick={toggle}
             aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/50"
+            className={`mb-0.5 flex w-full items-center rounded-lg py-2 text-sm font-medium text-text-secondary hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/50 ${
+              collapsed ? 'justify-center gap-0 px-3' : 'gap-2.5 px-3'
+            }`}
+            title={collapsed ? (isDark ? 'Light mode' : 'Dark mode') : undefined}
           >
             <span className={isDark ? 'text-toggle-moon' : 'text-toggle-sun'}>
               {isDark ? <IconMoon /> : <IconSun />}
             </span>
-            {isDark ? 'Dark mode' : 'Light mode'}
+            {!collapsed && (isDark ? 'Dark mode' : 'Light mode')}
           </button>
           <button
             type="button"
             onClick={() => void logout()}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/50"
+            className={`flex w-full items-center rounded-lg py-2 text-sm font-medium text-text-secondary hover:bg-surface-subtle hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/50 ${
+              collapsed ? 'justify-center gap-0 px-3' : 'gap-2.5 px-3'
+            }`}
+            title={collapsed ? 'Log out' : undefined}
+            aria-label="Log out"
           >
-            Log out
+            {!collapsed && 'Log out'}
+            {collapsed && (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M2 4.75A2.75 2.75 0 0 1 4.75 2h2a.75.75 0 0 1 0 1.5h-2A1.25 1.25 0 0 0 3.5 4.75v6.5c0 .69.56 1.25 1.25 1.25h2a.75.75 0 0 1 0 1.5h-2A2.75 2.75 0 0 1 2 11.25v-6.5Zm9.97 1.56a.75.75 0 0 0-1.06 1.06l.72.72H6.75a.75.75 0 0 0 0 1.5h4.88l-.72.72a.75.75 0 1 0 1.06 1.06l2-2a.75.75 0 0 0 0-1.06l-2-2Z" clipRule="evenodd" />
+              </svg>
+            )}
           </button>
         </div>
-      </aside>
+      </motion.aside>
 
-      <main id="main" className="flex flex-1 flex-col overflow-auto">
+      {/* Main */}
+      <main id="main" className="flex min-w-0 flex-1 flex-col overflow-auto bg-canvas">
         <Outlet />
       </main>
     </div>
