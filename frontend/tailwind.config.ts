@@ -33,6 +33,7 @@ const config: Config = {
         'brand-emphasis': 'var(--color-brand-emphasis)',
         'toggle-sun': 'var(--color-toggle-sun)',
         'toggle-moon': 'var(--color-toggle-moon)',
+        canvas: 'var(--color-canvas)',
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
@@ -47,10 +48,12 @@ const config: Config = {
           from: { transform: 'rotate(0deg)' },
           to: { transform: 'rotate(360deg)' },
         },
+        /* marquee keyframes live in index.css so they can use var(--marquee-offset) */
       },
       animation: {
         shimmer: 'shimmer 1.2s ease-in-out infinite',
         'spin-slow': 'spin 2s linear infinite',
+        marquee: 'marquee 22s linear infinite',
       },
     },
   },
