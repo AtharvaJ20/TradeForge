@@ -1,9 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Marquee: endpoint is set in JS by measuring the exact pixel offset of the first duplicate */
+@keyframes marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(var(--marquee-offset, -50%), 0, 0); }
+}
+
 body {
-  background-color: var(--color-surface-base);
+  background-color: var(--color-canvas);
   color: var(--color-text-primary);
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Smooth theme transitions */
+*, *::before, *::after {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Never transition transforms/opacity (would fight explicit animations) */
+img, svg, canvas {
+  transition: none;
 }
