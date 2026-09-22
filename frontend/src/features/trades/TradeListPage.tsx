@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAccount } from '@/features/accounts/context/AccountContext'
+import { SegmentedControl } from '@/shared/components/SegmentedControl'
 import { tradesApi } from './api'
 import type { TradeListItemOut } from './types'
 
@@ -137,7 +138,7 @@ function SortHeader({
   const isActive = activeCol === column
   return (
     <th
-      className="cursor-pointer select-none px-3 pb-2 text-left text-xs uppercase tracking-wider text-text-secondary hover:text-text-primary"
+      className="cursor-pointer select-none px-3 pb-2 text-left text-xs font-medium text-text-muted hover:text-text-primary"
       onClick={() => onSort(column)}
     >
       {label}
@@ -261,22 +262,18 @@ export function TradeListPage() {
       {/* Filter bar */}
       <section aria-label="Trade filters" className="rounded-xl border border-border bg-surface-base p-4">
         <div className="flex flex-wrap gap-4">
-          {/* Status tabs */}
-          <div className="flex gap-1 rounded-lg border border-border p-0.5">
-            {['', 'OPEN', 'PARTIAL', 'CLOSED'].map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatus(s)}
-                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                  status === s
-                    ? 'bg-accent text-white'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {s === '' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
+          {/* Status filter */}
+          <SegmentedControl
+            aria-label="Status filter"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { label: 'All', value: '' },
+              { label: 'Open', value: 'OPEN' },
+              { label: 'Partial', value: 'PARTIAL' },
+              { label: 'Closed', value: 'CLOSED' },
+            ]}
+          />
 
           {/* Direction */}
           <select
@@ -352,10 +349,10 @@ export function TradeListPage() {
             <thead>
               <tr className="border-b border-border">
                 <SortHeader label="Date" column="trade_date" activeCol={sortCol} activeDir={sortDir} onSort={handleSort} />
-                <th className="px-3 pb-2 text-left text-xs uppercase tracking-wider text-text-secondary">Symbol</th>
-                <th className="px-3 pb-2 text-left text-xs uppercase tracking-wider text-text-secondary">Type</th>
-                <th className="px-3 pb-2 text-left text-xs uppercase tracking-wider text-text-secondary">Direction</th>
-                <th className="px-3 pb-2 text-left text-xs uppercase tracking-wider text-text-secondary">Status</th>
+                <th className="px-3 pb-2 text-left text-xs font-medium text-text-muted">Symbol</th>
+                <th className="px-3 pb-2 text-left text-xs font-medium text-text-muted">Type</th>
+                <th className="px-3 pb-2 text-left text-xs font-medium text-text-muted">Direction</th>
+                <th className="px-3 pb-2 text-left text-xs font-medium text-text-muted">Status</th>
                 <SortHeader label="Net P&L" column="net_pnl" activeCol={sortCol} activeDir={sortDir} onSort={handleSort} />
                 <SortHeader label="R-multiple" column="r_multiple" activeCol={sortCol} activeDir={sortDir} onSort={handleSort} />
               </tr>

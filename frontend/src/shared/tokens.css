@@ -3,121 +3,124 @@
    All Tailwind colour utilities reference these vars via tailwind.config.ts. */
 
 :root {
-  /* Text */
-  --color-text-primary: #111827;
-  --color-text-secondary: #6b7280;
-  --color-text-muted: #9ca3af;
+  /* ── Canvas ─────────────────────────────────────────────── */
+  --color-canvas: #EEF2F7;
 
-  /* Surfaces */
-  --color-surface-base: #ffffff;
-  --color-surface-subtle: #f9fafb;
+  /* ── Text ───────────────────────────────────────────────── */
+  --color-text-primary: #0E1B27;
+  --color-text-secondary: #4B6278;
+  --color-text-muted: #94A3B8;
+
+  /* ── Surfaces ───────────────────────────────────────────── */
+  --color-surface-base: #FFFFFF;
+  --color-surface-subtle: #F5F8FC;
   --color-surface-warning: #fffbeb;
   --color-surface-info: #eff6ff;
-  --color-surface-success: #f0fdf4;
+  --color-surface-success: #ecfdf5;
   --color-surface-danger: #fef2f2;
-  --color-surface-neutral: #f9fafb;
+  --color-surface-neutral: #F5F8FC;
   --color-surface-danger-subtle: #fee2e2;
 
-  /* Semantic emphasis */
-  --color-warning: #d97706;
-  --color-warning-emphasis: #b45309;
-  --color-info: #2563eb;
-  --color-success: #16a34a;
-  --color-success-emphasis: #15803d;
-  --color-danger: #dc2626;
-  --color-danger-emphasis: #b91c1c;
-  --color-success-subtle: #bbf7d0;
+  /* ── Semantic emphasis ──────────────────────────────────── */
+  --color-warning: #D97706;
+  --color-warning-emphasis: #B45309;
+  --color-info: #2563EB;
+  --color-success: #059669;
+  --color-success-emphasis: #059669;
+  --color-danger: #DC2626;
+  --color-danger-emphasis: #DC2626;
+  --color-success-subtle: #D1FAF0;
   --color-danger-subtle: #fecaca;
 
-  /* Borders */
-  --color-border: #e5e7eb;
-  --color-border-focus: #2563eb;
+  /* ── Borders ────────────────────────────────────────────── */
+  --color-border: #DDE5EE;
+  --color-border-focus: #4F46E5;
 
-  /* Brand */
-  --color-primary: #2563eb;
-  --color-primary-emphasis: #1d4ed8;
+  /* ── Brand ──────────────────────────────────────────────── */
+  --color-primary: #2563EB;
+  --color-primary-emphasis: #1D4ED8;
+  --color-brand: #4F46E5;
+  --color-brand-emphasis: #4338CA;
 
-  /* Redesign brand — indigo */
-  --color-brand: #4f46e5;
-  --color-brand-emphasis: #4338ca;
-
-  /* Theme toggle icons */
-  --color-toggle-sun: #d97706;
-  --color-toggle-moon: #4f46e5;
+  /* ── Theme toggle icons ─────────────────────────────────── */
+  --color-toggle-sun: #D97706;
+  --color-toggle-moon: #4F46E5;
 }
 
+/* ── Dark: system preference ────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --color-text-primary: #f9fafb;
-    --color-text-secondary: #9ca3af;
-    --color-text-muted: #6b7280;
+    --color-canvas: #060D1A;
+    --color-text-primary: #E2EAF4;
+    --color-text-secondary: #7292AA;
+    --color-text-muted: #3D5469;
 
-    --color-surface-base: #111827;
-    --color-surface-subtle: #1f2937;
+    --color-surface-base: #0D1626;
+    --color-surface-subtle: #141F30;
     --color-surface-warning: #1c1408;
     --color-surface-info: #0c1929;
-    --color-surface-success: #052e16;
+    --color-surface-success: #0A2E24;
     --color-surface-danger: #1c0606;
-    --color-surface-neutral: #1f2937;
+    --color-surface-neutral: #1A2840;
     --color-surface-danger-subtle: #450a0a;
 
-    --color-warning: #fbbf24;
-    --color-warning-emphasis: #f59e0b;
-    --color-info: #60a5fa;
-    --color-success: #4ade80;
-    --color-success-emphasis: #22c55e;
-    --color-danger: #f87171;
-    --color-danger-emphasis: #ef4444;
-    --color-success-subtle: #14532d;
+    --color-warning: #F4A942;
+    --color-warning-emphasis: #F4A942;
+    --color-info: #60A5FA;
+    --color-success: #16DBA1;
+    --color-success-emphasis: #16DBA1;
+    --color-danger: #F05252;
+    --color-danger-emphasis: #F05252;
+    --color-success-subtle: #0A2E24;
     --color-danger-subtle: #7f1d1d;
 
-    --color-border: #374151;
-    --color-border-focus: #60a5fa;
+    --color-border: #1C2E42;
+    --color-border-focus: #5B52F2;
 
-    --color-primary: #60a5fa;
-    --color-primary-emphasis: #3b82f6;
+    --color-primary: #60A5FA;
+    --color-primary-emphasis: #3B82F6;
+    --color-brand: #5B52F2;
+    --color-brand-emphasis: #4A41E0;
 
-    --color-brand: #818cf8;
-    --color-brand-emphasis: #6366f1;
-
-    --color-toggle-sun: #f59e0b;
-    --color-toggle-moon: #818cf8;
+    --color-toggle-sun: #F59E0B;
+    --color-toggle-moon: #5B52F2;
   }
 }
 
+/* ── Dark: explicit toggle ──────────────────────────────────── */
 :root[data-theme='dark'] {
-  --color-text-primary: #f9fafb;
-  --color-text-secondary: #9ca3af;
-  --color-text-muted: #6b7280;
+  --color-canvas: #060D1A;
+  --color-text-primary: #E2EAF4;
+  --color-text-secondary: #7292AA;
+  --color-text-muted: #3D5469;
 
-  --color-surface-base: #111827;
-  --color-surface-subtle: #1f2937;
+  --color-surface-base: #0D1626;
+  --color-surface-subtle: #141F30;
   --color-surface-warning: #1c1408;
   --color-surface-info: #0c1929;
-  --color-surface-success: #052e16;
+  --color-surface-success: #0A2E24;
   --color-surface-danger: #1c0606;
-  --color-surface-neutral: #1f2937;
+  --color-surface-neutral: #1A2840;
   --color-surface-danger-subtle: #450a0a;
 
-  --color-warning: #fbbf24;
-  --color-warning-emphasis: #f59e0b;
-  --color-info: #60a5fa;
-  --color-success: #4ade80;
-  --color-success-emphasis: #22c55e;
-  --color-danger: #f87171;
-  --color-danger-emphasis: #ef4444;
-  --color-success-subtle: #14532d;
+  --color-warning: #F4A942;
+  --color-warning-emphasis: #F4A942;
+  --color-info: #60A5FA;
+  --color-success: #16DBA1;
+  --color-success-emphasis: #16DBA1;
+  --color-danger: #F05252;
+  --color-danger-emphasis: #F05252;
+  --color-success-subtle: #0A2E24;
   --color-danger-subtle: #7f1d1d;
 
-  --color-border: #374151;
-  --color-border-focus: #60a5fa;
+  --color-border: #1C2E42;
+  --color-border-focus: #5B52F2;
 
-  --color-primary: #60a5fa;
-  --color-primary-emphasis: #3b82f6;
+  --color-primary: #60A5FA;
+  --color-primary-emphasis: #3B82F6;
+  --color-brand: #5B52F2;
+  --color-brand-emphasis: #4A41E0;
 
-  --color-brand: #818cf8;
-  --color-brand-emphasis: #6366f1;
-
-  --color-toggle-sun: #f59e0b;
-  --color-toggle-moon: #818cf8;
+  --color-toggle-sun: #F59E0B;
+  --color-toggle-moon: #5B52F2;
 }

@@ -92,11 +92,9 @@ function StatTile({
   large?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-subtle p-4">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-text-secondary">
-        {label}
-      </p>
-      <p className={`tabular-nums font-bold ${large ? 'text-3xl' : 'text-xl'} ${valueClass}`}>
+    <div className="rounded-xl border border-border bg-surface-base p-4">
+      <p className="mb-1 text-xs font-medium text-text-muted">{label}</p>
+      <p className={`font-mono tabular-nums font-bold ${large ? 'text-2xl' : 'text-lg'} ${valueClass}`}>
         {value}
       </p>
     </div>
@@ -262,192 +260,170 @@ export function DashboardPage() {
   const { data: trades, isLoading: tradesLoading, isError: tradesError } = useRecentTrades(accountId)
   const { data: journal, isLoading: journalLoading, isError: journalError } = useRecentJournal(accountId)
 
+  const sectionHeader = 'mb-3 text-xs font-semibold text-text-muted'
+
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-5 p-6">
       <h1 className="text-xl font-semibold text-text-primary">
         {selectedAccount?.display_name ?? 'Dashboard'}
       </h1>
 
-      {/* Section 1 — Account Overview */}
-      <section
-        aria-label="Account Overview"
-        className="rounded-xl border border-border bg-surface-base p-5"
-      >
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Account Overview
-        </h2>
-        {(summaryLoading || accountLoading) && (
-          <div
-            role="status"
-            aria-label="Loading dashboard"
-            className="space-y-2"
+      {/* Row 1 — P&L hero + performance side by side */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        {/* Account overview — 2/3 */}
+        <section
+          aria-label="Account Overview"
+          className="rounded-xl border border-border bg-surface-base p-5 lg:col-span-2"
+        >
+          <h2 className={sectionHeader}>Account overview</h2>
+          {(summaryLoading || accountLoading) && (
+            <div role="status" aria-label="Loading dashboard" className="space-y-2">
+              <div className="h-5 w-1/2 animate-pulse rounded bg-surface-subtle" />
+              <div className="h-5 w-1/3 animate-pulse rounded bg-surface-subtle" />
+            </div>
+          )}
+          {!accountLoading && !selectedAccount && (
+            <p className="text-sm text-text-secondary">No account selected.</p>
+          )}
+          {summaryError && !summaryLoading && !accountLoading && selectedAccount && (
+            <p role="alert" className="text-sm text-danger-emphasis">
+              Failed to load account overview.
+            </p>
+          )}
+          {summary && !summaryLoading && !accountLoading && selectedAccount && (
+            <AccountOverviewContent data={summary} />
+          )}
+        </section>
+
+        {/* Performance + Streaks — 1/3 */}
+        <div className="flex flex-col gap-5">
+          <section
+            aria-label="Performance"
+            className="rounded-xl border border-border bg-surface-base p-5"
           >
-            <div className="h-5 w-1/2 animate-pulse rounded bg-surface-subtle" />
-            <div className="h-5 w-1/3 animate-pulse rounded bg-surface-subtle" />
-            <div className="h-5 w-2/5 animate-pulse rounded bg-surface-subtle" />
-          </div>
-        )}
-        {!accountLoading && !selectedAccount && (
-          <p className="text-sm text-text-secondary">No account selected.</p>
-        )}
-        {summaryError && !summaryLoading && !accountLoading && selectedAccount && (
-          <p role="alert" className="text-sm text-danger-emphasis">
-            Failed to load account overview.
-          </p>
-        )}
-        {summary && !summaryLoading && !accountLoading && selectedAccount && (
-          <AccountOverviewContent data={summary} />
-        )}
-      </section>
+            <h2 className={sectionHeader}>Performance</h2>
+            {analytics && <PerformanceContent data={analytics as AnalyticsSummary} />}
+            {analyticsError && !analytics && (
+              <p role="alert" className="text-sm text-danger-emphasis">
+                Failed to load performance data.
+              </p>
+            )}
+            {!analytics && !analyticsError && (
+              <div className="h-10 w-2/3 animate-pulse rounded bg-surface-subtle" />
+            )}
+          </section>
 
-      {/* Section 2 — Performance */}
-      <section
-        aria-label="Performance"
-        className="rounded-xl border border-border bg-surface-base p-5"
-      >
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Performance
-        </h2>
-        {analytics && <PerformanceContent data={analytics as AnalyticsSummary} />}
-        {analyticsError && !analytics && (
-          <p role="alert" className="text-sm text-danger-emphasis">
-            Failed to load performance data.
-          </p>
-        )}
-        {!analytics && !analyticsError && (
-          <div className="h-10 w-2/3 animate-pulse rounded bg-surface-subtle" />
-        )}
-      </section>
+          <section
+            aria-label="Streaks"
+            className="rounded-xl border border-border bg-surface-base p-5"
+          >
+            <h2 className={sectionHeader}>Current streak</h2>
+            {streakData && <StreaksContent data={streakData} />}
+            {streaksError && !streakData && (
+              <p role="alert" className="text-sm text-danger-emphasis">
+                Failed to load streak data.
+              </p>
+            )}
+            {!streakData && !streaksError && (
+              <div className="h-8 w-1/4 animate-pulse rounded bg-surface-subtle" />
+            )}
+          </section>
+        </div>
+      </div>
 
-      {/* Section 3 — Streaks */}
-      <section
-        aria-label="Streaks"
-        className="rounded-xl border border-border bg-surface-base p-5"
-      >
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Streaks
-        </h2>
-        {streakData && <StreaksContent data={streakData} />}
-        {streaksError && !streakData && (
-          <p role="alert" className="text-sm text-danger-emphasis">
-            Failed to load streak data.
-          </p>
-        )}
-        {!streakData && !streaksError && (
-          <div className="h-8 w-1/4 animate-pulse rounded bg-surface-subtle" />
-        )}
-      </section>
+      {/* Row 2 — Recent trades + journal side by side */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-5">
+        {/* Recent trades — 3/5 */}
+        <section
+          aria-label="Recent Trades"
+          className="rounded-xl border border-border bg-surface-base p-5 xl:col-span-3"
+        >
+          <h2 className={sectionHeader}>Recent trades</h2>
+          {(tradesLoading || accountLoading) && (
+            <div aria-busy="true" className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </div>
+          )}
+          {!accountLoading && !selectedAccount && (
+            <p className="text-sm text-text-secondary">No account selected.</p>
+          )}
+          {tradesError && !tradesLoading && !accountLoading && selectedAccount && (
+            <p role="alert" className="text-sm text-danger-emphasis">
+              Failed to load recent trades.
+            </p>
+          )}
+          {!tradesLoading && !tradesError && !accountLoading && selectedAccount && trades !== undefined && trades.length === 0 && (
+            <p className="text-sm text-text-secondary">No closed trades yet.</p>
+          )}
+          {!tradesLoading && !tradesError && !accountLoading && selectedAccount && trades && trades.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="pb-2 pr-4 text-xs font-medium text-text-muted">Date</th>
+                    <th className="pb-2 pr-4 text-xs font-medium text-text-muted">Symbol</th>
+                    <th className="pb-2 pr-4 text-xs font-medium text-text-muted">Dir</th>
+                    <th className="pb-2 pr-4 text-xs font-medium text-text-muted">P&L</th>
+                    <th className="pb-2 text-xs font-medium text-text-muted">R</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trades.map((trade) => (
+                    <TradeRow key={trade.id} trade={trade} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
-      {/* Section 4 — Recent Trades */}
-      <section
-        aria-label="Recent Trades"
-        className="rounded-xl border border-border bg-surface-base p-5"
-      >
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Recent Trades
-        </h2>
-        {(tradesLoading || accountLoading) && (
-          <div aria-busy="true" className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <SkeletonRow key={i} />
-            ))}
-          </div>
-        )}
-        {!accountLoading && !selectedAccount && (
-          <p className="text-sm text-text-secondary">No account selected.</p>
-        )}
-        {tradesError && !tradesLoading && !accountLoading && selectedAccount && (
-          <p role="alert" className="text-sm text-danger-emphasis">
-            Failed to load recent trades.
-          </p>
-        )}
-        {!tradesLoading && !tradesError && !accountLoading && selectedAccount && trades !== undefined && trades.length === 0 && (
-          <p className="text-sm text-text-secondary">No closed trades yet.</p>
-        )}
-        {!tradesLoading && !tradesError && !accountLoading && selectedAccount && trades && trades.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="pb-2 pr-4 text-xs uppercase tracking-wider text-text-secondary">
-                    Date
-                  </th>
-                  <th className="pb-2 pr-4 text-xs uppercase tracking-wider text-text-secondary">
-                    Symbol
-                  </th>
-                  <th className="pb-2 pr-4 text-xs uppercase tracking-wider text-text-secondary">
-                    Dir
-                  </th>
-                  <th className="pb-2 pr-4 text-xs uppercase tracking-wider text-text-secondary">
-                    P&L
-                  </th>
-                  <th className="pb-2 text-xs uppercase tracking-wider text-text-secondary">R</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trades.map((trade) => (
-                  <TradeRow key={trade.id} trade={trade} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Section 5 — Recent Journal */}
-      <section
-        aria-label="Recent Journal"
-        className="rounded-xl border border-border bg-surface-base p-5"
-      >
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Recent Journal
-        </h2>
-        {(journalLoading || accountLoading) && (
-          <div aria-busy="true" className="space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <SkeletonRow key={i} />
-            ))}
-          </div>
-        )}
-        {!accountLoading && !selectedAccount && (
-          <p className="text-sm text-text-secondary">No account selected.</p>
-        )}
-        {journalError && !journalLoading && !accountLoading && selectedAccount && (
-          <p role="alert" className="text-sm text-danger-emphasis">
-            Failed to load recent journal entries.
-          </p>
-        )}
-        {!journalLoading && !journalError && !accountLoading && selectedAccount && journal !== undefined && journal.length === 0 && (
-          <p className="text-sm text-text-secondary">No journal entries yet.</p>
-        )}
-        {!journalLoading && !journalError && !accountLoading && selectedAccount && journal && journal.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="pb-2 pr-4 text-xs uppercase tracking-wider text-text-secondary">
-                    Date
-                  </th>
-                  <th className="pb-2 pr-4 text-xs uppercase tracking-wider text-text-secondary">
-                    Symbol
-                  </th>
-                  <th className="pb-2 pr-4 text-xs uppercase tracking-wider text-text-secondary">
-                    Score
-                  </th>
-                  <th className="pb-2 text-xs uppercase tracking-wider text-text-secondary">
-                    Emotion
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {journal.map((entry) => (
-                  <JournalRow key={entry.trade_id} entry={entry} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+        {/* Recent journal — 2/5 */}
+        <section
+          aria-label="Recent Journal"
+          className="rounded-xl border border-border bg-surface-base p-5 xl:col-span-2"
+        >
+          <h2 className={sectionHeader}>Recent journal</h2>
+          {(journalLoading || accountLoading) && (
+            <div aria-busy="true" className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </div>
+          )}
+          {!accountLoading && !selectedAccount && (
+            <p className="text-sm text-text-secondary">No account selected.</p>
+          )}
+          {journalError && !journalLoading && !accountLoading && selectedAccount && (
+            <p role="alert" className="text-sm text-danger-emphasis">
+              Failed to load recent journal entries.
+            </p>
+          )}
+          {!journalLoading && !journalError && !accountLoading && selectedAccount && journal !== undefined && journal.length === 0 && (
+            <p className="text-sm text-text-secondary">No journal entries yet.</p>
+          )}
+          {!journalLoading && !journalError && !accountLoading && selectedAccount && journal && journal.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="pb-2 pr-4 text-xs font-medium text-text-muted">Date</th>
+                    <th className="pb-2 pr-4 text-xs font-medium text-text-muted">Symbol</th>
+                    <th className="pb-2 pr-4 text-xs font-medium text-text-muted">Score</th>
+                    <th className="pb-2 text-xs font-medium text-text-muted">Emotion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {journal.map((entry) => (
+                    <JournalRow key={entry.trade_id} entry={entry} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   )
 }
